@@ -1,0 +1,236 @@
+"""
+Outscraper API client for Google My Business scraping.
+"""
+import asyncio
+from typing import List, Dict, Any, Optional
+from outscraper import ApiClient
+from core.config import get_settings
+from core.exceptions import ExternalAPIException
+import logging
+
+logger = logging.getLogger(__name__)
+settings = get_settings()
+
+
+class OutscraperClient:
+    """
+    Wrapper for Outscraper API with error handling and rate limiting.
+    """
+    
+    def __init__(self, api_key: Optional[str] = None):
+        """
+        Initialize Outscraper client.
+        
+        Args:
+            api_key: Outscraper API key (defaults to settings)
+        """
+        self.api_key = api_key or settings.OUTSCRAPER_API_KEY
+        self.client = ApiClient(api_key=self.api_key)
+        self.rate_limit_delay = 1.0  # seconds between requests
+        
+    async def search_businesses(
+        self,
+        query: str,
+        city: str,
+        state: str,
+        country: str = "US",
+        limit: int = 50,
+        language: str = "en"
+    ) -> List[Dict[str, Any]]:
+        """
+        Search for businesses on Google Maps.
+        
+        Args:
+            query: Search query (e.g., "Plumbers", "Pizza Restaurant")
+            city: City name
+            state: State code (e.g., "TX", "CA")
+            country: Country code (default: "US")
+            limit: Maximum number of results
+            language: Language code (default: "en")
+            
+        Returns:
+            List of business dictionaries
+            
+        Raises:
+            ExternalAPIException: If the API request fails
+        """
+        try:
+            # Build search query
+            location = f"{city}, {state}, {country}"
+            search_query = f"{query} in {location}"
+            
+            logger.info(f"Searching Outscraper: {search_query} (limit: {limit})")
+            
+            # Run synchronous API call in thread pool
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(
+                None,
+                self._search_sync,
+                search_query,
+                limit,
+                language
+            )
+            
+            # Normalize results
+            normalized = self._normalize_results(results)
+            
+            logger.info(f"Found {len(normalized)} businesses")
+            return normalized
+            
+        except Exception as e:
+            logger.error(f"Outscraper API error: {str(e)}")
+            raise ExternalAPIException(f"Failed to scrape businesses: {str(e)}")
+    
+    def _search_sync(
+        self,
+        query: str,
+        limit: int,
+        language: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Synchronous search call to Outscraper.
+        This runs in a thread pool to avoid blocking.
+        """
+        results = self.client.google_maps_search(
+            query=[query],
+            limit=limit,
+            language=language,
+            region=None,
+            drop_duplicates=True
+        )
+        
+        # Outscraper returns a list of lists
+        if results and len(results) > 0:
+            return results[0]  # Get first result set
+        return []
+    
+    def _normalize_results(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Normalize Outscraper results to our standard format.
+        
+        Outscraper fields → Our fields:
+        - name → name
+        - full_address → address
+        - city → city
+        - state → state
+        - postal_code → zip_code
+        - country_code → country
+        - latitude → latitude
+        - longitude → longitude
+        - phone → phone
+        - site → website_url
+        - type → category
+        - rating → rating
+        - reviews → review_count
+        - reviews_data → reviews_data (for AI analysis)
+        - place_id → gmb_place_id
+        - google_id → gmb_id
+        - photos_data_id → photos_urls
+        """
+        normalized = []
+        
+        for business in results:
+            try:
+                # Extract review data for AI analysis
+                reviews_data = business.get("reviews_data", [])
+                review_texts = [
+                    {
+                        "text": review.get("review_text", ""),
+                        "rating": review.get("review_rating"),
+                        "date": review.get("review_datetime_utc")
+                    }
+                    for review in reviews_data[:10]  # Top 10 reviews
+                    if review.get("review_text")
+                ]
+                
+                # Extract photo URLs
+                photos = business.get("photos_data_id", [])
+                photo_urls = [photo for photo in photos[:10] if photo]  # Top 10 photos
+                
+                normalized_business = {
+                    # Identity
+                    "gmb_id": business.get("google_id"),
+                    "gmb_place_id": business.get("place_id"),
+                    "name": business.get("name", "").strip(),
+                    
+                    # Contact
+                    "phone": business.get("phone"),
+                    "website_url": business.get("site"),
+                    "email": None,  # Not provided by Outscraper
+                    
+                    # Location
+                    "address": business.get("full_address"),
+                    "city": business.get("city"),
+                    "state": business.get("state"),
+                    "zip_code": business.get("postal_code"),
+                    "country": business.get("country_code", "US"),
+                    "latitude": business.get("latitude"),
+                    "longitude": business.get("longitude"),
+                    
+                    # Business Info
+                    "category": business.get("type"),
+                    "subcategory": business.get("subtypes", [None])[0] if business.get("subtypes") else None,
+                    "rating": business.get("rating"),
+                    "review_count": business.get("reviews", 0),
+                    
+                    # Media
+                    "photos_urls": photo_urls,
+                    "logo_url": photos[0] if photos else None,
+                    
+                    # Raw data for AI processing
+                    "reviews_data": review_texts,
+                    
+                    # Metadata
+                    "raw_data": business  # Store original for debugging
+                }
+                
+                # Only add if has name (required field)
+                if normalized_business["name"]:
+                    normalized.append(normalized_business)
+                    
+            except Exception as e:
+                logger.warning(f"Failed to normalize business: {str(e)}")
+                continue
+        
+        return normalized
+    
+    async def get_business_by_place_id(self, place_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get detailed business information by Google Place ID.
+        
+        Args:
+            place_id: Google Place ID
+            
+        Returns:
+            Business dictionary or None if not found
+        """
+        try:
+            logger.info(f"Fetching business by place_id: {place_id}")
+            
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(
+                None,
+                self._get_by_place_id_sync,
+                place_id
+            )
+            
+            if results:
+                normalized = self._normalize_results(results)
+                return normalized[0] if normalized else None
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch business: {str(e)}")
+            return None
+    
+    def _get_by_place_id_sync(self, place_id: str) -> List[Dict[str, Any]]:
+        """Synchronous place_id lookup."""
+        results = self.client.google_maps_search(
+            query=[f"place_id:{place_id}"],
+            limit=1
+        )
+        
+        if results and len(results) > 0:
+            return results[0]
+        return []
