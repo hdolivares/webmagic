@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recurrente API: Technical and Operational Analysis</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 900px; margin: 0 auto; padding: 20px; color: #333; }
+        h1 { border-bottom: 2px solid #eaeaea; padding-bottom: 10px; }
+        h2 { margin-top: 40px; border-bottom: 1px solid #eaeaea; padding-bottom: 5px; color: #2c3e50; }
+        h3 { margin-top: 30px; color: #34495e; }
+        code { background-color: #f6f8fa; padding: 2px 5px; border-radius: 3px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; font-size: 0.9em; color: #d63384; }
+        pre { background-color: #f6f8fa; padding: 16px; border-radius: 6px; overflow-x: auto; border: 1px solid #e1e4e8; }
+        pre code { background-color: transparent; padding: 0; color: #24292e; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+        th, td { border: 1px solid #dfe2e5; padding: 10px; text-align: left; }
+        th { background-color: #f6f8fa; font-weight: 600; }
+        .warning { background-color: #fff5b1; padding: 15px; border-left: 5px solid #ffeb3b; margin: 20px 0; }
+        .insight { background-color: #e3f2fd; padding: 15px; border-left: 5px solid #2196f3; margin: 20px 0; }
+        .citation { font-size: 0.75em; color: #777; vertical-align: super; text-decoration: none; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Comprehensive Technical and Operational Analysis of Recurrente Payment Infrastructure</h1>
+        <p><em>Target Audience: Systems Architects, CTOs, and Lead Developers.</em></p>
+    </header>
+
+    <main>
+        <section id="executive-introduction">
+            <h2>1. Executive Introduction: The Digital Payment Landscape in Guatemala</h2>
+            <p>
+                [cite_start]Recurrente (Soluciones En Tecnologia, S.A.) [cite: 4] [cite_start]functions as a comprehensive financial layer that synchronizes disparate commercial channels—from e-commerce to POS systems[cite: 7]. [cite_start]It addresses the "time-to-market" friction in Guatemala by offering immediate onboarding and a RESTful architecture[cite: 7].
+            </p>
+
+            <article id="market-positioning">
+                <h3>1.1 Corporate Profile and Market Positioning</h3>
+                <p>Recurrente segments its services into two tiers:</p>
+                <ul>
+                    [cite_start]<li><strong>Recurrente Personal:</strong> For P2P transfers and bill splitting[cite: 11].</li>
+                    [cite_start]<li><strong>Recurrente Business (Empresa):</strong> The focus of this analysis, providing API access for custom apps and high-volume processing[cite: 13].</li>
+                </ul>
+                <div class="insight">
+                    [cite_start]<strong>Critical Differentiator:</strong> Recurrente uses a <strong>24-hour settlement model</strong>, depositing funds the next business day, unlike the T+2/T+3 cycles of traditional acquirers[cite: 16].
+                </div>
+            </article>
+
+            <article id="value-proposition">
+                <h3>1.2 The Value Proposition</h3>
+                <p>
+                    [cite_start]Recurrente acts as a <strong>Payment Service Provider (PSP) Aggregator</strong>[cite: 18]. [cite_start]Merchants contract with Recurrente rather than directly with banks[cite: 19].
+                </p>
+                <ul>
+                    [cite_start]<li><strong>Fee Structure:</strong> 4.5% + Q2.00 per transaction[cite: 21].</li>
+                    [cite_start]<li><strong>Includes:</strong> Fraud protection, gateway access, and rapid settlement[cite: 21].</li>
+                </ul>
+            </article>
+        </section>
+
+        <section id="api-architecture">
+            <h2>2. API Architecture and Security Protocols</h2>
+            <p>
+                [cite_start]The API follows <strong>RESTful principles</strong> using standard HTTP verbs and JSON payloads[cite: 24].
+            </p>
+
+            <article id="authentication">
+                <h3>2.1 Authentication Mechanisms</h3>
+                <p>
+                    [cite_start]Authentication uses a static key-pair model in the HTTP headers, eschewing complex OAuth flows[cite: 26].
+                </p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Header Name</th>
+                            <th>Description</th>
+                            <th>Security Implication</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>X-PUBLIC-KEY</code></td>
+                            <td>Merchant account identifier.</td>
+                            [cite_start]<td>Routing identifier[cite: 30].</td>
+                        </tr>
+                        <tr>
+                            <td><code>X-SECRET-KEY</code></td>
+                            <td>Private signing credential.</td>
+                            [cite_start]<td><strong>Critical Secret.</strong> Authorizes fund movement[cite: 30].</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p>
+                    <strong>Environment Switching:</strong> There is no separate sandbox URL. [cite_start]The environment (Live vs. Sandbox) is determined <em>strictly</em> by which keys (Live or Test) are used in the header[cite: 32].
+                </p>
+            </article>
+
+            <article id="endpoints">
+                <h3>2.2 Endpoint Structure</h3>
+                [cite_start]<p>Base URL: <code>https://app.recurrente.com/api/</code> [cite: 35]</p>
+                <ul>
+                    [cite_start]<li>Checkouts: <code>/api/checkouts/</code> [cite: 37]</li>
+                    [cite_start]<li>Products: <code>/api/products/</code> [cite: 38]</li>
+                    [cite_start]<li>Refunds: <code>/api/refunds</code> [cite: 39]</li>
+                </ul>
+            </article>
+
+            <article id="formats">
+                <h3>2.3 Request/Response Formats</h3>
+                <p>The API strictly consumes and produces JSON. [cite_start]Requests must include <code>Content-Type: application/json</code>[cite: 42, 43].</p>
+            </article>
+        </section>
+
+        <section id="checkout-api">
+            <h2>3. The Checkout API: One-Time Payments</h2>
+            <p>Recurrente uses a session-based model. [cite_start]The developer creates a checkout session server-side, and the platform handles the sensitive data entry[cite: 48, 49].</p>
+
+            <article id="create-checkout">
+                <h3>3.1 Creating a Checkout Session</h3>
+                [cite_start]<p><strong>Endpoint:</strong> <code>POST https://app.recurrente.com/api/checkouts/</code> [cite: 53]</p>
+                [cite_start]<p>The payload supports <strong>dynamic cart modeling</strong> (defining items at the moment of purchase)[cite: 52].</p>
+                
+                <pre><code class="language-json">{
+  "items": [
+    {
+      "name": "Product Name", 
+      "currency": "GTQ", 
+      "amount": 100
+    }
+  ],
+  "cancel_url": "https://merchant.com/cart",
+  "success_url": "https://merchant.com/thank-you"
+}</code></pre>
+                
+                <ul>
+                    [cite_start]<li><strong>items[currency]:</strong> Supports <code>GTQ</code> (Quetzales) and <code>USD</code>[cite: 64].</li>
+                    [cite_start]<li><strong>items[name]:</strong> Product string displayed to the user[cite: 62].</li>
+                </ul>
+            </article>
+
+            <article id="checkout-status">
+                <h3>3.2 Retrieving Checkout Status</h3>
+                [cite_start]<p><strong>Endpoint:</strong> <code>GET https://app.recurrente.com/api/checkouts/{{checkoutId}}</code> [cite: 71]</p>
+                <p>The response object is critical for reconciliation:</p>
+                <ul>
+                    [cite_start]<li><code>id</code>: Unique identifier (e.g., <code>ch_...</code>)[cite: 74].</li>
+                    [cite_start]<li><code>status</code>: Current state (<code>paid</code>, <code>pending</code>, <code>failed</code>)[cite: 74].</li>
+                    <li><code>live_mode</code>: <strong>Crucial Validation.</strong> <code>true</code> = Real money; [cite_start]<code>false</code> = Sandbox[cite: 74].</li>
+                </ul>
+            </article>
+        </section>
+
+        <section id="subscriptions">
+            <h2>4. Subscription Engine Mechanics</h2>
+            [cite_start]<p>Subscriptions are treated as a specialized type of payment object within the system[cite: 89].</p>
+
+            <article id="subscription-model">
+                <h3>4.1 Data Model</h3>
+                <p>A successful subscription checkout returns a payment object containing:</p>
+                <pre><code class="language-json">"paymentable": {
+    "type": "Subscription",
+    "id": "su_nehndm7j",
+    "tax_name": null,
+    "tax_id": null
+}</code></pre>
+                [cite_start]<p>The <code>id</code> (su_...) is distinct from the checkout ID[cite: 97].</p>
+            </article>
+
+            <article id="create-subscription">
+                <h3>4.2 Workflow</h3>
+                <ol>
+                    [cite_start]<li><strong>Define Product:</strong> Create a product via <code>/api/products/</code> with a billing interval[cite: 107].</li>
+                    [cite_start]<li><strong>Initiate Checkout:</strong> Create a checkout referencing this product[cite: 108].</li>
+                    [cite_start]<li><strong>Recurring Capture:</strong> Recurrente tokenizes the card and charges automatically[cite: 110].</li>
+                </ol>
+            </article>
+        </section>
+
+        <section id="sandbox-testing">
+            <h2>5. Sandbox Environment and Testing Nuances</h2>
+            <p>The sandbox is activated by using <strong>Test Keys</strong>. [cite_start]Links generated in this mode display a "PRUEBA" notice[cite: 126].</p>
+
+            <article id="test-cards">
+                <h3>5.1 Simulation Credentials</h3>
+                [cite_start]<p>To simulate a successful payment (Status: Paid)[cite: 130]:</p>
+                <ul>
+                    <li><strong>Card:</strong> <code>4242 4242 4242 4242</code></li>
+                    <li><strong>Expiry:</strong> Any future date</li>
+                    <li><strong>CVC:</strong> Any 3 digits</li>
+                </ul>
+            </article>
+
+            <div class="warning">
+                <h3>5.2 Critical Limitation: Webhooks</h3>
+                <p>
+                    [cite_start]<strong>"Checkouts created with TEST keys... will not trigger webhooks."</strong> [cite: 135]
+                </p>
+                <p>
+                    <strong>Implication:</strong> You cannot rely on the sandbox to test end-to-end fulfillment logic. [cite_start]You must build a manual trigger or use tools like Postman to mock the webhook payload sent to your local server[cite: 139, 140].
+                </p>
+            </div>
+        </section>
+
+        <section id="integrations">
+            <h2>6. Ecosystem Integration</h2>
+            
+            <article id="odoo">
+                <h3>6.1 Odoo ERP</h3>
+                [cite_start]<p>Integration requires "Developer Mode" in Odoo[cite: 149].</p>
+                [cite_start]<p><strong>Mandatory Webhook URL:</strong> <code>https://[your-domain]/payment/recurrente/webhook</code>[cite: 151].</p>
+            </article>
+        </section>
+
+        <section id="financial-ops">
+            <h2>7. Financial Operations</h2>
+            
+            <article id="settlement">
+                <h3>7.1 Settlement & Fees</h3>
+                [cite_start]<p><strong>Settlement:</strong> 24 hours (next business day)[cite: 162].</p>
+                [cite_start]<p><strong>Commission:</strong> 4.5% + Q2.00 (composed of ~4.02% base + IVA)[cite: 167, 169].</p>
+            </article>
+
+            <article id="refunds">
+                <h3>7.2 Refund Policy (The "Same Day" Rule)</h3>
+                <p>
+                    [cite_start]If a transaction is refunded via <code>/api/refunds</code> on the <strong>same day</strong> it was created, Recurrente refunds <strong>100% of the amount</strong>, including the commission[cite: 175].
+                </p>
+                <p><em>Strategy: Implement an "Undo" button in your UI to utilize this window.</em></p>
+            </article>
+        </section>
+
+        <section id="implementation-guide">
+            <h2>8. Strategic Implementation Checklist</h2>
+            <ul>
+                [cite_start]<li><strong>Credential Isolation:</strong> Store <code>X-SECRET-KEY</code> in environment variables, never in client-side code[cite: 181].</li>
+                <li><strong>Currency:</strong> Explicitly set <code>currency: "GTQ"</code> or <code>"USD"</code>. [cite_start]Do not rely on defaults[cite: 182].</li>
+                [cite_start]<li><strong>Mock Webhooks:</strong> Create a local script to POST sample JSON payloads to test your listeners, as the Sandbox will not fire them[cite: 183].</li>
+                <li><strong>Handling Asynchrony:</strong> Do not rely on the <code>success_url</code> for fulfillment. [cite_start]Poll the API or wait for the Webhook (in Production)[cite: 189].</li>
+            </ul>
+        </section>
+    </main>
+
+    <footer>
+        <hr>
+        [cite_start]<p><em>Generated based on provided technical documentation sources [cite: 1-207].</em></p>
+    </footer>
+</body>
+</html>
