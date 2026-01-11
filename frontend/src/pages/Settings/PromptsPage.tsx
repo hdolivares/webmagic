@@ -11,6 +11,7 @@ interface PromptTemplate {
   id: string
   agent_name: string
   description: string
+  sections_count: number
 }
 
 interface PromptSetting {
@@ -30,7 +31,7 @@ const AGENT_ICONS: Record<string, any> = {
   email_composer: Mail,
 }
 
-export const SettingsPage = () => {
+export function PromptsPage() {
   const [templates, setTemplates] = useState<PromptTemplate[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
   const [settings, setSettings] = useState<PromptSetting[]>([])
@@ -145,7 +146,7 @@ export const SettingsPage = () => {
                       {template.agent_name.replace('_', ' ')}
                     </div>
                     <div className="text-sm text-secondary">
-                      {template.description}
+                      {template.sections_count} sections
                     </div>
                   </div>
                 </div>
@@ -162,6 +163,7 @@ export const SettingsPage = () => {
                 <h2 className="card-title capitalize">
                   {currentTemplate.agent_name.replace('_', ' ')} Prompts
                 </h2>
+                <div className="text-secondary">{currentTemplate.description}</div>
               </div>
 
               <div className="space-y-3">
