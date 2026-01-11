@@ -57,7 +57,7 @@ US_CITIES = [
 async def init_campaign():
     """Initialize the complete campaign system."""
     print("=" * 70)
-    print("🚀 WebMagic Discovery Campaign Initialization")
+    print("WebMagic Discovery Campaign Initialization")
     print("=" * 70)
     print()
     
@@ -79,26 +79,26 @@ async def init_campaign():
         existing_count = existing_result.scalar() or 0
         
         if existing_count > 0:
-            print(f"⚠️  Warning: {existing_count:,} coverage grids already exist")
+            print(f"WARNING: {existing_count:,} coverage grids already exist")
             response = input("Continue and add more? (y/n): ")
             if response.lower() != 'y':
-                print("❌ Aborted")
+                print("ABORTED")
                 return
             print()
         
-        print(f"📍 Cities to process: {len(US_CITIES)}")
-        print(f"📋 Business categories: {len(BUSINESS_CATEGORIES)}")
-        print(f"🎯 Total combinations: {len(US_CITIES) * len(BUSINESS_CATEGORIES):,}")
-        print(f"💰 Estimated cost (@$0.50/search): ${len(US_CITIES) * len(BUSINESS_CATEGORIES) * 0.50:,.2f}")
+        print(f"Cities to process: {len(US_CITIES)}")
+        print(f"Business categories: {len(BUSINESS_CATEGORIES)}")
+        print(f"Total combinations: {len(US_CITIES) * len(BUSINESS_CATEGORIES):,}")
+        print(f"Estimated cost (@$0.50/search): ${len(US_CITIES) * len(BUSINESS_CATEGORIES) * 0.50:,.2f}")
         print()
         
         response = input("Proceed with initialization? (y/n): ")
         if response.lower() != 'y':
-            print("❌ Aborted")
+            print("ABORTED")
             return
         
         print()
-        print("🔄 Creating coverage grids...")
+        print("Creating coverage grids...")
         print()
         
         created = 0
@@ -143,18 +143,18 @@ async def init_campaign():
                 # Commit in batches
                 if created % batch_size == 0:
                     await session.commit()
-                    print(f"  ✅ Created: {created:,} | Skipped: {skipped:,}")
+                    print(f"  Created: {created:,} | Skipped: {skipped:,}")
         
         # Final commit
         await session.commit()
         
         print()
         print("=" * 70)
-        print("✨ Campaign Initialization Complete!")
+        print("Campaign Initialization Complete!")
         print("=" * 70)
-        print(f"✅ Created: {created:,} new coverage grids")
-        print(f"⏭️  Skipped: {skipped:,} existing grids")
-        print(f"📊 Total grids: {created + skipped:,}")
+        print(f"Created: {created:,} new coverage grids")
+        print(f"Skipped: {skipped:,} existing grids")
+        print(f"Total grids: {created + skipped:,}")
         print()
         
         # Show priority breakdown
@@ -165,18 +165,18 @@ async def init_campaign():
             ).group_by(CoverageGrid.priority)
         )
         
-        print("🎯 Priority Breakdown:")
+        print("Priority Breakdown:")
         for row in sorted(result, key=lambda x: x.priority, reverse=True):
             print(f"  Priority {row.priority}: {row.count:,} grids")
         
         print()
-        print("📈 Next Steps:")
+        print("Next Steps:")
         print("  1. Review campaign at: http://localhost:3000/coverage")
         print("  2. Start high-priority searches first (Priority 9-10)")
         print("  3. Monitor progress and business discovery")
         print("  4. Adjust categories based on results")
         print()
-        print("🚀 Ready to discover businesses!")
+        print("Ready to discover businesses!")
 
 
 def _calculate_priority(population: int, profit_score: int) -> int:

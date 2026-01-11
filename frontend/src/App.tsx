@@ -17,6 +17,7 @@ import { BusinessesPage } from '@/pages/Businesses/BusinessesPage'
 import { SitesPage } from '@/pages/Sites/SitesPage'
 import { CampaignsPage } from '@/pages/Campaigns/CampaignsPage'
 import { CustomersPage } from '@/pages/Customers/CustomersPage'
+import { CoveragePage } from '@/pages/Coverage/CoveragePage'
 import { SettingsPage } from '@/pages/Settings/SettingsPage'
 
 // Create React Query client
@@ -77,6 +78,7 @@ function App() {
             <Route path="sites" element={<SitesPage />} />
             <Route path="campaigns" element={<CampaignsPage />} />
             <Route path="customers" element={<CustomersPage />} />
+            <Route path="coverage" element={<CoveragePage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
 

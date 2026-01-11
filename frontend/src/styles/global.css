@@ -290,6 +290,180 @@
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background-color: var(--color-border);
   }
+
+  /* ========== PAGE LAYOUTS ========== */
+  
+  .page-container {
+    @apply p-6 space-y-6 max-w-7xl mx-auto;
+  }
+
+  .loading-screen {
+    @apply flex items-center justify-center h-screen text-text-secondary;
+  }
+
+  /* ========== STATS & METRICS ========== */
+  
+  .stats-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-md;
+  }
+
+  .stat-label {
+    @apply text-sm text-text-secondary;
+  }
+
+  .stat-value {
+    @apply text-3xl font-bold mt-2;
+  }
+
+  .stat-meta {
+    @apply text-sm text-text-tertiary mt-1;
+  }
+
+  /* ========== PROGRESS BARS ========== */
+  
+  .progress-bar-wrapper {
+    @apply w-full bg-surface rounded-full h-6 overflow-hidden;
+  }
+
+  .progress-bar {
+    @apply bg-gradient-to-r from-primary to-success h-full flex items-center justify-center text-white text-sm font-medium transition-all duration-500;
+  }
+
+  .progress-labels {
+    @apply flex justify-between mt-2 text-sm;
+  }
+
+  .progress-inline {
+    @apply flex items-center justify-center gap-2;
+  }
+
+  .progress-bar-small {
+    @apply w-24 bg-surface rounded-full h-2;
+  }
+
+  .progress-fill {
+    @apply bg-primary h-2 rounded-full transition-all duration-300;
+  }
+
+  .progress-text {
+    @apply text-sm;
+  }
+
+  /* ========== FORMS ========== */
+  
+  .form-section {
+    @apply space-y-md;
+  }
+
+  .form-row {
+    @apply flex items-center justify-between;
+  }
+
+  .form-label {
+    @apply block text-sm font-medium mb-2;
+  }
+
+  .form-hint {
+    @apply text-sm text-text-secondary mt-1;
+  }
+
+  .form-group {
+    @apply space-y-2;
+  }
+
+  .form-section-nested {
+    @apply space-y-3 pl-4 border-l-2 border-primary;
+  }
+
+  .input-number {
+    @apply w-48;
+  }
+
+  /* ========== TOGGLE SWITCH ========== */
+  
+  .toggle-switch {
+    @apply relative inline-flex items-center cursor-pointer;
+  }
+
+  .toggle-switch input {
+    @apply sr-only;
+  }
+
+  .toggle-slider {
+    @apply w-11 h-6 bg-surface-secondary rounded-full transition-colors duration-200;
+    position: relative;
+  }
+
+  .toggle-slider::after {
+    content: '';
+    @apply absolute top-[2px] left-[2px] bg-white border border-border rounded-full h-5 w-5 transition-transform duration-200;
+  }
+
+  .toggle-switch input:checked + .toggle-slider {
+    @apply bg-primary;
+  }
+
+  .toggle-switch input:checked + .toggle-slider::after {
+    transform: translateX(20px);
+  }
+
+  .toggle-switch input:focus + .toggle-slider {
+    @apply ring-4 ring-primary/30;
+  }
+
+  /* ========== TABS ========== */
+  
+  .tabs-container {
+    @apply border-b border-border;
+  }
+
+  .tabs {
+    @apply flex gap-md;
+  }
+
+  .tab {
+    @apply pb-2 px-1 border-b-2 border-transparent text-text-secondary hover:text-text-primary transition-colors duration-[var(--transition-fast)];
+  }
+
+  .tab-active {
+    @apply border-primary text-primary;
+  }
+
+  /* ========== DATA TABLES ========== */
+  
+  .data-table {
+    @apply w-full;
+  }
+
+  .data-table thead {
+    @apply bg-surface-secondary;
+  }
+
+  .data-table th {
+    @apply px-md py-sm text-xs font-medium text-text-secondary uppercase tracking-wider;
+  }
+
+  .data-table tbody {
+    @apply divide-y divide-border;
+  }
+
+  .data-table tr {
+    @apply hover:bg-surface-hover transition-colors duration-[var(--transition-fast)];
+  }
+
+  .data-table td {
+    @apply px-md py-3 text-sm;
+  }
+
+  .table-container {
+    @apply overflow-x-auto;
+  }
+
+  /* ========== BUTTON GROUP ========== */
+  
+  .btn-group {
+    @apply flex gap-3;
+  }
 }
 
 /* ============================================
