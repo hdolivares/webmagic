@@ -133,13 +133,13 @@ export const SettingsPage = () => {
                 key={template.id}
                 className={`cursor-pointer transition-all ${
                   selectedTemplate === template.id
-                    ? 'ring-2 ring-primary'
+                    ? 'ring-2 ring-primary-500'
                     : 'hover:bg-surface-hover'
                 }`}
                 onClick={() => setSelectedTemplate(template.id)}
               >
                 <div className="flex items-center gap-3">
-                  <Icon className="w-6 h-6 text-primary" />
+                  <Icon className="w-6 h-6 text-primary-600" />
                   <div>
                     <div className="font-semibold capitalize">
                       {template.agent_name.replace('_', ' ')}
@@ -169,7 +169,7 @@ export const SettingsPage = () => {
                   <div
                     key={setting.id}
                     className={`border border-border rounded-lg overflow-hidden transition-all ${
-                      selectedSetting === setting.id ? 'ring-2 ring-primary' : ''
+                      selectedSetting === setting.id ? 'ring-2 ring-primary-500' : ''
                     }`}
                   >
                     <div
