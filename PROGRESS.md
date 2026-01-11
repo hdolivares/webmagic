@@ -836,15 +836,15 @@ Conductor Cycle (5-60 min intervals)
 
 ## 🎯 Next Steps: Phase 8
 
-**Phase 8**: Deployment & Production
+**Phase 8**: Deployment & Production (No Docker)
 
 What we'll build:
-1. **Docker Setup** - Containerization for all services
-2. **Nginx Configuration** - Reverse proxy and static hosting
-3. **Domain Setup** - Wildcard subdomain configuration
-4. **Production Database** - PostgreSQL optimization
-5. **Environment Management** - Production configurations
-6. **CI/CD Pipeline** - Automated deployment
-7. **Monitoring Setup** - Logging and metrics
+1. **Nginx Configuration** - Virtual hosting for thousands of sites with wildcard subdomains
+2. **Process Management** - systemd services for FastAPI, Celery workers, Beat scheduler
+3. **Domain Setup** - Wildcard DNS configuration (*.webmagic.com)
+4. **Static Site Hosting** - File system structure for generated sites
+5. **Environment Management** - Production configurations and secrets
+6. **SSL/HTTPS** - Let's Encrypt with auto-renewal
+7. **Monitoring Setup** - Logging, metrics, and health endpoints
 
-Ready when you are! 🚀
+**Tech Stack**: Raw Linux processes, Nginx virtual hosting, systemd - NO Docker! 🚀
