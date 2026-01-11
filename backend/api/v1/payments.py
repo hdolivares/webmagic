@@ -26,7 +26,7 @@ from services.payments.webhook_handler import WebhookHandler
 from services.payments.recurrente_client import RecurrenteClient
 from models.user import AdminUser
 
-router = APIRouter()
+router = APIRouter(prefix="/payments", tags=["payments"])
 
 
 # Checkout endpoints (public for customers)

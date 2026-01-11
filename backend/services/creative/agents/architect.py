@@ -2,7 +2,7 @@
 Architect Agent - generates HTML/CSS/JS code for websites.
 Creates responsive, animated, semantic websites based on design brief.
 """
-from typing import Dict, Any
+from typing import Dict, Any, List
 import logging
 
 from services.creative.agents.base import BaseAgent

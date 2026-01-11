@@ -12,9 +12,9 @@ sys.path.insert(0, str(backend_path))
 
 def main():
     """Start the FastAPI development server."""
-    print("🚀 Starting WebMagic API Server...")
-    print("📝 API Docs will be available at: http://localhost:8000/docs")
-    print("🏥 Health check: http://localhost:8000/health")
+    print(">> Starting WebMagic API Server...")
+    print(">> API Docs will be available at: http://localhost:8000/docs")
+    print(">> Health check: http://localhost:8000/health")
     print("\n" + "=" * 60 + "\n")
     
     uvicorn.run(

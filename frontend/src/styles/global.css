@@ -215,19 +215,19 @@
   }
   
   .alert-success {
-    @apply alert bg-success-light border-success text-success-dark dark:bg-success-dark/20 dark:border-success dark:text-success;
+    @apply alert bg-success-light border-success text-success-dark dark:bg-success-dark dark:border-success dark:text-success;
   }
   
   .alert-warning {
-    @apply alert bg-warning-light border-warning text-warning-dark dark:bg-warning-dark/20 dark:border-warning dark:text-warning;
+    @apply alert bg-warning-light border-warning text-warning-dark dark:bg-warning-dark dark:border-warning dark:text-warning;
   }
   
   .alert-error {
-    @apply alert bg-error-light border-error text-error-dark dark:bg-error-dark/20 dark:border-error dark:text-error;
+    @apply alert bg-error-light border-error text-error-dark dark:bg-error-dark dark:border-error dark:text-error;
   }
   
   .alert-info {
-    @apply alert bg-info-light border-info text-info-dark dark:bg-info-dark/20 dark:border-info dark:text-info;
+    @apply alert bg-info-light border-info text-info-dark dark:bg-info-dark dark:border-info dark:text-info;
   }
   
   /* ========== LOADING ========== */

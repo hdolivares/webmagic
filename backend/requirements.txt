@@ -12,6 +12,7 @@ alembic==1.13.1
 pydantic==2.5.3
 pydantic-settings==2.1.0
 python-dotenv==1.0.0
+email-validator==2.3.0  # Required by pydantic for email validation
 
 # Authentication & Security
 python-jose[cryptography]==3.3.0
@@ -22,7 +23,7 @@ bcrypt==4.1.2
 httpx==0.26.0
 
 # AI/LLM
-anthropic==0.9.0
+anthropic==0.75.0
 
 # Task Queue
 celery==5.3.6
@@ -33,7 +34,7 @@ boto3==1.34.28  # AWS SES
 sendgrid==6.11.0
 
 # Web Scraping
-outscraper==3.0.21
+outscraper==6.0.0
 playwright==1.41.2
 
 # Utilities
