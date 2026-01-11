@@ -29,8 +29,22 @@ class CampaignService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.email_generator = EmailGenerator()
-        self.email_sender = EmailSender()
+        self._email_sender = None  # Lazy-loaded when needed
         self.tracker = EmailTracker(db)
+    
+    @property
+    def email_sender(self) -> EmailSender:
+        """Lazy-load email sender only when needed."""
+        if self._email_sender is None:
+            try:
+                self._email_sender = EmailSender()
+            except Exception as e:
+                logger.error(f"Failed to initialize email sender: {e}")
+                raise ValueError(
+                    "Email sender not configured. Set BREVO_API_KEY, SENDGRID_API_KEY, "
+                    "or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY in .env to send emails."
+                )
+        return self._email_sender
     
     async def create_campaign(
         self,
