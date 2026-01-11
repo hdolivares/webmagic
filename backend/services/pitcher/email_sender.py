@@ -1,10 +1,11 @@
 """
-Email sender service with support for AWS SES and SendGrid.
+Email sender service with support for AWS SES, SendGrid, and Brevo.
 """
 from typing import Optional, Dict, Any
 from abc import ABC, abstractmethod
 import logging
 from datetime import datetime
+import httpx
 
 from core.config import get_settings
 from core.exceptions import ExternalAPIException
@@ -157,10 +158,102 @@ class SendGridEmailProvider(EmailProvider):
             raise ExternalAPIException(f"Failed to send email via SendGrid: {str(e)}")
 
 
+class BrevoEmailProvider(EmailProvider):
+    """Brevo (formerly Sendinblue) email provider."""
+    
+    def __init__(self):
+        try:
+            if not settings.BREVO_API_KEY:
+                raise ValueError("BREVO_API_KEY not configured")
+            
+            self.api_key = settings.BREVO_API_KEY
+            self.api_url = "https://api.brevo.com/v3/smtp/email"
+            logger.info("Brevo client initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize Brevo: {str(e)}")
+            raise ExternalAPIException(f"Brevo initialization failed: {str(e)}")
+    
+    async def send_email(
+        self,
+        to_email: str,
+        subject: str,
+        body_text: str,
+        body_html: Optional[str] = None,
+        from_email: Optional[str] = None,
+        reply_to: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Send email via Brevo API."""
+        try:
+            from_addr = from_email or settings.EMAIL_FROM
+            
+            # Extract name from email if format is "Name <email@domain.com>"
+            from_name = settings.APP_NAME
+            if "<" in from_addr:
+                from_name, from_addr = from_addr.split("<")
+                from_name = from_name.strip()
+                from_addr = from_addr.strip(">").strip()
+            
+            # Build request payload
+            payload = {
+                "sender": {
+                    "name": from_name,
+                    "email": from_addr
+                },
+                "to": [
+                    {"email": to_email}
+                ],
+                "subject": subject,
+                "textContent": body_text
+            }
+            
+            # Add HTML content if provided
+            if body_html:
+                payload["htmlContent"] = body_html
+            
+            # Add reply-to if provided
+            if reply_to:
+                payload["replyTo"] = {"email": reply_to}
+            
+            # Send via Brevo API
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    self.api_url,
+                    json=payload,
+                    headers={
+                        "api-key": self.api_key,
+                        "Content-Type": "application/json",
+                        "accept": "application/json"
+                    },
+                    timeout=30.0
+                )
+                
+                response.raise_for_status()
+                result = response.json()
+            
+            message_id = result.get("messageId", "")
+            
+            logger.info(f"Email sent via Brevo: {message_id} to {to_email}")
+            
+            return {
+                "provider": "brevo",
+                "message_id": message_id,
+                "status": "sent",
+                "sent_at": datetime.utcnow().isoformat()
+            }
+            
+        except httpx.HTTPStatusError as e:
+            error_detail = e.response.text
+            logger.error(f"Brevo HTTP error: {e.response.status_code} - {error_detail}")
+            raise ExternalAPIException(f"Brevo API error: {error_detail}")
+        except Exception as e:
+            logger.error(f"Brevo send failed: {str(e)}")
+            raise ExternalAPIException(f"Failed to send email via Brevo: {str(e)}")
+
+
 class EmailSender:
     """
     Main email sender service.
-    Routes to appropriate provider (SES or SendGrid).
+    Routes to appropriate provider (SES, SendGrid, or Brevo).
     """
     
     def __init__(self, provider_name: Optional[str] = None):
@@ -168,7 +261,7 @@ class EmailSender:
         Initialize email sender with specified provider.
         
         Args:
-            provider_name: "ses" or "sendgrid" (defaults to settings.EMAIL_PROVIDER)
+            provider_name: "ses", "sendgrid", or "brevo" (defaults to settings.EMAIL_PROVIDER)
         """
         self.provider_name = provider_name or settings.EMAIL_PROVIDER
         self.provider = self._initialize_provider()
@@ -179,8 +272,10 @@ class EmailSender:
             return SESEmailProvider()
         elif self.provider_name == "sendgrid":
             return SendGridEmailProvider()
+        elif self.provider_name == "brevo":
+            return BrevoEmailProvider()
         else:
-            raise ValueError(f"Unknown email provider: {self.provider_name}")
+            raise ValueError(f"Unknown email provider: {self.provider_name}. Must be 'ses', 'sendgrid', or 'brevo'.")
     
     async def send_campaign_email(
         self,
