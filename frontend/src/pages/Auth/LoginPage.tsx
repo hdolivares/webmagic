@@ -37,7 +37,9 @@ export const LoginPage = () => {
         <form onSubmit={handleSubmit} className="space-y-md">
           {error && (
             <div className="alert-error">
-              <p className="text-sm">{error}</p>
+              <p className="text-sm">
+                {typeof error === 'string' ? error : 'An error occurred. Please try again.'}
+              </p>
             </div>
           )}
 

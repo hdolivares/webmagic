@@ -10,11 +10,16 @@ from .config import get_settings
 settings = get_settings()
 
 # Create async engine
+# Note: statement_cache_size=0 is required for Supabase pooler (pgbouncer)
+# which doesn't support prepared statements
 engine = create_async_engine(
     settings.DATABASE_URL,
     pool_size=settings.DATABASE_POOL_SIZE,
     pool_pre_ping=True,
     echo=settings.DEBUG,
+    connect_args={
+        "statement_cache_size": 0,
+    },
 )
 
 # Create async session factory

@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str
     DATABASE_POOL_SIZE: int = 5
+    DATABASE_URL_POOL: Optional[str] = None  # Supabase pooler URL (optional)
+    DIRECT_URL: Optional[str] = None  # Supabase direct connection (optional)
+    
+    # Supabase (optional - for client SDK if needed)
+    SUPABASE_PROJECT_URL: Optional[str] = None
+    SUPABASE_API_KEY: Optional[str] = None
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"

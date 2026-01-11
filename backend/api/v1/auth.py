@@ -2,6 +2,7 @@
 Authentication endpoints.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from datetime import datetime
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 
 @router.post("/login", response_model=LoginResponse)
 async def login(
-    credentials: LoginRequest,
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -26,30 +27,33 @@ async def login(
     - Email: admin@webmagic.com
     - Password: admin123
     """
+    # Validate email format
+    email = form_data.username.strip().lower()
+    
     # Find user by email
     result = await db.execute(
-        select(AdminUser).where(AdminUser.email == credentials.email)
+        select(AdminUser).where(AdminUser.email == email)
     )
     user = result.scalar_one_or_none()
     
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="No account found with this email address. Please check your email and try again.",
         )
     
     # Verify password
-    if not verify_password(credentials.password, user.password_hash):
+    if not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Incorrect password. Please try again.",
         )
     
     # Check if user is active
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive",
+            detail="Your account has been deactivated. Please contact an administrator.",
         )
     
     # Update last login

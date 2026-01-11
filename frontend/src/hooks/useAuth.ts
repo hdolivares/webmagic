@@ -29,9 +29,30 @@ export const useAuth = create<AuthState>((set) => ({
       const user = await api.getCurrentUser()
       set({ user, isAuthenticated: true, isLoading: false })
     } catch (error: any) {
+      let errorMessage = 'Login failed'
+      
+      // Handle different error response formats
+      if (error.response?.data?.detail) {
+        const detail = error.response.data.detail
+        // If detail is an array of validation errors
+        if (Array.isArray(detail)) {
+          errorMessage = detail.map((err: any) => err.msg).join(', ')
+        } else if (typeof detail === 'string') {
+          errorMessage = detail
+        } else if (typeof detail === 'object') {
+          errorMessage = JSON.stringify(detail)
+        }
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      // Clear any existing token and reset auth state
+      localStorage.removeItem('access_token')
       set({
-        error: error.response?.data?.detail || 'Login failed',
+        error: errorMessage,
         isLoading: false,
+        isAuthenticated: false,
+        user: null,
       })
       throw error
     }
