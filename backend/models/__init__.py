@@ -7,6 +7,7 @@ from models.business import Business
 from models.coverage import CoverageGrid
 from models.prompt import PromptTemplate, PromptSetting
 from models.site import GeneratedSite
+from models.campaign import Campaign
 
 __all__ = [
     "BaseModel",
@@ -16,4 +17,5 @@ __all__ = [
     "PromptTemplate",
     "PromptSetting",
     "GeneratedSite",
+    "Campaign",
 ]
