@@ -10,16 +10,19 @@ import { Wrench, Lightbulb, Palette, Code, Mail } from 'lucide-react'
 interface PromptTemplate {
   id: string
   agent_name: string
-  description: string
+  system_prompt: string
+  output_format: string | null
+  placeholder_sections: string[]
 }
 
 interface PromptSetting {
   id: string
-  template_id: string
+  agent_name: string
   section_name: string
   content: string
   description: string | null
   version: number
+  is_active: boolean
 }
 
 const AGENT_ICONS: Record<string, any> = {
@@ -45,9 +48,12 @@ export const SettingsPage = () => {
 
   useEffect(() => {
     if (selectedTemplate) {
-      loadSettings(selectedTemplate)
+      const template = templates.find(t => t.id === selectedTemplate)
+      if (template) {
+        loadSettings(template.agent_name)
+      }
     }
-  }, [selectedTemplate])
+  }, [selectedTemplate, templates])
 
   const loadTemplates = async () => {
     try {
@@ -72,16 +78,16 @@ export const SettingsPage = () => {
     }
   }
 
-  const loadSettings = async (templateId: string) => {
+  const loadSettings = async (agentName: string) => {
     try {
-      const response = await fetch(`/api/v1/settings/templates/${templateId}/settings`)
+      const response = await fetch(`/api/v1/settings/prompts?agent_name=${agentName}&active_only=true`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       const data = await response.json()
       
-      // Ensure data is an array
-      const settingsArray = Array.isArray(data) ? data : []
+      // The API returns {settings: [], total: number}
+      const settingsArray = Array.isArray(data.settings) ? data.settings : []
       setSettings(settingsArray)
     } catch (error) {
       console.error('Failed to load settings:', error)
@@ -99,7 +105,7 @@ export const SettingsPage = () => {
 
     setSaving(true)
     try {
-      const response = await fetch(`/api/v1/settings/settings/${selectedSetting}`, {
+      const response = await fetch(`/api/v1/settings/prompts/${selectedSetting}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: editContent }),
@@ -107,9 +113,12 @@ export const SettingsPage = () => {
 
       if (response.ok) {
         alert('Prompt saved successfully!')
-        if (selectedTemplate) {
-          loadSettings(selectedTemplate)
+        // Reload settings for current agent
+        const currentTemplate = templates.find(t => t.id === selectedTemplate)
+        if (currentTemplate) {
+          loadSettings(currentTemplate.agent_name)
         }
+        setSelectedSetting(null) // Close the editor
       } else {
         alert('Failed to save prompt')
       }
@@ -168,10 +177,10 @@ export const SettingsPage = () => {
                   <Icon className="w-6 h-6 text-primary-600" />
                   <div>
                     <div className="font-semibold capitalize">
-                      {template.agent_name.replace('_', ' ')}
+                      {template.agent_name.replace(/_/g, ' ')}
                     </div>
                     <div className="text-sm text-secondary">
-                      {template.description}
+                      {template.placeholder_sections?.length || 0} sections
                     </div>
                   </div>
                 </div>
@@ -186,7 +195,7 @@ export const SettingsPage = () => {
             <Card>
               <div className="card-header">
                 <h2 className="card-title capitalize">
-                  {currentTemplate.agent_name.replace('_', ' ')} Prompts
+                  {currentTemplate.agent_name.replace(/_/g, ' ')} Prompts
                 </h2>
               </div>
 
