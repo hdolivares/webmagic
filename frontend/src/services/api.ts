@@ -108,7 +108,7 @@ class ApiClient {
     status?: string
     has_website?: boolean
   }): Promise<BusinessListResponse> {
-    const response = await this.client.get<BusinessListResponse>('/businesses', {
+    const response = await this.client.get<BusinessListResponse>('/businesses/', {
       params,
     })
     return response.data
@@ -139,7 +139,7 @@ class ApiClient {
     skip?: number
     limit?: number
   }): Promise<{ grids: CoverageGrid[]; total: number }> {
-    const response = await this.client.get('/coverage', { params })
+    const response = await this.client.get('/coverage/', { params })
     return response.data
   }
 
@@ -160,7 +160,7 @@ class ApiClient {
     limit?: number
     status?: string
   }): Promise<{ sites: GeneratedSite[]; total: number }> {
-    const response = await this.client.get('/sites', { params })
+    const response = await this.client.get('/sites/', { params })
     return response.data
   }
 
@@ -210,7 +210,7 @@ class ApiClient {
     limit?: number
     status?: string
   }): Promise<CampaignListResponse> {
-    const response = await this.client.get<CampaignListResponse>('/campaigns', {
+    const response = await this.client.get<CampaignListResponse>('/campaigns/', {
       params,
     })
     return response.data
