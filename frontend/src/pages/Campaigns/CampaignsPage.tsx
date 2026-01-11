@@ -7,15 +7,44 @@ import { Card, CardHeader, CardBody, CardTitle, Badge } from '@/components/ui'
 import { Mail, Eye, MousePointer } from 'lucide-react'
 
 export const CampaignsPage = () => {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => api.getCampaigns({ limit: 50 }),
+    retry: false, // Don't retry on this page
+    refetchOnMount: false, // Don't refetch automatically
   })
 
-  const { data: stats } = useQuery({
+  const { data: stats, isError: isStatsError } = useQuery({
     queryKey: ['campaign-stats'],
     queryFn: () => api.getCampaignStats(),
+    retry: false, // Don't retry on this page
+    refetchOnMount: false, // Don't refetch automatically
   })
+
+  // Show error state
+  if (isError || isStatsError) {
+    return (
+      <div className="p-xl">
+        <div className="mb-xl">
+          <h1 className="text-4xl font-bold text-text-primary mb-2">Email Campaigns</h1>
+          <p className="text-text-secondary">Track your email outreach performance</p>
+        </div>
+        <Card>
+          <CardBody>
+            <div className="text-center py-xl">
+              <p className="text-error text-lg mb-4">Unable to load campaigns data</p>
+              <p className="text-text-secondary mb-4">
+                {error instanceof Error ? error.message : 'An error occurred'}
+              </p>
+              <p className="text-sm text-text-secondary">
+                This page will be available once you start creating campaigns.
+              </p>
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+    )
+  }
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, any> = {
