@@ -183,9 +183,10 @@ class ApiClient {
     return response.data
   }
 
-  async getPromptSettings(templateId: string): Promise<PromptSetting[]> {
-    const response = await this.client.get<PromptSetting[]>(
-      `/settings/templates/${templateId}/settings`
+  async getPromptSettings(agentName: string): Promise<{ settings: PromptSetting[]; total: number }> {
+    const response = await this.client.get<{ settings: PromptSetting[]; total: number }>(
+      `/settings/prompts`,
+      { params: { agent_name: agentName, active_only: true } }
     )
     return response.data
   }
@@ -195,7 +196,7 @@ class ApiClient {
     data: PromptSettingUpdate
   ): Promise<PromptSetting> {
     const response = await this.client.patch<PromptSetting>(
-      `/settings/settings/${settingId}`,
+      `/settings/prompts/${settingId}`,
       data
     )
     return response.data

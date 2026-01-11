@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Wrench, Lightbulb, Palette, Code, Mail } from 'lucide-react'
+import { api } from '@/services/api'
 
 interface PromptTemplate {
   id: string
@@ -57,11 +58,7 @@ export const SettingsPage = () => {
 
   const loadTemplates = async () => {
     try {
-      const response = await fetch('/api/v1/settings/templates')
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
+      const data = await api.getPromptTemplates()
       
       // Ensure data is an array
       const templatesArray = Array.isArray(data) ? data : []
@@ -80,11 +77,7 @@ export const SettingsPage = () => {
 
   const loadSettings = async (agentName: string) => {
     try {
-      const response = await fetch(`/api/v1/settings/prompts?agent_name=${agentName}&active_only=true`)
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
+      const data = await api.getPromptSettings(agentName)
       
       // The API returns {settings: [], total: number}
       const settingsArray = Array.isArray(data.settings) ? data.settings : []
@@ -105,23 +98,15 @@ export const SettingsPage = () => {
 
     setSaving(true)
     try {
-      const response = await fetch(`/api/v1/settings/prompts/${selectedSetting}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: editContent }),
-      })
-
-      if (response.ok) {
-        alert('Prompt saved successfully!')
-        // Reload settings for current agent
-        const currentTemplate = templates.find(t => t.id === selectedTemplate)
-        if (currentTemplate) {
-          loadSettings(currentTemplate.agent_name)
-        }
-        setSelectedSetting(null) // Close the editor
-      } else {
-        alert('Failed to save prompt')
+      await api.updatePromptSetting(selectedSetting, { content: editContent })
+      
+      alert('Prompt saved successfully!')
+      // Reload settings for current agent
+      const currentTemplate = templates.find(t => t.id === selectedTemplate)
+      if (currentTemplate) {
+        loadSettings(currentTemplate.agent_name)
       }
+      setSelectedSetting(null) // Close the editor
     } catch (error) {
       alert('Error saving prompt: ' + error)
     } finally {
