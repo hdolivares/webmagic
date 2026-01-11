@@ -52,14 +52,22 @@ export const SettingsPage = () => {
   const loadTemplates = async () => {
     try {
       const response = await fetch('/api/v1/settings/templates')
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
       const data = await response.json()
-      setTemplates(data)
-      if (data.length > 0) {
-        setSelectedTemplate(data[0].id)
+      
+      // Ensure data is an array
+      const templatesArray = Array.isArray(data) ? data : []
+      setTemplates(templatesArray)
+      
+      if (templatesArray.length > 0) {
+        setSelectedTemplate(templatesArray[0].id)
       }
       setLoading(false)
     } catch (error) {
       console.error('Failed to load templates:', error)
+      setTemplates([]) // Set empty array on error
       setLoading(false)
     }
   }
@@ -67,10 +75,17 @@ export const SettingsPage = () => {
   const loadSettings = async (templateId: string) => {
     try {
       const response = await fetch(`/api/v1/settings/templates/${templateId}/settings`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
       const data = await response.json()
-      setSettings(data)
+      
+      // Ensure data is an array
+      const settingsArray = Array.isArray(data) ? data : []
+      setSettings(settingsArray)
     } catch (error) {
       console.error('Failed to load settings:', error)
+      setSettings([]) // Set empty array on error
     }
   }
 
@@ -110,7 +125,6 @@ export const SettingsPage = () => {
   }
 
   const currentTemplate = templates.find(t => t.id === selectedTemplate)
-  const currentSetting = settings.find(s => s.id === selectedSetting)
 
   return (
     <div className="page-container">
@@ -123,10 +137,22 @@ export const SettingsPage = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Agent Selection Sidebar */}
-        <div className="lg:col-span-1 space-y-3">
-          {templates.map((template) => {
+      {templates.length === 0 ? (
+        <Card>
+          <div className="text-center py-12">
+            <p className="text-lg text-secondary mb-4">
+              No prompt templates available yet.
+            </p>
+            <p className="text-sm text-tertiary">
+              Prompt templates will appear here once they are configured in the database.
+            </p>
+          </div>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Agent Selection Sidebar */}
+          <div className="lg:col-span-1 space-y-3">
+            {templates.map((template) => {
             const Icon = AGENT_ICONS[template.agent_name] || Wrench
             return (
               <Card
@@ -232,7 +258,8 @@ export const SettingsPage = () => {
             </Card>
           )}
         </div>
-      </div>
+        </div>
+      )}
     </div>
   )
 }
