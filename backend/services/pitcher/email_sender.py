@@ -35,14 +35,27 @@ class SESEmailProvider(EmailProvider):
     """AWS SES email provider."""
     
     def __init__(self):
+        """Initialize SES provider. Client creation is deferred until first send."""
+        self.client = None
+        self._initialized = False
+    
+    def _check_credentials(self):
+        """Initialize SES client before sending. Raises error if not configured."""
+        if self._initialized:
+            return
+        
         try:
             import boto3
+            if not settings.AWS_ACCESS_KEY_ID or not settings.AWS_SECRET_ACCESS_KEY:
+                raise ValueError("AWS credentials not configured")
+            
             self.client = boto3.client(
                 'ses',
                 region_name=settings.AWS_REGION,
                 aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
                 aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
             )
+            self._initialized = True
             logger.info("AWS SES client initialized")
         except Exception as e:
             logger.error(f"Failed to initialize SES: {str(e)}")
@@ -59,6 +72,9 @@ class SESEmailProvider(EmailProvider):
     ) -> Dict[str, Any]:
         """Send email via AWS SES."""
         try:
+            # Check credentials before sending
+            self._check_credentials()
+            
             from_addr = from_email or settings.EMAIL_FROM
             
             # Build message
@@ -100,9 +116,22 @@ class SendGridEmailProvider(EmailProvider):
     """SendGrid email provider."""
     
     def __init__(self):
+        """Initialize SendGrid provider. Client creation is deferred until first send."""
+        self.client = None
+        self._initialized = False
+    
+    def _check_credentials(self):
+        """Initialize SendGrid client before sending. Raises error if not configured."""
+        if self._initialized:
+            return
+        
         try:
+            if not settings.SENDGRID_API_KEY:
+                raise ValueError("SENDGRID_API_KEY not configured")
+            
             from sendgrid import SendGridAPIClient
             self.client = SendGridAPIClient(settings.SENDGRID_API_KEY)
+            self._initialized = True
             logger.info("SendGrid client initialized")
         except Exception as e:
             logger.error(f"Failed to initialize SendGrid: {str(e)}")
@@ -119,6 +148,9 @@ class SendGridEmailProvider(EmailProvider):
     ) -> Dict[str, Any]:
         """Send email via SendGrid."""
         try:
+            # Check credentials before sending
+            self._check_credentials()
+            
             from sendgrid.helpers.mail import Mail, Email, To, Content
             
             from_addr = from_email or settings.EMAIL_FROM
@@ -162,16 +194,23 @@ class BrevoEmailProvider(EmailProvider):
     """Brevo (formerly Sendinblue) email provider."""
     
     def __init__(self):
-        try:
-            if not settings.BREVO_API_KEY:
-                raise ValueError("BREVO_API_KEY not configured")
-            
-            self.api_key = settings.BREVO_API_KEY
-            self.api_url = "https://api.brevo.com/v3/smtp/email"
-            logger.info("Brevo client initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize Brevo: {str(e)}")
-            raise ExternalAPIException(f"Brevo initialization failed: {str(e)}")
+        """Initialize Brevo provider. API key check is deferred until first send."""
+        self.api_key = settings.BREVO_API_KEY
+        self.api_url = "https://api.brevo.com/v3/smtp/email"
+        self._initialized = False
+    
+    def _check_credentials(self):
+        """Check credentials before sending. Raises error if not configured."""
+        if self._initialized:
+            return
+        
+        if not self.api_key:
+            raise ExternalAPIException(
+                "BREVO_API_KEY not configured. "
+                "Get your API key from https://app.brevo.com/ → Settings → SMTP & API → API Keys"
+            )
+        self._initialized = True
+        logger.info("Brevo credentials verified")
     
     async def send_email(
         self,
@@ -184,6 +223,9 @@ class BrevoEmailProvider(EmailProvider):
     ) -> Dict[str, Any]:
         """Send email via Brevo API."""
         try:
+            # Check credentials before sending
+            self._check_credentials()
+            
             from_addr = from_email or settings.EMAIL_FROM
             
             # Extract name from email if format is "Name <email@domain.com>"
@@ -259,12 +301,20 @@ class EmailSender:
     def __init__(self, provider_name: Optional[str] = None):
         """
         Initialize email sender with specified provider.
+        Provider initialization is deferred until first send.
         
         Args:
             provider_name: "ses", "sendgrid", or "brevo" (defaults to settings.EMAIL_PROVIDER)
         """
         self.provider_name = provider_name or settings.EMAIL_PROVIDER
-        self.provider = self._initialize_provider()
+        self._provider = None  # Lazy-loaded
+    
+    @property
+    def provider(self) -> EmailProvider:
+        """Lazy-load email provider only when needed."""
+        if self._provider is None:
+            self._provider = self._initialize_provider()
+        return self._provider
     
     def _initialize_provider(self) -> EmailProvider:
         """Initialize the email provider."""
