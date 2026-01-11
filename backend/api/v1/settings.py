@@ -173,3 +173,42 @@ async def get_prompt_template(
         raise HTTPException(status_code=404, detail="Template not found")
     
     return PromptTemplateResponse.model_validate(template)
+
+
+@router.get("/templates/{template_id}/settings", response_model=list[PromptSettingResponse])
+async def get_template_settings(
+    template_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """Get all prompt settings for a specific template."""
+    # First get the template to get the agent_name
+    template_result = await db.execute(
+        select(PromptTemplate).where(PromptTemplate.id == template_id)
+    )
+    template = template_result.scalar_one_or_none()
+    
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    
+    # Get settings for this template
+    result = await db.execute(
+        select(PromptSetting)
+        .where(PromptSetting.template_id == template_id)
+        .where(PromptSetting.is_active == True)
+        .order_by(PromptSetting.section_name, PromptSetting.version.desc())
+    )
+    settings = result.scalars().all()
+    
+    return [PromptSettingResponse.model_validate(s) for s in settings]
+
+
+@router.patch("/settings/{setting_id}", response_model=PromptSettingResponse)
+async def update_setting_by_id(
+    setting_id: UUID,
+    updates: PromptSettingUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """Update a specific prompt setting (alternative endpoint)."""
+    return await update_prompt_setting(setting_id, updates, db, current_user)
