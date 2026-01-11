@@ -357,3 +357,106 @@ async def start_batch_scrape(
         "queued_tasks": queued_count,
         "message": f"Queued {queued_count} scraping tasks with priority >= {priority_min}"
     }
+
+
+@router.post("/test-searches")
+async def test_manual_searches(
+    count: int = Query(..., ge=1, le=25, description="Number of searches to run"),
+    priority_min: int = Query(7, ge=1, le=10, description="Minimum priority"),
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Manual testing endpoint - run a specific number of searches and return immediate results.
+    This is synchronous and perfect for testing before enabling autopilot.
+    
+    Returns detailed results for each search including:
+    - Location and industry searched
+    - Number of businesses found
+    - Qualified vs total leads
+    - Sample business names
+    """
+    from services.hunter.hunter_service import HunterService
+    import asyncio
+    
+    # Find highest-priority pending grids
+    result = await db.execute(
+        select(CoverageGrid)
+        .where(
+            and_(
+                CoverageGrid.status == "pending",
+                CoverageGrid.priority >= priority_min
+            )
+        )
+        .order_by(CoverageGrid.priority.desc())
+        .limit(count)
+    )
+    grids = result.scalars().all()
+    
+    if not grids:
+        return {
+            "success": False,
+            "message": f"No pending grids found with priority >= {priority_min}",
+            "searches_completed": 0,
+            "results": []
+        }
+    
+    # Run searches synchronously
+    hunter_service = HunterService(db)
+    results = []
+    successful = 0
+    failed = 0
+    
+    for grid in grids:
+        try:
+            # Mark as in progress
+            grid.status = "in_progress"
+            await db.commit()
+            
+            # Run scrape
+            scrape_result = await hunter_service.scrape_location(
+                city=grid.city,
+                state=grid.state,
+                industry=grid.industry,
+                country=grid.country,
+                limit=50,  # Get 50 results per search
+                priority=grid.priority
+            )
+            
+            # Record result
+            results.append({
+                "grid_id": str(grid.id),
+                "location": f"{grid.city}, {grid.state}",
+                "industry": grid.industry,
+                "status": "success",
+                "businesses_found": scrape_result.get("scraped", 0),
+                "qualified": scrape_result.get("qualified", 0),
+                "saved": scrape_result.get("saved", 0),
+                "qualification_rate": scrape_result.get("qualification_rate", 0),
+                "sample_businesses": scrape_result.get("sample_businesses", [])[:3]
+            })
+            successful += 1
+            
+        except Exception as e:
+            # Record failure
+            grid.status = "failed"
+            grid.error_message = str(e)
+            await db.commit()
+            
+            results.append({
+                "grid_id": str(grid.id),
+                "location": f"{grid.city}, {grid.state}",
+                "industry": grid.industry,
+                "status": "failed",
+                "error": str(e)
+            })
+            failed += 1
+    
+    return {
+        "success": True,
+        "searches_completed": successful,
+        "searches_failed": failed,
+        "total_requested": count,
+        "message": f"Completed {successful}/{count} test searches successfully",
+        "results": results
+    }

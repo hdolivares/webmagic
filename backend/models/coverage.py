@@ -1,7 +1,7 @@
 """
 Coverage Grid model for tracking scraping territories.
 """
-from sqlalchemy import Column, String, Integer, DateTime
+from sqlalchemy import Column, String, Integer, DateTime, Boolean, Text
 from models.base import BaseModel
 
 
@@ -37,9 +37,21 @@ class CoverageGrid(BaseModel):
     site_count = Column(Integer, default=0, nullable=False)
     conversion_count = Column(Integer, default=0, nullable=False)
     
+    # Pagination & Continuation Support
+    scrape_count = Column(Integer, default=0, nullable=False)
+    scrape_offset = Column(Integer, default=0, nullable=False)
+    has_more_results = Column(Boolean, default=True, nullable=False)
+    max_results_available = Column(Integer, nullable=True)
+    last_scrape_size = Column(Integer, nullable=True)
+    estimated_businesses = Column(Integer, nullable=True)
+    
     # Timing
     last_scraped_at = Column(DateTime, nullable=True)
     cooldown_until = Column(DateTime, nullable=True)
+    next_scheduled = Column(DateTime, nullable=True)
+    
+    # Error tracking
+    error_message = Column(Text, nullable=True)
     
     def __repr__(self):
         return f"<CoverageGrid {self.city}, {self.state} - {self.industry} ({self.status})>"

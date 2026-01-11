@@ -50,6 +50,11 @@ export function CoveragePage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'overview' | 'locations' | 'categories'>('overview')
   
+  // Manual testing
+  const [testSearchCount, setTestSearchCount] = useState(5)
+  const [testRunning, setTestRunning] = useState(false)
+  const [testResults, setTestResults] = useState<any>(null)
+  
   // Scheduling settings
   const [scheduledSearches, setScheduledSearches] = useState(100)
   const [scheduleEnabled, setScheduleEnabled] = useState(false)
@@ -76,13 +81,54 @@ export function CoveragePage() {
     }
   }
 
+  const runTestSearches = async () => {
+    if (!confirm(`Run ${testSearchCount} test searches? This will scrape real businesses and use API credits.`)) return
+    
+    setTestRunning(true)
+    setTestResults(null)
+    
+    try {
+      const response = await fetch(
+        `/api/v1/coverage/campaigns/test-searches?count=${testSearchCount}&priority_min=7`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          },
+        }
+      )
+      
+      if (response.ok) {
+        const data = await response.json()
+        setTestResults(data)
+        alert(`✅ Completed ${data.searches_completed}/${data.total_requested} searches successfully!`)
+        loadCampaignData() // Refresh stats
+      } else {
+        const error = await response.json()
+        alert(`Failed: ${error.detail || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error running test searches:', error)
+      alert('Error running test searches: ' + error)
+    } finally {
+      setTestRunning(false)
+    }
+  }
+
   const startBatchScrape = async (priorityMin: number, limit: number) => {
     if (!confirm(`Start scraping ${limit} high-priority grids?`)) return
     
     try {
       const response = await fetch(
         `/api/v1/coverage/campaigns/start-batch?priority_min=${priorityMin}&limit=${limit}`,
-        { method: 'POST' }
+        { 
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          }
+        }
       )
       const data = await response.json()
       alert(`Success! Queued ${data.queued_tasks} scraping tasks`)
@@ -160,6 +206,115 @@ export function CoveragePage() {
           </div>
         </Card>
       </div>
+
+      {/* Manual Testing Section */}
+      <Card>
+        <div className="card-header">
+          <h2 className="card-title">🧪 Manual Testing</h2>
+          <p className="text-sm text-secondary">Test the system before enabling autopilot</p>
+        </div>
+        <div className="card-body space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Test Controls */}
+            <div className="space-y-4">
+              <div>
+                <label className="form-label flex items-center justify-between">
+                  <span>Number of Searches</span>
+                  <span className="badge badge-primary">{testSearchCount}</span>
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="25"
+                  value={testSearchCount}
+                  onChange={(e) => setTestSearchCount(parseInt(e.target.value))}
+                  className="w-full"
+                  disabled={testRunning}
+                />
+                <div className="flex justify-between text-xs text-secondary mt-1">
+                  <span>1</span>
+                  <span>25</span>
+                </div>
+              </div>
+
+              <button
+                onClick={runTestSearches}
+                disabled={testRunning}
+                className="btn btn-primary w-full"
+              >
+                {testRunning ? (
+                  <>
+                    <span className="spinner-sm"></span>
+                    Running {testSearchCount} searches...
+                  </>
+                ) : (
+                  `🚀 Test ${testSearchCount} Search${testSearchCount > 1 ? 'es' : ''}`
+                )}
+              </button>
+
+              <div className="alert alert-info text-sm">
+                <p><strong>What this does:</strong></p>
+                <ul className="list-disc list-inside mt-2 space-y-1">
+                  <li>Selects {testSearchCount} highest-priority locations</li>
+                  <li>Scrapes ~50 businesses per location</li>
+                  <li>Qualifies leads automatically</li>
+                  <li>Returns immediate results</li>
+                  <li>Cost: ~${(testSearchCount * 0.50).toFixed(2)} in API credits</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Test Results */}
+            <div>
+              <h3 className="font-semibold mb-3">Last Test Results</h3>
+              {!testResults ? (
+                <div className="text-center py-8 text-secondary">
+                  <p>No test results yet.</p>
+                  <p className="text-sm mt-2">Run a test to see results here.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="stats-grid grid-cols-2">
+                    <div className="stat-card bg-success/10">
+                      <div className="stat-label">Successful</div>
+                      <div className="stat-value text-success">{testResults.searches_completed}</div>
+                    </div>
+                    <div className="stat-card bg-error/10">
+                      <div className="stat-label">Failed</div>
+                      <div className="stat-value text-error">{testResults.searches_failed}</div>
+                    </div>
+                  </div>
+
+                  <div className="max-h-64 overflow-y-auto space-y-2">
+                    {testResults.results?.map((result: any, index: number) => (
+                      <div
+                        key={index}
+                        className={`p-3 rounded-lg border ${
+                          result.status === 'success'
+                            ? 'border-success bg-success/5'
+                            : 'border-error bg-error/5'
+                        }`}
+                      >
+                        <div className="font-semibold">{result.location}</div>
+                        <div className="text-sm text-secondary">{result.industry}</div>
+                        {result.status === 'success' ? (
+                          <div className="text-sm mt-2">
+                            Found: <strong>{result.businesses_found}</strong> | 
+                            Qualified: <strong>{result.qualified}</strong> | 
+                            Rate: <strong>{result.qualification_rate?.toFixed(1)}%</strong>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-error mt-2">{result.error}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
 
       {/* Progress Bar */}
       <Card>
