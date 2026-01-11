@@ -222,6 +222,29 @@ class ApiClient {
     return response.data
   }
 
+  // ============================================
+  // COVERAGE CAMPAIGN METHODS
+  // ============================================
+
+  async getCoverageStats(): Promise<any> {
+    const response = await this.client.get<any>('/coverage/campaigns/stats')
+    return response.data
+  }
+
+  async getCoverageLocations(params?: { limit?: number }): Promise<any[]> {
+    const response = await this.client.get<any[]>('/coverage/campaigns/locations', {
+      params,
+    })
+    return response.data
+  }
+
+  async getCoverageCategories(params?: { limit?: number }): Promise<any[]> {
+    const response = await this.client.get<any[]>('/coverage/campaigns/categories', {
+      params,
+    })
+    return response.data
+  }
+
   async createCampaign(data: CreateCampaignRequest): Promise<Campaign> {
     const response = await this.client.post<Campaign>('/campaigns', data)
     return response.data

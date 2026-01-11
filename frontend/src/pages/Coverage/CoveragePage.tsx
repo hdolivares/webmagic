@@ -61,14 +61,14 @@ export function CoveragePage() {
   const loadCampaignData = async () => {
     try {
       const [statsData, locationsData, categoriesData] = await Promise.all([
-        fetch('/api/v1/coverage/campaigns/stats').then(r => r.json()),
-        fetch('/api/v1/coverage/campaigns/locations?limit=50').then(r => r.json()),
-        fetch('/api/v1/coverage/campaigns/categories?limit=20').then(r => r.json()),
+        api.getCoverageStats(),
+        api.getCoverageLocations({ limit: 50 }),
+        api.getCoverageCategories({ limit: 20 }),
       ])
       
       setStats(statsData)
-      setLocations(locationsData)
-      setCategories(categoriesData)
+      setLocations(locationsData || [])
+      setCategories(categoriesData || [])
       setLoading(false)
     } catch (error) {
       console.error('Failed to load campaign data:', error)
@@ -128,15 +128,15 @@ export function CoveragePage() {
       <div className="stats-grid">
         <Card>
           <div className="stat-label">Total Grids</div>
-          <div className="stat-value">{stats?.total_grids.toLocaleString()}</div>
+          <div className="stat-value">{stats?.total_grids?.toLocaleString() || '0'}</div>
           <div className="stat-meta">
-            {stats?.total_locations} cities × {stats?.total_categories} categories
+            {stats?.total_locations || 0} cities × {stats?.total_categories || 0} categories
           </div>
         </Card>
 
         <Card>
           <div className="stat-label">Completion</div>
-          <div className="stat-value">{stats?.completion_percentage.toFixed(1)}%</div>
+          <div className="stat-value">{stats?.completion_percentage?.toFixed(1) || '0'}%</div>
           <div className="stat-meta">
             {stats?.completed_grids} of {stats?.total_grids} complete
           </div>
@@ -145,18 +145,18 @@ export function CoveragePage() {
         <Card>
           <div className="stat-label">Businesses Found</div>
           <div className="stat-value text-success">
-            {stats?.total_businesses_found.toLocaleString()}
+            {stats?.total_businesses_found?.toLocaleString() || '0'}
           </div>
           <div className="stat-meta">
-            {stats?.pending_grids} searches pending
+            {stats?.pending_grids || 0} searches pending
           </div>
         </Card>
 
         <Card>
           <div className="stat-label">Cost</div>
-          <div className="stat-value">${stats?.actual_cost.toFixed(2)}</div>
+          <div className="stat-value">${stats?.actual_cost?.toFixed(2) || '0.00'}</div>
           <div className="stat-meta">
-            of ${stats?.estimated_cost.toFixed(2)} estimated
+            of ${stats?.estimated_cost?.toFixed(2) || '0.00'} estimated
           </div>
         </Card>
       </div>
@@ -169,16 +169,16 @@ export function CoveragePage() {
         <div className="progress-bar-wrapper">
           <div
             className="progress-bar"
-            style={{ width: `${stats?.completion_percentage}%` }}
+            style={{ width: `${stats?.completion_percentage || 0}%` }}
           >
-            {stats?.completion_percentage.toFixed(1)}%
+            {stats?.completion_percentage?.toFixed(1) || '0'}%
           </div>
         </div>
         <div className="progress-labels">
-          <span className="text-success">{stats?.completed_grids} Completed</span>
-          <span className="text-info">{stats?.in_progress_grids} In Progress</span>
-          <span className="text-secondary">{stats?.pending_grids} Pending</span>
-          <span className="text-error">{stats?.failed_grids} Failed</span>
+          <span className="text-success">{stats?.completed_grids || 0} Completed</span>
+          <span className="text-info">{stats?.in_progress_grids || 0} In Progress</span>
+          <span className="text-secondary">{stats?.pending_grids || 0} Pending</span>
+          <span className="text-error">{stats?.failed_grids || 0} Failed</span>
         </div>
       </Card>
 
@@ -283,20 +283,20 @@ export function CoveragePage() {
                     </td>
                     <td className="text-center">{loc.total_categories}</td>
                     <td className="text-center text-success">
-                      {loc.completed_categories}
+                      {loc.completed_categories || 0}
                     </td>
                     <td className="text-center font-bold">
-                      {loc.total_businesses.toLocaleString()}
+                      {loc.total_businesses?.toLocaleString() || '0'}
                     </td>
                     <td className="text-center">
                       <div className="progress-inline">
                         <div className="progress-bar-small">
                           <div
                             className="progress-fill"
-                            style={{ width: `${loc.completion_percentage}%` }}
+                            style={{ width: `${loc.completion_percentage || 0}%` }}
                           />
                         </div>
-                        <span className="progress-text">{loc.completion_percentage.toFixed(0)}%</span>
+                        <span className="progress-text">{loc.completion_percentage?.toFixed(0) || '0'}%</span>
                       </div>
                     </td>
                   </tr>
@@ -328,23 +328,23 @@ export function CoveragePage() {
                 {categories.map((cat) => (
                   <tr key={cat.category}>
                     <td className="font-semibold capitalize">{cat.category}</td>
-                    <td className="text-center">{cat.total_locations}</td>
+                    <td className="text-center">{cat.total_locations || 0}</td>
                     <td className="text-center text-success">
-                      {cat.completed_locations}
+                      {cat.completed_locations || 0}
                     </td>
-                    <td className="text-center">{cat.avg_businesses_per_location.toFixed(1)}</td>
+                    <td className="text-center">{cat.avg_businesses_per_location?.toFixed(1) || '0.0'}</td>
                     <td className="text-center font-bold">
-                      {cat.total_businesses.toLocaleString()}
+                      {cat.total_businesses?.toLocaleString() || '0'}
                     </td>
                     <td className="text-center">
                       <div className="progress-inline">
                         <div className="progress-bar-small">
                           <div
                             className="progress-fill"
-                            style={{ width: `${cat.completion_percentage}%` }}
+                            style={{ width: `${cat.completion_percentage || 0}%` }}
                           />
                         </div>
-                        <span className="progress-text">{cat.completion_percentage.toFixed(0)}%</span>
+                        <span className="progress-text">{cat.completion_percentage?.toFixed(0) || '0'}%</span>
                       </div>
                     </td>
                   </tr>
