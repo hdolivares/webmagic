@@ -10,6 +10,7 @@ import {
   Globe,
   Mail,
   Users,
+  Map,
   Settings,
   LogOut,
   Sun,
@@ -26,6 +27,7 @@ export const Layout = () => {
     { to: '/sites', icon: Globe, label: 'Sites' },
     { to: '/campaigns', icon: Mail, label: 'Campaigns' },
     { to: '/customers', icon: Users, label: 'Customers' },
+    { to: '/coverage', icon: Map, label: 'Coverage' },
     { to: '/settings', icon: Settings, label: 'Settings' },
   ]
 
