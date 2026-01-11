@@ -1,0 +1,326 @@
+/**
+ * Global styles with semantic class definitions
+ * Built on Tailwind + custom CSS variables
+ */
+
+@import './theme.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-text-primary antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold text-text-primary;
+  }
+  
+  h1 { @apply text-4xl; }
+  h2 { @apply text-3xl; }
+  h3 { @apply text-2xl; }
+  h4 { @apply text-xl; }
+  h5 { @apply text-lg; }
+  h6 { @apply text-base; }
+}
+
+/* ============================================
+   SEMANTIC COMPONENT CLASSES
+   ============================================ */
+@layer components {
+  
+  /* ========== BUTTONS ========== */
+  
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-md py-sm rounded-md font-medium transition-all duration-[var(--transition-fast)] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+  
+  .btn-primary {
+    @apply btn bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 focus:ring-primary-500;
+  }
+  
+  .btn-secondary {
+    @apply btn bg-secondary-200 text-secondary-900 hover:bg-secondary-300 active:bg-secondary-400 focus:ring-secondary-500 dark:bg-secondary-700 dark:text-secondary-100 dark:hover:bg-secondary-600;
+  }
+  
+  .btn-success {
+    @apply btn bg-success text-white hover:bg-success-dark focus:ring-success;
+  }
+  
+  .btn-warning {
+    @apply btn bg-warning text-white hover:bg-warning-dark focus:ring-warning;
+  }
+  
+  .btn-error {
+    @apply btn bg-error text-white hover:bg-error-dark focus:ring-error;
+  }
+  
+  .btn-ghost {
+    @apply btn bg-transparent text-text-secondary hover:bg-surface-hover hover:text-text-primary;
+  }
+  
+  .btn-outline {
+    @apply btn bg-transparent border border-border text-text-primary hover:bg-surface-hover;
+  }
+  
+  .btn-sm {
+    @apply px-sm py-xs text-sm;
+  }
+  
+  .btn-lg {
+    @apply px-lg py-md text-lg;
+  }
+  
+  /* ========== BADGES ========== */
+  
+  .badge {
+    @apply inline-flex items-center gap-1 px-sm py-xs rounded-md text-xs font-medium;
+  }
+  
+  .badge-primary {
+    @apply badge bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300;
+  }
+  
+  .badge-success {
+    @apply badge bg-success-light text-success-dark dark:bg-success-dark dark:text-success-light;
+  }
+  
+  .badge-warning {
+    @apply badge bg-warning-light text-warning-dark dark:bg-warning-dark dark:text-warning-light;
+  }
+  
+  .badge-error {
+    @apply badge bg-error-light text-error-dark dark:bg-error-dark dark:text-error-light;
+  }
+  
+  .badge-info {
+    @apply badge bg-info-light text-info-dark dark:bg-info-dark dark:text-info-light;
+  }
+  
+  .badge-secondary {
+    @apply badge bg-secondary-100 text-secondary-700 dark:bg-secondary-800 dark:text-secondary-300;
+  }
+  
+  /* ========== CARDS ========== */
+  
+  .card {
+    @apply bg-surface rounded-lg border border-border shadow-sm transition-shadow duration-[var(--transition-base)];
+  }
+  
+  .card-hover {
+    @apply card hover:shadow-md cursor-pointer;
+  }
+  
+  .card-header {
+    @apply px-lg py-md border-b border-border;
+  }
+  
+  .card-body {
+    @apply px-lg py-md;
+  }
+  
+  .card-footer {
+    @apply px-lg py-md border-t border-border bg-background-secondary;
+  }
+  
+  .card-title {
+    @apply text-lg font-semibold text-text-primary;
+  }
+  
+  .card-subtitle {
+    @apply text-sm text-text-secondary mt-1;
+  }
+  
+  /* ========== FORMS ========== */
+  
+  .input {
+    @apply w-full px-md py-sm bg-background border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-[var(--transition-fast)] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .input-error {
+    @apply input border-error focus:ring-error;
+  }
+  
+  .label {
+    @apply block text-sm font-medium text-text-primary mb-xs;
+  }
+  
+  .label-required::after {
+    content: ' *';
+    @apply text-error;
+  }
+  
+  .input-helper {
+    @apply text-xs text-text-secondary mt-xs;
+  }
+  
+  .input-error-text {
+    @apply text-xs text-error mt-xs;
+  }
+  
+  .select {
+    @apply input cursor-pointer;
+  }
+  
+  .textarea {
+    @apply input resize-y min-h-[100px];
+  }
+  
+  .checkbox {
+    @apply w-4 h-4 text-primary-600 bg-background border-border rounded focus:ring-primary-500 focus:ring-2 cursor-pointer;
+  }
+  
+  .radio {
+    @apply checkbox rounded-full;
+  }
+  
+  /* ========== TABLES ========== */
+  
+  .table {
+    @apply w-full border-collapse;
+  }
+  
+  .table-header {
+    @apply bg-background-secondary border-b border-border;
+  }
+  
+  .table-header-cell {
+    @apply px-md py-sm text-left text-xs font-medium text-text-secondary uppercase tracking-wider;
+  }
+  
+  .table-row {
+    @apply border-b border-border hover:bg-surface-hover transition-colors duration-[var(--transition-fast)];
+  }
+  
+  .table-cell {
+    @apply px-md py-sm text-sm text-text-primary;
+  }
+  
+  /* ========== ALERTS ========== */
+  
+  .alert {
+    @apply p-md rounded-md border flex items-start gap-md;
+  }
+  
+  .alert-success {
+    @apply alert bg-success-light border-success text-success-dark dark:bg-success-dark/20 dark:border-success dark:text-success;
+  }
+  
+  .alert-warning {
+    @apply alert bg-warning-light border-warning text-warning-dark dark:bg-warning-dark/20 dark:border-warning dark:text-warning;
+  }
+  
+  .alert-error {
+    @apply alert bg-error-light border-error text-error-dark dark:bg-error-dark/20 dark:border-error dark:text-error;
+  }
+  
+  .alert-info {
+    @apply alert bg-info-light border-info text-info-dark dark:bg-info-dark/20 dark:border-info dark:text-info;
+  }
+  
+  /* ========== LOADING ========== */
+  
+  .spinner {
+    @apply inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin;
+  }
+  
+  .spinner-lg {
+    @apply w-8 h-8 border-4;
+  }
+  
+  /* ========== NAVIGATION ========== */
+  
+  .nav-link {
+    @apply flex items-center gap-md px-md py-sm rounded-md text-sm font-medium text-text-secondary hover:bg-surface-hover hover:text-text-primary transition-all duration-[var(--transition-fast)];
+  }
+  
+  .nav-link-active {
+    @apply nav-link bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300;
+  }
+  
+  /* ========== TOOLTIPS ========== */
+  
+  .tooltip {
+    @apply absolute z-[var(--z-tooltip)] px-sm py-xs bg-secondary-900 text-white text-xs rounded-md shadow-lg pointer-events-none;
+  }
+  
+  /* ========== DIVIDERS ========== */
+  
+  .divider {
+    @apply border-t border-border my-md;
+  }
+  
+  .divider-vertical {
+    @apply border-l border-border mx-md;
+  }
+  
+  /* ========== SCROLLBARS ========== */
+  
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-dark) transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: var(--color-border-dark);
+    border-radius: var(--radius-full);
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-border);
+  }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn var(--transition-base) ease-in;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp var(--transition-base) ease-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
