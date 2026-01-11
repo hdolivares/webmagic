@@ -37,11 +37,12 @@ class Settings(BaseSettings):
     OUTSCRAPER_API_KEY: str
     
     # Email
-    EMAIL_PROVIDER: str = "ses"  # ses or sendgrid
+    EMAIL_PROVIDER: str = "brevo"  # ses, sendgrid, or brevo
     AWS_ACCESS_KEY_ID: Optional[str] = None
     AWS_SECRET_ACCESS_KEY: Optional[str] = None
     AWS_REGION: str = "us-east-1"
     SENDGRID_API_KEY: Optional[str] = None
+    BREVO_API_KEY: Optional[str] = None
     EMAIL_FROM: str = "hugo@webmagic.com"
     
     # Recurrente

@@ -33,6 +33,15 @@ This guide explains where to get each API key and what they're used for.
 ### 2. **OUTSCRAPER_API_KEY** 🗺️
 **Purpose**: Scrapes business data from Google Maps
 
+**Why Outscraper vs ScrapingDog?**
+While ScrapingDog is ~70% cheaper ($0.003/business vs $0.01/business), **Outscraper is required for WebMagic** because:
+- ✅ **Includes full review text** - Your AI Analyst needs this to find "what customers love"
+- ✅ **Includes business photos** - Your generated websites need these images
+- ✅ **Better data quality** - More reliable for agency-grade output
+- ❌ ScrapingDog only provides review COUNT, no text or photos
+
+**The extra $0.007 per business is worth it** when you're charging $50-500/site and need rich data for AI content generation.
+
 **How to Get**:
 1. Go to: https://app.outscraper.com/
 2. Sign up with Google or email
@@ -41,14 +50,14 @@ This guide explains where to get each API key and what they're used for.
 5. Paste into `.env`: `OUTSCRAPER_API_KEY=...`
 
 **Cost**:
-- ~$0.50 per 50 businesses scraped
-- $2 free credit for new accounts (100 businesses)
+- ~$10 per 1,000 businesses (with reviews & photos)
+- $2 free credit for new accounts (~200 businesses)
 - Recommended: Add $20 credit for testing (~2,000 businesses)
 
 **Used by**:
 - ✅ Discovery Campaign scraping
 - ✅ Finding businesses without websites
-- ✅ Getting contact info (phone, address, reviews)
+- ✅ Getting contact info, reviews, and photos
 
 ---
 
@@ -104,7 +113,31 @@ This guide explains where to get each API key and what they're used for.
 ### 5. **Email Provider** (Optional)
 **Purpose**: Sending outreach emails to businesses
 
-#### Option A: AWS SES (Recommended for production)
+#### Option A: Brevo (RECOMMENDED - Best for startups) ⭐
+1. Go to: https://app.brevo.com/
+2. Sign up (free account)
+3. Verify your sending domain (optional but recommended)
+4. Go to: **Settings** → **SMTP & API** → **API Keys**
+5. Click "Create a new API key"
+6. Copy the key
+7. Paste into `.env`:
+   ```
+   EMAIL_PROVIDER=brevo
+   BREVO_API_KEY=...
+   ```
+
+**Cost**: 
+- **FREE: 300 emails/day** (9,000/month)
+- Paid: $25/month for 20K emails
+- Excellent deliverability
+
+**Why Brevo?**
+- ✅ Most generous free tier (300/day vs 100/day)
+- ✅ No credit card required for free tier
+- ✅ Better UI than SendGrid
+- ✅ Includes marketing automation features
+
+#### Option B: AWS SES (For high volume)
 1. Go to: https://aws.amazon.com/ses/
 2. Create an account
 3. Request production access (required to send to any email)
@@ -118,9 +151,9 @@ This guide explains where to get each API key and what they're used for.
    AWS_REGION=us-east-1
    ```
 
-**Cost**: $0.10 per 1,000 emails
+**Cost**: $0.10 per 1,000 emails (cheapest at scale)
 
-#### Option B: SendGrid (Easier to start)
+#### Option C: SendGrid (Alternative)
 1. Go to: https://sendgrid.com/
 2. Sign up (free tier: 100 emails/day)
 3. Create API key: Settings → API Keys
