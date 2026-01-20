@@ -106,26 +106,33 @@ export interface GenerateSiteRequest {
 
 export interface PromptTemplate {
   id: string
-  name: string
-  agent_type: string
-  base_template: string
+  agent_name: string
+  system_prompt: string
   output_format?: string
+  placeholder_sections?: string[]
   created_at: string
   updated_at: string
 }
 
 export interface PromptSetting {
   id: string
-  template_id: string
-  setting_key: string
-  setting_value: string
+  agent_name: string
+  section_name: string
+  content: string
   description?: string
+  version: number
+  is_active: boolean
+  usage_count?: number
+  success_count?: number
+  success_rate?: number
   created_at: string
   updated_at: string
 }
 
 export interface PromptSettingUpdate {
-  setting_value: string
+  content?: string
+  description?: string
+  is_active?: boolean
 }
 
 // ============================================
