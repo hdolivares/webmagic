@@ -4,7 +4,7 @@
  * Allows configuration of AI agent prompts for the creative pipeline.
  */
 import { useState, useEffect } from 'react'
-import { Card } from '@/components/ui/card'
+import { Card } from '@/components/ui'
 import { Wrench, Lightbulb, Palette, Code, Mail } from 'lucide-react'
 import { api } from '@/services/api'
 
