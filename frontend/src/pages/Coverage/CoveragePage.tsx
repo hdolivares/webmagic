@@ -5,7 +5,7 @@
  * and controls for starting/scheduling automated discovery.
  */
 import { useState, useEffect } from 'react'
-import { Card } from '@/components/ui/card'
+import { Card } from '@/components/ui'
 import { api } from '@/services/api'
 
 interface CampaignStats {
