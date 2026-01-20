@@ -7,24 +7,7 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui'
 import { Wrench, Lightbulb, Palette, Code, Mail } from 'lucide-react'
 import { api } from '@/services/api'
-
-interface PromptTemplate {
-  id: string
-  agent_name: string
-  system_prompt: string
-  output_format: string | null
-  placeholder_sections: string[]
-}
-
-interface PromptSetting {
-  id: string
-  agent_name: string
-  section_name: string
-  content: string
-  description: string | null
-  version: number
-  is_active: boolean
-}
+import type { PromptTemplate, PromptSetting } from '@/types'
 
 const AGENT_ICONS: Record<string, any> = {
   analyst: Wrench,
