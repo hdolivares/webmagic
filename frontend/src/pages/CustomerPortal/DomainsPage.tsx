@@ -99,7 +99,6 @@ const DomainsPage: React.FC = () => {
       {hasDomain ? (
         <DomainManagement
           siteId={site.id}
-          onUpdate={handleDomainUpdate}
         />
       ) : (
         <DomainSetup
