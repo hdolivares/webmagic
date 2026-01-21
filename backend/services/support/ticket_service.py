@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from models.support_ticket import SupportTicket, TicketMessage, TicketTemplate
 from models.site_models import CustomerUser, Site
-from core.exceptions import NotFoundError, ValidationError, ForbiddenError, BusinessLogicError
+from core.exceptions import NotFoundError, ValidationError, ForbiddenError
 from services.creative.ai_client import AIClient
 
 logger = logging.getLogger(__name__)
