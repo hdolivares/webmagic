@@ -316,9 +316,9 @@ class SubscriptionService:
         recurrente = RecurrenteClient()
         
         try:
-            recurrente.cancel_subscription(
+            await recurrente.cancel_subscription(
                 subscription_id=site.subscription_id,
-                immediate=immediate
+                reason=reason
             )
         except Exception as e:
             logger.error(f"Failed to cancel subscription in Recurrente: {e}")
