@@ -435,3 +435,47 @@ class EmailTemplates:
 </body>
 </html>
 """
+
+    def render_subscription_activated_email(
+        self,
+        customer_name: str,
+        site_title: str,
+        site_url: str,
+        next_billing_date: str,
+        portal_url: str
+    ) -> str:
+        """Render subscription activation confirmation email."""
+        return f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscription Activated!</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, ''Segoe UI'', Roboto, ''Helvetica Neue'', Arial, sans-serif; background-color: {self.bg_light};">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: {self.bg_light}; padding: 40px 20px;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px;">
+                    <tr>
+                        <td style="background: linear-gradient(135deg, {self.success_color} 0%, #059669 100%); padding: 40px; text-align: center;">
+                            <div style="font-size: 48px; margin-bottom: 10px;">🎉</div>
+                            <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: bold;">Subscription Activated!</h1>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="margin: 0 0 20px; color: {self.text_color}; font-size: 16px;">Hi <strong>{customer_name}</strong>,</p>
+                            <p style="margin: 0 0 30px; color: {self.text_color}; font-size: 16px;">Your monthly subscription is now active. Your website has full access to all premium features.</p>
+                            <p style="margin: 0; color: {self.text_color};">Next Billing: {next_billing_date}</p>
+                            <p style="margin: 20px 0;"><a href="{portal_url}" style="background-color: {self.brand_color}; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 8px;">Access Dashboard</a></p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+"""

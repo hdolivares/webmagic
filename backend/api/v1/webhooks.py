@@ -22,6 +22,7 @@ from core.database import get_db
 from core.config import get_settings
 from services.payments.recurrente_client import RecurrenteClient
 from services.site_purchase_service import get_site_purchase_service
+from services.subscription_service import get_subscription_service
 from services.emails.email_service import get_email_service
 
 logger = logging.getLogger(__name__)
@@ -201,7 +202,7 @@ async def handle_subscription_activated(
     event_data: Dict[str, Any]
 ) -> None:
     """
-    Handle subscription activation webhook (Phase 3).
+    Handle subscription activation webhook.
     
     Actions:
     1. Update site status to 'active'
@@ -212,8 +213,32 @@ async def handle_subscription_activated(
     
     logger.info(f"Subscription activated: {subscription_id}")
     
-    # TODO: Implement in Phase 3
-    # This will activate monthly billing and make site live
+    try:
+        subscription_service = get_subscription_service()
+        
+        # Activate subscription
+        site = await subscription_service.activate_subscription(
+            db=db,
+            subscription_id=subscription_id,
+            subscription_data=event_data
+        )
+        
+        # Send activation email
+        email_service = get_email_service()
+        if site.customer:
+            await email_service.send_subscription_activated_email(
+                to_email=site.customer.email,
+                customer_name=site.customer.full_name or site.customer.email.split('@')[0],
+                site_title=site.site_title or site.slug,
+                site_url=f"https://{settings.SITES_DOMAIN}/{site.slug}",
+                next_billing_date=site.next_billing_date
+            )
+        
+        logger.info(f"Subscription activated and email sent: {subscription_id}")
+    
+    except Exception as e:
+        logger.error(f"Error activating subscription {subscription_id}: {e}", exc_info=True)
+        raise
 
 
 async def handle_subscription_cancelled(
@@ -221,18 +246,42 @@ async def handle_subscription_cancelled(
     event_data: Dict[str, Any]
 ) -> None:
     """
-    Handle subscription cancellation webhook (Phase 3).
+    Handle subscription cancellation webhook.
     
     Actions:
     1. Update subscription status
-    2. Set grace period end date
+    2. Downgrade site if immediate
     3. Send cancellation confirmation
     """
     subscription_id = event_data.get('id')
     
     logger.info(f"Subscription cancelled: {subscription_id}")
     
-    # TODO: Implement in Phase 3
+    try:
+        from sqlalchemy import select
+        from models.site_models import Site
+        
+        # Find site
+        result = await db.execute(
+            select(Site).where(Site.subscription_id == subscription_id)
+        )
+        site = result.scalar_one_or_none()
+        
+        if site:
+            # Update status
+            site.subscription_status = "cancelled"
+            
+            # If no end date set, cancel immediately
+            if not site.subscription_ends_at:
+                site.status = "owned"
+                site.subscription_ends_at = datetime.utcnow()
+            
+            await db.commit()
+            logger.info(f"Subscription cancelled in database: {subscription_id}")
+    
+    except Exception as e:
+        logger.error(f"Error cancelling subscription {subscription_id}: {e}", exc_info=True)
+        raise
 
 
 async def handle_subscription_payment_failed(
@@ -240,15 +289,40 @@ async def handle_subscription_payment_failed(
     event_data: Dict[str, Any]
 ) -> None:
     """
-    Handle failed subscription payment webhook (Phase 3).
+    Handle failed subscription payment webhook.
     
     Actions:
     1. Update subscription status to 'past_due'
-    2. Send payment failed email
-    3. Start grace period
+    2. Start 7-day grace period
+    3. Send payment failed email
     """
     subscription_id = event_data.get('id')
     
     logger.warning(f"Subscription payment failed: {subscription_id}")
     
-    # TODO: Implement in Phase 3
+    try:
+        subscription_service = get_subscription_service()
+        
+        # Handle payment failure
+        site = await subscription_service.handle_payment_failure(
+            db=db,
+            subscription_id=subscription_id,
+            failure_data=event_data
+        )
+        
+        # Send payment failed email
+        email_service = get_email_service()
+        if site.customer:
+            await email_service.send_subscription_payment_failed_email(
+                to_email=site.customer.email,
+                customer_name=site.customer.full_name or site.customer.email.split('@')[0],
+                site_title=site.site_title or site.slug,
+                grace_period_ends=site.grace_period_ends,
+                payment_url=f"{settings.FRONTEND_URL}/dashboard/billing"
+            )
+        
+        logger.info(f"Payment failure processed and email sent: {subscription_id}")
+    
+    except Exception as e:
+        logger.error(f"Error processing payment failure {subscription_id}: {e}", exc_info=True)
+        raise
