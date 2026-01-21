@@ -9,6 +9,13 @@ from models.prompt import PromptTemplate, PromptSetting
 from models.site import GeneratedSite
 from models.campaign import Campaign
 from models.customer import Customer, Subscription, Payment
+from models.site_models import (
+    Site,
+    CustomerUser,
+    SiteVersion,
+    EditRequest,
+    DomainVerificationRecord
+)
 
 __all__ = [
     "BaseModel",
@@ -22,4 +29,10 @@ __all__ = [
     "Customer",
     "Subscription",
     "Payment",
+    # Phase 2 models
+    "Site",
+    "CustomerUser",
+    "SiteVersion",
+    "EditRequest",
+    "DomainVerificationRecord",
 ]
