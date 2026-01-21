@@ -23,7 +23,7 @@ class BaseAgent:
     def __init__(
         self,
         agent_name: str,
-        model: str = "claude-3-5-sonnet-20240620",
+        model: str = "claude-3-5-sonnet-latest",
         temperature: float = 0.7,
         max_tokens: int = 4096
     ):

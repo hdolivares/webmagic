@@ -19,7 +19,7 @@ class ConceptAgent(BaseAgent):
     Output: 3 brand concepts + selected concept + Creative DNA
     """
     
-    def __init__(self, prompt_builder: PromptBuilder, model: str = "claude-3-5-sonnet-20240620"):
+    def __init__(self, prompt_builder: PromptBuilder, model: str = "claude-3-5-sonnet-latest"):
         super().__init__(
             agent_name="concept",
             model=model,

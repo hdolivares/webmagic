@@ -88,7 +88,7 @@ class CreativeOrchestrator:
                 logger.info(f"Using configured model: {provider}/{model}")
         except Exception as e:
             # Fallback to default if settings not found
-            model = "claude-3-5-sonnet-20240620"
+            model = "claude-3-5-sonnet-latest"
             logger.warning(f"Failed to load model config, using default: {model}. Error: {e}")
         
         # Initialize agents with dynamic model

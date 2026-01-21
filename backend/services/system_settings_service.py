@@ -16,8 +16,10 @@ AI_PROVIDERS = {
     "anthropic": {
         "name": "Anthropic (Claude)",
         "models": [
-            {"id": "claude-3-5-sonnet-20240620", "name": "Claude 3.5 Sonnet", "recommended": True},
-            {"id": "claude-3-opus-20240229", "name": "Claude 3 Opus (Most Capable)"},
+            {"id": "claude-3-5-sonnet-latest", "name": "Claude 3.5 Sonnet (Latest)", "recommended": True},
+            {"id": "claude-3-5-sonnet-20240620", "name": "Claude 3.5 Sonnet (June 2024)"},
+            {"id": "claude-3-opus-latest", "name": "Claude 3 Opus (Most Capable)"},
+            {"id": "claude-3-sonnet-20240229", "name": "Claude 3 Sonnet"},
             {"id": "claude-3-haiku-20240307", "name": "Claude 3 Haiku (Fastest)"},
         ],
         "requires_key": "ANTHROPIC_API_KEY"
@@ -139,7 +141,7 @@ class SystemSettingsService:
     async def get_ai_config(db: AsyncSession) -> Dict[str, Any]:
         """Get current AI configuration."""
         llm_provider = await SystemSettingsService.get_setting(db, "llm_provider", "anthropic")
-        llm_model = await SystemSettingsService.get_setting(db, "llm_model", "claude-3-5-sonnet-20240620")
+        llm_model = await SystemSettingsService.get_setting(db, "llm_model", "claude-3-5-sonnet-latest")
         image_provider = await SystemSettingsService.get_setting(db, "image_provider", "google")
         image_model = await SystemSettingsService.get_setting(db, "image_model", "imagen-3.0-generate-001")
         
@@ -183,7 +185,7 @@ class SystemSettingsService:
             },
             {
                 "key": "llm_model",
-                "value": "claude-3-5-sonnet-20240620",
+                "value": "claude-3-5-sonnet-latest",
                 "value_type": "string",
                 "category": "ai",
                 "label": "LLM Model",

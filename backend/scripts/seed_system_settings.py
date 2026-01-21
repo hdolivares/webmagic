@@ -17,6 +17,7 @@ async def create_table():
     engine = create_async_engine(settings.DATABASE_URL)
     
     async with engine.begin() as conn:
+        # Create table
         await conn.execute(text("""
             CREATE TABLE IF NOT EXISTS system_settings (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -32,10 +33,15 @@ async def create_table():
                 default_value TEXT,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-            );
-            
-            CREATE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings(key);
-            CREATE INDEX IF NOT EXISTS idx_system_settings_category ON system_settings(category);
+            )
+        """))
+        
+        # Create indexes
+        await conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings(key)
+        """))
+        await conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_system_settings_category ON system_settings(category)
         """))
     
     await engine.dispose()
