@@ -11,7 +11,7 @@ import logging
 
 from core.database import get_db
 from core.customer_security import get_current_customer
-from core.exceptions import NotFoundError, ValidationError, ForbiddenError, BusinessLogicError
+from core.exceptions import NotFoundError, ValidationError, ForbiddenError
 from api.schemas.ticket import (
     TicketCreateRequest,
     TicketMessageCreate,
