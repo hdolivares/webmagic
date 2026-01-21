@@ -262,20 +262,17 @@ async def update_architect_prompt():
             return
         
         print("📝 Current template found")
-        print(f"   System prompt length: {len(architect.system_template)} chars")
-        print(f"   User prompt length: {len(architect.user_template)} chars")
+        print(f"   System prompt length: {len(architect.system_prompt)} chars")
         print()
         
-        # Update the templates
-        architect.system_template = ARCHITECT_SYSTEM_PROMPT
-        architect.user_template = ARCHITECT_USER_PROMPT
+        # Update the prompt
+        architect.system_prompt = ARCHITECT_SYSTEM_PROMPT
         
         await session.commit()
         
         print("✅ Architect template updated successfully!")
         print()
         print(f"   New system prompt: {len(ARCHITECT_SYSTEM_PROMPT)} chars")
-        print(f"   New user prompt: {len(ARCHITECT_USER_PROMPT)} chars")
         print()
         print("🎯 Changes:")
         print("   - Removed all fallback logic")
@@ -284,6 +281,9 @@ async def update_architect_prompt():
         print("   - Intelligent content adaptation based on business type")
         print("   - Enhanced service section generation")
         print("   - Better contact strategy handling")
+        print()
+        print("NOTE: The user prompt is generated dynamically by PromptBuilder")
+        print("      using the enhanced business data from CategoryKnowledgeService")
         print()
         print("🚀 Ready to generate production-quality websites!")
         
