@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import text
 from core.config import get_settings
 
 settings = get_settings()
@@ -31,10 +32,10 @@ async def add_grace_period_column():
     print()
     
     async with engine.begin() as conn:
-        await conn.execute("""
+        await conn.execute(text("""
             ALTER TABLE sites 
             ADD COLUMN IF NOT EXISTS grace_period_ends TIMESTAMP WITH TIME ZONE;
-        """)
+        """))
         
         print("✅ Column grace_period_ends added to sites table")
     

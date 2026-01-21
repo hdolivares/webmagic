@@ -225,7 +225,7 @@ async def run_tests():
                 
                 assert failed_site.subscription_status == "past_due"
                 assert failed_site.grace_period_ends is not None
-                grace_days = (failed_site.grace_period_ends - datetime.utcnow()).days
+                grace_days = (failed_site.grace_period_ends - datetime.now()).days
                 assert 6 <= grace_days <= 7, f"Grace period should be ~7 days, got {grace_days}"
                 print_success(f"Grace period started: ends {failed_site.grace_period_ends}")
                 test_results.append(("Handle payment failure", True))
