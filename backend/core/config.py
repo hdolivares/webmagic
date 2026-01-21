@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     RECURRENTE_SECRET_KEY: str
     RECURRENTE_WEBHOOK_SECRET: str = ""
     RECURRENTE_BASE_URL: str = "https://app.recurrente.com"
+    RECURRENTE_SUBSCRIPTION_PLAN_ID: str = "default_plan"  # Monthly subscription plan ID
     
     # Site Hosting
     SITES_DOMAIN: str = "sites.lavish.solutions"  # Domain for path-based hosting
