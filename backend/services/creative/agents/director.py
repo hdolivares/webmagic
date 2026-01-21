@@ -19,7 +19,7 @@ class ArtDirectorAgent(BaseAgent):
     Output: Complete design specification (vibe, typography, colors, etc.)
     """
     
-    def __init__(self, prompt_builder: PromptBuilder, model: str = "claude-3-5-sonnet-latest"):
+    def __init__(self, prompt_builder: PromptBuilder, model: str = "claude-sonnet-4-5"):
         super().__init__(
             agent_name="art_director",
             model=model,
