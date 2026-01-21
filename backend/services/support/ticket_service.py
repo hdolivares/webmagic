@@ -15,9 +15,11 @@ from sqlalchemy.orm import selectinload
 from models.support_ticket import SupportTicket, TicketMessage, TicketTemplate
 from models.site_models import CustomerUser, Site
 from core.exceptions import NotFoundError, ValidationError, ForbiddenError
-from services.creative.ai_client import AIClient
+from anthropic import AsyncAnthropic
+from core.config import get_settings
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 class TicketService:
@@ -167,7 +169,8 @@ class TicketService:
             ticket: Ticket to process
         """
         try:
-            ai_client = AIClient()
+            import json
+            ai_client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
             
             # Build prompt for AI
             prompt = f"""You are a customer support AI assistant. Analyze the following support ticket and provide:
@@ -198,19 +201,22 @@ Respond in JSON format:
 }}"""
             
             # Get AI response
-            response = await ai_client.chat(
-                messages=[
-                    {"role": "system", "content": "You are a helpful customer support assistant."},
-                    {"role": "user", "content": prompt}
-                ],
+            message = await ai_client.messages.create(
+                model="claude-sonnet-3-5-20241022",
                 max_tokens=1500,
-                temperature=0.3
+                temperature=0.3,
+                system="You are a helpful customer support assistant.",
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
             )
             
+            # Extract response text
+            response_text = message.content[0].text
+            
             # Parse AI response
-            import json
             try:
-                ai_analysis = json.loads(response)
+                ai_analysis = json.loads(response_text)
             except json.JSONDecodeError:
                 logger.warning(f"Failed to parse AI response for ticket {ticket.ticket_number}")
                 return
