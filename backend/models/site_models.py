@@ -84,6 +84,11 @@ class Site(BaseModel):
         back_populates="site",
         cascade="all, delete-orphan"
     )
+    support_tickets = relationship(
+        "SupportTicket",
+        back_populates="site",
+        cascade="all, delete-orphan"
+    )
     customer_user = relationship(
         "CustomerUser",
         back_populates="site",
@@ -153,6 +158,7 @@ class CustomerUser(BaseModel):
     
     # Relationships
     site = relationship("Site", back_populates="customer_user")
+    support_tickets = relationship("SupportTicket", back_populates="customer_user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<CustomerUser {self.email}>"

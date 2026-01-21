@@ -486,6 +486,59 @@ class ApiClient {
     })
     return response.data
   }
+
+  // ============================================
+  // SUPPORT TICKETS METHODS (Phase 6)
+  // ============================================
+
+  async getTicketCategories(): Promise<any> {
+    const response = await this.client.get('/tickets/categories')
+    return response.data
+  }
+
+  async createTicket(data: {
+    subject: string
+    description: string
+    category: string
+    site_id?: string
+  }): Promise<any> {
+    const response = await this.client.post('/tickets/', data)
+    return response.data
+  }
+
+  async listTickets(params?: {
+    status?: string
+    category?: string
+    limit?: number
+    offset?: number
+  }): Promise<any> {
+    const response = await this.client.get('/tickets/', { params })
+    return response.data
+  }
+
+  async getTicket(ticketId: string): Promise<any> {
+    const response = await this.client.get(`/tickets/${ticketId}`)
+    return response.data
+  }
+
+  async getTicketStats(): Promise<any> {
+    const response = await this.client.get('/tickets/stats')
+    return response.data
+  }
+
+  async addTicketMessage(ticketId: string, message: string): Promise<any> {
+    const response = await this.client.post(`/tickets/${ticketId}/messages`, {
+      message
+    })
+    return response.data
+  }
+
+  async updateTicketStatus(ticketId: string, status: string): Promise<any> {
+    const response = await this.client.patch(`/tickets/${ticketId}/status`, {
+      status
+    })
+    return response.data
+  }
 }
 
 // Export singleton instance
