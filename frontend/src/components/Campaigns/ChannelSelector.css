@@ -1,0 +1,213 @@
+/**
+ * Channel Selector Styles
+ * 
+ * Uses semantic CSS variables for consistency with the WebMagic design system.
+ * 
+ * Author: WebMagic Team
+ * Date: January 21, 2026
+ */
+
+/* =============================================================================
+   Channel Selector Container
+   ============================================================================= */
+
+.channel-selector {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm, 0.75rem);
+    margin-bottom: var(--spacing-md, 1rem);
+}
+
+.channel-selector__label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs, 0.5rem);
+    font-size: var(--font-size-md, 0.95rem);
+    font-weight: var(--font-weight-semibold, 600);
+    color: var(--color-text-primary, #1a1a1a);
+}
+
+.channel-selector__info {
+    font-size: var(--font-size-sm, 0.875rem);
+    opacity: 0.7;
+    cursor: help;
+    transition: opacity var(--transition-fast, 0.15s) ease;
+}
+
+.channel-selector__info:hover {
+    opacity: 1;
+}
+
+/* =============================================================================
+   Channel Options Grid
+   ============================================================================= */
+
+.channel-selector__options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--spacing-md, 1rem);
+}
+
+@media (max-width: 768px) {
+    .channel-selector__options {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =============================================================================
+   Channel Option Card
+   ============================================================================= */
+
+.channel-option {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--spacing-md, 1rem);
+    padding: var(--spacing-md, 1rem);
+    background: var(--color-bg-secondary, #ffffff);
+    border: 2px solid var(--color-border-light, #e5e7eb);
+    border-radius: var(--border-radius-md, 0.5rem);
+    cursor: pointer;
+    transition: all var(--transition-normal, 0.2s) ease;
+    text-align: left;
+}
+
+.channel-option:hover:not(.channel-option--disabled) {
+    border-color: var(--color-primary, #6366f1);
+    box-shadow: var(--shadow-md, 0 4px 6px rgba(0, 0, 0, 0.1));
+    transform: translateY(-2px);
+}
+
+.channel-option:focus {
+    outline: none;
+    border-color: var(--color-primary, #6366f1);
+    box-shadow: 0 0 0 3px var(--color-primary-alpha, rgba(99, 102, 241, 0.1));
+}
+
+.channel-option--selected {
+    border-color: var(--color-primary, #6366f1);
+    background: var(--color-primary-alpha-light, rgba(99, 102, 241, 0.05));
+}
+
+.channel-option--disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* =============================================================================
+   Channel Option Content
+   ============================================================================= */
+
+.channel-option__icon {
+    font-size: var(--font-size-2xl, 2rem);
+    flex-shrink: 0;
+}
+
+.channel-option__content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs, 0.5rem);
+}
+
+.channel-option__header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs, 0.5rem);
+}
+
+.channel-option__label {
+    font-size: var(--font-size-md, 0.95rem);
+    font-weight: var(--font-weight-semibold, 600);
+    color: var(--color-text-primary, #1a1a1a);
+}
+
+.channel-option__badge {
+    padding: var(--spacing-xs, 0.25rem) var(--spacing-sm, 0.5rem);
+    background: var(--color-success-alpha, rgba(34, 197, 94, 0.1));
+    color: var(--color-success, #22c55e);
+    border-radius: var(--border-radius-sm, 0.25rem);
+    font-size: var(--font-size-xs, 0.75rem);
+    font-weight: var(--font-weight-medium, 500);
+}
+
+.channel-option__description {
+    margin: 0;
+    font-size: var(--font-size-sm, 0.875rem);
+    color: var(--color-text-secondary, #64748b);
+    line-height: 1.5;
+}
+
+.channel-option__cost {
+    margin: 0;
+    font-size: var(--font-size-xs, 0.75rem);
+    color: var(--color-text-tertiary, #94a3b8);
+    font-weight: var(--font-weight-medium, 500);
+}
+
+.channel-option__checkmark {
+    position: absolute;
+    top: var(--spacing-sm, 0.75rem);
+    right: var(--spacing-sm, 0.75rem);
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-primary, #6366f1);
+    color: white;
+    border-radius: 50%;
+    font-size: var(--font-size-sm, 0.875rem);
+    font-weight: var(--font-weight-bold, 700);
+}
+
+/* =============================================================================
+   Responsive Adjustments
+   ============================================================================= */
+
+@media (max-width: 768px) {
+    .channel-option {
+        padding: var(--spacing-sm, 0.75rem);
+    }
+
+    .channel-option__icon {
+        font-size: var(--font-size-xl, 1.5rem);
+    }
+
+    .channel-option__label {
+        font-size: var(--font-size-sm, 0.875rem);
+    }
+
+    .channel-option__description {
+        font-size: var(--font-size-xs, 0.75rem);
+    }
+}
+
+/* =============================================================================
+   Dark Mode Support (Optional)
+   ============================================================================= */
+
+@media (prefers-color-scheme: dark) {
+    .channel-option {
+        background: var(--color-bg-dark-secondary, #1e293b);
+        border-color: var(--color-border-dark, #334155);
+    }
+
+    .channel-option__label {
+        color: var(--color-text-dark-primary, #f1f5f9);
+    }
+
+    .channel-option__description {
+        color: var(--color-text-dark-secondary, #94a3b8);
+    }
+
+    .channel-option__cost {
+        color: var(--color-text-dark-tertiary, #64748b);
+    }
+
+    .channel-option--selected {
+        background: var(--color-primary-alpha-dark, rgba(99, 102, 241, 0.15));
+    }
+}
+
