@@ -92,8 +92,11 @@ async def test_creative_pipeline():
             # Generate the website
             result = await orchestrator.generate_website(
                 business_data=BUSINESS_DATA,
-                subdomain="la-plumbing-pros-test"
+                save_intermediate=True
             )
+            
+            # Extract website data from nested structure
+            website = result.get("website", {})
             
             # Save results
             print("\n" + "=" * 80)
@@ -101,10 +104,10 @@ async def test_creative_pipeline():
             print("=" * 80)
             
             # 1. Brand Analysis
-            if result.get("brand_analysis"):
+            if result.get("analysis"):
                 analysis_file = output_dir / "01_brand_analysis.json"
                 with open(analysis_file, "w") as f:
-                    json.dump(result["brand_analysis"], f, indent=2)
+                    json.dump(result["analysis"], f, indent=2)
                 print(f"✅ Brand Analysis saved: {analysis_file}")
             
             # 2. Creative DNA
@@ -122,31 +125,31 @@ async def test_creative_pipeline():
                 print(f"✅ Design Brief saved: {brief_file}")
             
             # 4. HTML
-            if result.get("html"):
+            if website.get("html"):
                 html_file = output_dir / "04_website.html"
                 with open(html_file, "w") as f:
-                    f.write(result["html"])
+                    f.write(website["html"])
                 print(f"✅ HTML saved: {html_file}")
             
             # 5. CSS
-            if result.get("css"):
+            if website.get("css"):
                 css_file = output_dir / "05_styles.css"
                 with open(css_file, "w") as f:
-                    f.write(result["css"])
+                    f.write(website["css"])
                 print(f"✅ CSS saved: {css_file}")
             
             # 6. JavaScript
-            if result.get("js"):
+            if website.get("js"):
                 js_file = output_dir / "06_scripts.js"
                 with open(js_file, "w") as f:
-                    f.write(result["js"])
+                    f.write(website["js"])
                 print(f"✅ JavaScript saved: {js_file}")
             
             # 7. Generated Images
-            if result.get("generated_images"):
+            if website.get("generated_images"):
                 images_file = output_dir / "07_generated_images.json"
                 with open(images_file, "w") as f:
-                    json.dump(result["generated_images"], f, indent=2)
+                    json.dump(website["generated_images"], f, indent=2)
                 print(f"✅ Generated Images metadata: {images_file}")
             
             # 8. Complete package
@@ -158,14 +161,16 @@ async def test_creative_pipeline():
                     "business": BUSINESS_DATA["name"],
                     "category": BUSINESS_DATA["category"],
                     "location": f"{BUSINESS_DATA['city']}, {BUSINESS_DATA['state']}",
-                    "html_length": len(result.get("html", "")),
-                    "css_length": len(result.get("css", "")),
-                    "js_length": len(result.get("js", "")),
-                    "brand_analysis": result.get("brand_analysis"),
+                    "html_length": len(website.get("html", "")),
+                    "css_length": len(website.get("css", "")),
+                    "js_length": len(website.get("js", "")),
+                    "brand_analysis": result.get("analysis"),
                     "creative_dna": result.get("creative_dna"),
                     "design_brief": result.get("design_brief"),
-                    "generated_images": result.get("generated_images"),
-                    "meta": result.get("meta"),
+                    "generated_images": website.get("generated_images"),
+                    "meta": website.get("meta"),
+                    "total_duration_ms": result.get("total_duration_ms"),
+                    "status": result.get("status"),
                 }
                 json.dump(summary, f, indent=2)
             print(f"✅ Complete summary: {complete_file}")
@@ -175,27 +180,34 @@ async def test_creative_pipeline():
             print("✅ PIPELINE COMPLETE - RESULTS SUMMARY")
             print("=" * 80)
             
+            total_duration = result.get("total_duration_ms", 0) / 1000
+            print(f"\n⏱️  Total Generation Time: {total_duration:.1f} seconds")
+            
             print(f"\n📊 Content Generated:")
-            html_len = len(result.get('html', ''))
-            css_len = len(result.get('css', ''))
-            js_len = len(result.get('js', ''))
+            html_len = len(website.get('html', ''))
+            css_len = len(website.get('css', ''))
+            js_len = len(website.get('js', ''))
             print(f"   - HTML: {html_len:,} characters")
             print(f"   - CSS: {css_len:,} characters")
             print(f"   - JavaScript: {js_len:,} characters")
             
-            if result.get("brand_analysis"):
-                analysis = result["brand_analysis"]
+            if result.get("analysis"):
+                analysis = result["analysis"]
                 print(f"\n🎯 Brand Analysis:")
+                print(f"   - Brand Archetype: {analysis.get('brand_archetype', 'N/A')}")
                 print(f"   - Target Audience: {analysis.get('target_audience', 'N/A')}")
-                print(f"   - Brand Personality: {', '.join(analysis.get('brand_personality', []))}")
-                print(f"   - Competitive Advantages: {', '.join(analysis.get('competitive_advantages', []))}")
+                traits = analysis.get('personality_traits', [])
+                if traits:
+                    print(f"   - Personality Traits: {', '.join(traits[:3])}")
             
             if result.get("creative_dna"):
                 dna = result["creative_dna"]
                 print(f"\n🧬 Creative DNA:")
                 print(f"   - Brand Archetype: {dna.get('brand_archetype', 'N/A')}")
                 print(f"   - Value Proposition: {dna.get('value_proposition', 'N/A')}")
-                print(f"   - Personality Traits: {', '.join(dna.get('personality_traits', []))}")
+                traits = dna.get('personality_traits', [])
+                if traits:
+                    print(f"   - Personality Traits: {', '.join(traits[:3])}")
             
             if result.get("design_brief"):
                 brief = result["design_brief"]
@@ -209,8 +221,8 @@ async def test_creative_pipeline():
                 print(f"   - Display Font: {typography.get('display', 'N/A')}")
                 print(f"   - Body Font: {typography.get('body', 'N/A')}")
             
-            if result.get("generated_images"):
-                images = result["generated_images"]
+            if website.get("generated_images"):
+                images = website["generated_images"]
                 print(f"\n🖼️  Generated Images: {len(images)}")
                 for img in images:
                     img_size = img['size_bytes']
