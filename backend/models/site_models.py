@@ -51,6 +51,7 @@ class Site(BaseModel):
     subscription_ends_at = Column(DateTime(timezone=True), nullable=True)
     monthly_amount = Column(Numeric(10, 2), default=95.00)
     next_billing_date = Column(Date, nullable=True)
+    grace_period_ends = Column(DateTime(timezone=True), nullable=True)  # Phase 3: Grace period for failed payments
     
     # Custom domain
     custom_domain = Column(String(255), unique=True, nullable=True, index=True)
