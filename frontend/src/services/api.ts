@@ -314,6 +314,33 @@ class ApiClient {
     )
     return response.data
   }
+
+  // ============================================
+  // IMAGE GENERATION METHODS
+  // ============================================
+
+  async testImageGeneration(
+    data: import('@/types').ImageGenerationRequest
+  ): Promise<import('@/types').ImageGenerationResponse> {
+    const response = await this.client.post<import('@/types').ImageGenerationResponse>(
+      '/sites/test-image-generation',
+      data
+    )
+    return response.data
+  }
+
+  async downloadGeneratedImage(
+    data: import('@/types').ImageGenerationRequest
+  ): Promise<Blob> {
+    const response = await this.client.post(
+      '/sites/test-image-generation/download',
+      data,
+      {
+        responseType: 'blob',
+      }
+    )
+    return response.data
+  }
 }
 
 // Export singleton instance

@@ -154,6 +154,35 @@
   --z-modal: 1400;
   --z-popover: 1500;
   --z-tooltip: 1600;
+
+  /* ============================================
+     IMAGE GENERATION SPECIFIC
+     ============================================ */
+  /* Preview container */
+  --image-preview-size: 320px;
+  --image-preview-aspect: 16 / 9;
+  --image-preview-border: var(--color-border);
+  --image-preview-bg: var(--color-background-secondary);
+  --image-preview-loading-bg: var(--color-background-tertiary);
+  
+  /* Generator controls */
+  --generator-panel-bg: var(--color-surface);
+  --generator-panel-border: var(--color-border);
+  --generator-input-bg: var(--color-background);
+  
+  /* Image type badges */
+  --image-type-hero-color: var(--color-primary-600);
+  --image-type-background-color: var(--color-accent-600);
+  --image-type-icon-color: var(--color-warning);
+  --image-type-product-color: var(--color-success);
+  
+  /* Loading states */
+  --skeleton-base: var(--color-secondary-200);
+  --skeleton-highlight: var(--color-secondary-100);
+  
+  /* Progress indicator */
+  --progress-bar-bg: var(--color-secondary-200);
+  --progress-bar-fill: var(--color-primary-600);
 }
 
 /* ============================================
@@ -239,4 +268,10 @@
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.4);
+
+  /* Image Generation - Dark Mode Adjustments */
+  --image-preview-bg: var(--color-background-tertiary);
+  --image-preview-loading-bg: var(--color-surface);
+  --skeleton-base: var(--color-secondary-700);
+  --skeleton-highlight: var(--color-secondary-600);
 }
