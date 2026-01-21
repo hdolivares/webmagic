@@ -14,7 +14,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.deps import get_db, get_current_customer
+from api.deps import get_db, get_current_active_user
 from api.schemas.edit_request import (
     EditRequestCreate,
     EditRequestResponse,
@@ -23,7 +23,7 @@ from api.schemas.edit_request import (
     EditRequestApproval,
     EditRequestStats
 )
-from models.site_models import CustomerUser
+from models.user_models import AdminUser
 from services.edit_service import get_edit_service, EditService
 from core.exceptions import (
     ResourceNotFoundError,
@@ -86,7 +86,7 @@ async def create_edit_request(
     site_id: UUID,
     request_data: EditRequestCreate,
     db: AsyncSession = Depends(get_db),
-    current_customer: CustomerUser = Depends(get_current_customer)
+    current_user: AdminUser = Depends(get_current_active_user)
 ) -> EditRequestResponse:
     """
     Create a new edit request.
@@ -95,7 +95,7 @@ async def create_edit_request(
         site_id: ID of the site to edit
         request_data: Edit request details
         db: Database session
-        current_customer: Authenticated customer
+        current_user: Authenticated customer
     
     Returns:
         Created edit request
@@ -113,7 +113,7 @@ async def create_edit_request(
             request_text=request_data.request_text,
             request_type=request_data.request_type,
             target_section=request_data.target_section,
-            customer_id=current_customer.id
+            customer_id=current_user.id
         )
         
         # Trigger async processing (Celery task)
@@ -121,9 +121,9 @@ async def create_edit_request(
         process_edit_request_task.delay(str(edit_request.id))
         
         logger.info(
-            f"Customer {current_customer.id} created edit request {edit_request.id}",
+            f"Customer {current_user.id} created edit request {edit_request.id}",
             extra={
-                "customer_id": str(current_customer.id),
+                "customer_id": str(current_user.id),
                 "site_id": str(site_id),
                 "edit_request_id": str(edit_request.id)
             }
@@ -187,7 +187,7 @@ async def list_edit_requests(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     db: AsyncSession = Depends(get_db),
-    current_customer: CustomerUser = Depends(get_current_customer)
+    current_user: AdminUser = Depends(get_current_active_user)
 ) -> EditRequestList:
     """
     List edit requests for a site.
@@ -198,7 +198,7 @@ async def list_edit_requests(
         page: Page number (1-indexed)
         page_size: Number of items per page
         db: Database session
-        current_customer: Authenticated customer
+        current_user: Authenticated customer
     
     Returns:
         Paginated list of edit requests
@@ -216,7 +216,7 @@ async def list_edit_requests(
             status=status,
             limit=page_size,
             offset=offset,
-            customer_id=current_customer.id
+            customer_id=current_user.id
         )
         
         # Convert to response models
@@ -265,7 +265,7 @@ async def get_edit_request(
     site_id: UUID,
     request_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_customer: CustomerUser = Depends(get_current_customer)
+    current_user: AdminUser = Depends(get_current_active_user)
 ) -> EditRequestResponse:
     """
     Get a specific edit request.
@@ -274,7 +274,7 @@ async def get_edit_request(
         site_id: ID of the site
         request_id: ID of the edit request
         db: Database session
-        current_customer: Authenticated customer
+        current_user: Authenticated customer
     
     Returns:
         Edit request details
@@ -286,7 +286,7 @@ async def get_edit_request(
         # Get request
         edit_request = await edit_service.get_edit_request(
             request_id=request_id,
-            customer_id=current_customer.id
+            customer_id=current_user.id
         )
         
         # Verify it belongs to the specified site
@@ -334,7 +334,7 @@ async def get_edit_request(
 async def get_edit_request_stats(
     site_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_customer: CustomerUser = Depends(get_current_customer)
+    current_user: AdminUser = Depends(get_current_active_user)
 ) -> EditRequestStats:
     """
     Get edit request statistics for a site.
@@ -342,7 +342,7 @@ async def get_edit_request_stats(
     Args:
         site_id: ID of the site
         db: Database session
-        current_customer: Authenticated customer
+        current_user: Authenticated customer
     
     Returns:
         Statistics dictionary
@@ -354,7 +354,7 @@ async def get_edit_request_stats(
         # Get stats
         stats = await edit_service.get_edit_request_stats(
             site_id=site_id,
-            customer_id=current_customer.id
+            customer_id=current_user.id
         )
         
         return EditRequestStats(**stats)
@@ -402,7 +402,7 @@ async def approve_edit_request(
     request_id: UUID,
     approval_data: EditRequestApproval,
     db: AsyncSession = Depends(get_db),
-    current_customer: CustomerUser = Depends(get_current_customer)
+    current_user: AdminUser = Depends(get_current_active_user)
 ) -> EditRequestResponse:
     """
     Approve an edit request.
@@ -412,7 +412,7 @@ async def approve_edit_request(
         request_id: ID of the edit request
         approval_data: Approval details
         db: Database session
-        current_customer: Authenticated customer
+        current_user: Authenticated customer
     
     Returns:
         Updated edit request
@@ -425,7 +425,7 @@ async def approve_edit_request(
         if approval_data.approved:
             edit_request = await edit_service.approve_edit(
                 request_id=request_id,
-                customer_id=current_customer.id,
+                customer_id=current_user.id,
                 feedback=approval_data.feedback
             )
             
@@ -436,15 +436,15 @@ async def approve_edit_request(
             # If approved=false, treat as rejection
             edit_request = await edit_service.reject_edit(
                 request_id=request_id,
-                customer_id=current_customer.id,
+                customer_id=current_user.id,
                 reason=approval_data.feedback or "Customer did not approve"
             )
         
         logger.info(
-            f"Edit request {request_id} {'approved' if approval_data.approved else 'rejected'} by customer {current_customer.id}",
+            f"Edit request {request_id} {'approved' if approval_data.approved else 'rejected'} by customer {current_user.id}",
             extra={
                 "edit_request_id": str(request_id),
-                "customer_id": str(current_customer.id),
+                "customer_id": str(current_user.id),
                 "approved": approval_data.approved
             }
         )
@@ -495,7 +495,7 @@ async def reject_edit_request(
     request_id: UUID,
     rejection_data: EditRequestApproval,
     db: AsyncSession = Depends(get_db),
-    current_customer: CustomerUser = Depends(get_current_customer)
+    current_user: AdminUser = Depends(get_current_active_user)
 ) -> EditRequestResponse:
     """
     Reject an edit request.
@@ -505,7 +505,7 @@ async def reject_edit_request(
         request_id: ID of the edit request
         rejection_data: Rejection details
         db: Database session
-        current_customer: Authenticated customer
+        current_user: Authenticated customer
     
     Returns:
         Updated edit request
@@ -525,15 +525,15 @@ async def reject_edit_request(
         # Reject request
         edit_request = await edit_service.reject_edit(
             request_id=request_id,
-            customer_id=current_customer.id,
+            customer_id=current_user.id,
             reason=rejection_data.feedback
         )
         
         logger.info(
-            f"Edit request {request_id} rejected by customer {current_customer.id}",
+            f"Edit request {request_id} rejected by customer {current_user.id}",
             extra={
                 "edit_request_id": str(request_id),
-                "customer_id": str(current_customer.id),
+                "customer_id": str(current_user.id),
                 "reason": rejection_data.feedback
             }
         )
@@ -593,7 +593,7 @@ async def cancel_edit_request(
     site_id: UUID,
     request_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_customer: CustomerUser = Depends(get_current_customer)
+    current_user: AdminUser = Depends(get_current_active_user)
 ) -> None:
     """
     Cancel an edit request.
@@ -602,7 +602,7 @@ async def cancel_edit_request(
         site_id: ID of the site
         request_id: ID of the edit request
         db: Database session
-        current_customer: Authenticated customer
+        current_user: Authenticated customer
     """
     try:
         # Get service
@@ -611,14 +611,14 @@ async def cancel_edit_request(
         # Cancel request
         await edit_service.cancel_edit_request(
             request_id=request_id,
-            customer_id=current_customer.id
+            customer_id=current_user.id
         )
         
         logger.info(
-            f"Edit request {request_id} canceled by customer {current_customer.id}",
+            f"Edit request {request_id} canceled by customer {current_user.id}",
             extra={
                 "edit_request_id": str(request_id),
-                "customer_id": str(current_customer.id)
+                "customer_id": str(current_user.id)
             }
         )
         
