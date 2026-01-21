@@ -21,7 +21,7 @@ class ArtDirectorAgent(BaseAgent):
     
     def __init__(self, prompt_builder: PromptBuilder):
         super().__init__(
-            agent_name="director",
+            agent_name="art_director",
             model="claude-3-5-sonnet-20241022",
             temperature=0.7,  # Balanced creativity and consistency
             max_tokens=4096
@@ -55,7 +55,7 @@ class ArtDirectorAgent(BaseAgent):
         
         # Build prompts
         system_prompt, user_prompt = await self.prompt_builder.build_prompts(
-            agent_name="director",
+            agent_name="art_director",
             data={
                 "name": business_data.get("name"),
                 "category": business_data.get("category"),
