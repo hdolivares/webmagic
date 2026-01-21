@@ -168,9 +168,16 @@ class CustomerUser(BaseModel):
 
 
 class SiteVersion(BaseModel):
-    """Site version history model."""
+    """
+    Site version history model.
+    
+    Versions are immutable once created, so no updated_at column.
+    """
     
     __tablename__ = "site_versions"
+    
+    # Override updated_at from BaseModel (versions are immutable)
+    updated_at = None
     
     # Reference
     site_id = Column(
