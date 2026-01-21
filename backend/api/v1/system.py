@@ -10,7 +10,7 @@ from api.deps import get_db, get_current_user
 from models.user import AdminUser
 from services.system_settings_service import SystemSettingsService
 
-router = APIRouter()
+router = APIRouter(prefix="/system", tags=["System Settings"])
 
 
 class AIConfigResponse(BaseModel):
