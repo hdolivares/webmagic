@@ -244,3 +244,51 @@ export interface DashboardStats {
   total_revenue: number
   conversion_rate: number
 }
+
+// ============================================
+// IMAGE GENERATION TYPES
+// ============================================
+
+export type ImageType = 'hero' | 'background' | 'product' | 'icon'
+export type AspectRatio = '1:1' | '16:9' | '4:3' | '3:2' | '21:9'
+export type BrandArchetype = 
+  | 'Explorer' 
+  | 'Creator' 
+  | 'Caregiver' 
+  | 'Ruler' 
+  | 'Sage' 
+  | 'Innocent' 
+  | 'Hero' 
+  | 'Magician' 
+  | 'Outlaw' 
+  | 'Lover' 
+  | 'Jester' 
+  | 'Regular Guy'
+
+export interface ImageGenerationRequest {
+  business_name: string
+  category: string
+  brand_archetype?: BrandArchetype
+  color_primary?: string
+  color_secondary?: string
+  color_accent?: string
+  image_type: ImageType
+  aspect_ratio?: AspectRatio
+}
+
+export interface ImageGenerationResponse {
+  success: boolean
+  message: string
+  size_bytes?: number
+  aspect_ratio?: string
+  image_type: ImageType
+}
+
+export interface GeneratedImage {
+  id: string
+  type: ImageType
+  url: string
+  size_bytes: number
+  aspect_ratio: string
+  created_at: string
+}

@@ -19,6 +19,7 @@ import { CampaignsPage } from '@/pages/Campaigns/CampaignsPage'
 import { CustomersPage } from '@/pages/Customers/CustomersPage'
 import { CoveragePage } from '@/pages/Coverage/CoveragePage'
 import { SettingsPage } from '@/pages/Settings/SettingsPage'
+import { ImageGenerationPage } from '@/pages/ImageGeneration/ImageGenerationPage'
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -76,6 +77,7 @@ function App() {
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="businesses" element={<BusinessesPage />} />
             <Route path="sites" element={<SitesPage />} />
+            <Route path="sites/image-generator" element={<ImageGenerationPage />} />
             <Route path="campaigns" element={<CampaignsPage />} />
             <Route path="customers" element={<CustomersPage />} />
             <Route path="coverage" element={<CoveragePage />} />

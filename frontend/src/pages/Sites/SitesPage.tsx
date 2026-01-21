@@ -2,11 +2,14 @@
  * Sites gallery page
  */
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
-import { Card, CardHeader, CardBody, CardTitle, Badge } from '@/components/ui'
-import { Globe, ExternalLink } from 'lucide-react'
+import { Card, CardHeader, CardBody, CardTitle, Badge, Button } from '@/components/ui'
+import { Globe, ExternalLink, Wand2 } from 'lucide-react'
 
 export const SitesPage = () => {
+  const navigate = useNavigate()
+  
   const { data, isLoading } = useQuery({
     queryKey: ['sites'],
     queryFn: () => api.getSites({ limit: 50 }),
@@ -29,6 +32,15 @@ export const SitesPage = () => {
           <h1 className="text-4xl font-bold text-text-primary mb-2">Generated Sites</h1>
           <p className="text-text-secondary">View all AI-generated websites</p>
         </div>
+        
+        <Button
+          onClick={() => navigate('/sites/image-generator')}
+          variant="primary"
+          className="flex items-center gap-2"
+        >
+          <Wand2 className="w-4 h-4" />
+          Test Image Generator
+        </Button>
       </div>
 
       {isLoading ? (

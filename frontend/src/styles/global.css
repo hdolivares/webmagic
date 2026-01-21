@@ -297,8 +297,51 @@
     @apply p-6 space-y-6 max-w-7xl mx-auto;
   }
 
+  .page-header {
+    @apply mb-8;
+  }
+
+  .page-header__content {
+    @apply flex items-start gap-md;
+  }
+
+  .page-header__icon {
+    @apply flex items-center justify-center w-16 h-16 rounded-xl;
+    background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700));
+  }
+
+  .page-header__title {
+    @apply text-4xl font-bold text-text-primary mb-2;
+  }
+
+  .page-header__description {
+    @apply text-lg text-text-secondary;
+  }
+
+  .page-content {
+    @apply space-y-6;
+  }
+
   .loading-screen {
     @apply flex items-center justify-center h-screen text-text-secondary;
+  }
+
+  /* ========== INFO BANNERS ========== */
+
+  .info-banner {
+    @apply flex items-start gap-md p-md rounded-lg bg-info-light border border-info dark:bg-info-dark;
+  }
+
+  .info-banner__content {
+    @apply flex-1 space-y-1;
+  }
+
+  .info-banner__text {
+    @apply text-sm text-info-dark dark:text-info m-0;
+  }
+
+  .info-banner__subtext {
+    @apply text-xs text-info-dark/70 dark:text-info/70 m-0;
   }
 
   /* ========== STATS & METRICS ========== */
