@@ -7,6 +7,9 @@ from anthropic import Anthropic, AsyncAnthropic
 from anthropic.types import Message
 import json
 import logging
+import re
+from pathlib import Path
+from datetime import datetime
 from core.config import get_settings
 from core.exceptions import ExternalAPIException
 
@@ -141,23 +144,73 @@ class BaseAgent:
             max_tokens=max_tokens
         )
         
-        # Parse JSON
+        # Parse JSON with multiple strategies
         try:
-            # Clean markdown code blocks if present
+            # Strategy 1: Clean markdown code blocks if present
+            cleaned_text = text
             if "```json" in text:
-                text = text.split("```json")[1].split("```")[0].strip()
+                cleaned_text = text.split("```json")[1].split("```")[0].strip()
             elif "```" in text:
-                text = text.split("```")[1].split("```")[0].strip()
+                cleaned_text = text.split("```")[1].split("```")[0].strip()
             
-            data = json.loads(text)
-            logger.info(f"[{self.agent_name}] Successfully parsed JSON")
-            return data
+            # Try direct parsing
+            try:
+                data = json.loads(cleaned_text)
+                logger.info(f"[{self.agent_name}] Successfully parsed JSON")
+                return data
+            except json.JSONDecodeError:
+                pass
+            
+            # Strategy 2: Extract JSON object using regex
+            import re
+            json_pattern = r'\{[\s\S]*\}'
+            matches = re.findall(json_pattern, cleaned_text)
+            
+            for match in matches:
+                try:
+                    data = json.loads(match)
+                    logger.info(f"[{self.agent_name}] Successfully parsed JSON (regex extraction)")
+                    return data
+                except json.JSONDecodeError:
+                    continue
+            
+            # Strategy 3: Try to repair common JSON issues
+            # Replace unescaped newlines in strings
+            repaired_text = cleaned_text.replace('\n', '\\n')
+            repaired_text = repaired_text.replace('\r', '\\r')
+            repaired_text = repaired_text.replace('\t', '\\t')
+            
+            try:
+                data = json.loads(repaired_text)
+                logger.info(f"[{self.agent_name}] Successfully parsed JSON (repaired)")
+                return data
+            except json.JSONDecodeError:
+                pass
+            
+            # All strategies failed - raise error with details
+            raise json.JSONDecodeError(
+                "Could not parse JSON with any strategy",
+                cleaned_text,
+                0
+            )
             
         except json.JSONDecodeError as e:
             logger.error(
                 f"[{self.agent_name}] Failed to parse JSON: {str(e)}\n"
-                f"Raw output: {text[:500]}..."
+                f"Raw output (first 1000 chars): {text[:1000]}..."
             )
+            
+            # Save full output to file for debugging
+            debug_file = Path(__file__).parent.parent.parent / "test_output" / f"debug_{self.agent_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            debug_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(debug_file, 'w', encoding='utf-8') as f:
+                f.write(f"Failed to parse JSON for {self.agent_name}\n")
+                f.write(f"Error: {str(e)}\n")
+                f.write(f"="*80 + "\n")
+                f.write(text)
+            
+            logger.error(f"[{self.agent_name}] Full output saved to: {debug_file}")
+            
             raise ValueError(
                 f"Invalid JSON response from {self.agent_name}: {str(e)}"
             )
@@ -202,7 +255,17 @@ class BaseAgent:
                 if attempt < max_retries - 1:
                     # Add clarification to prompt for next retry
                     if as_json and isinstance(e, ValueError):
-                        user_prompt += "\n\nPLEASE RESPOND WITH VALID JSON ONLY. No markdown code blocks, no explanations."
+                        user_prompt += (
+                            "\n\n**CRITICAL JSON FORMATTING REQUIRED**:\n"
+                            "1. Return ONLY valid JSON (no markdown, no explanations)\n"
+                            "2. Properly escape ALL special characters in strings:\n"
+                            "   - Use \\n for newlines (NOT literal newlines)\n"
+                            "   - Use \\\" for quotes inside strings\n"
+                            "   - Use \\\\ for backslashes\n"
+                            "   - Use \\t for tabs\n"
+                            "3. Ensure all JSON syntax is valid (commas, brackets, braces)\n"
+                            "4. Test your JSON before responding"
+                        )
         
         # All retries failed
         raise ExternalAPIException(
