@@ -11,7 +11,7 @@ Date: January 21, 2026
 import asyncio
 import sys
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 # Add backend to path
@@ -225,7 +225,9 @@ async def run_tests():
                 
                 assert failed_site.subscription_status == "past_due"
                 assert failed_site.grace_period_ends is not None
-                grace_days = (failed_site.grace_period_ends - datetime.now()).days
+                # Use timezone-aware datetime
+                now = datetime.now(timezone.utc)
+                grace_days = (failed_site.grace_period_ends - now).days
                 assert 6 <= grace_days <= 7, f"Grace period should be ~7 days, got {grace_days}"
                 print_success(f"Grace period started: ends {failed_site.grace_period_ends}")
                 test_results.append(("Handle payment failure", True))
