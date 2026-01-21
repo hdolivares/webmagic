@@ -175,7 +175,7 @@ async def deploy_to_nginx(output_dir: Path) -> str:
     
     try:
         settings = get_settings()
-        site_root = Path(settings.SITE_FILES_ROOT)
+        site_root = Path(settings.SITES_BASE_PATH)
         
         # Create subdomain directory
         subdomain_dir = site_root / SUBDOMAIN
