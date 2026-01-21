@@ -441,6 +441,51 @@ class ApiClient {
   async cancelEditRequest(siteId: string, editId: string): Promise<void> {
     await this.client.delete(`/sites/${siteId}/edits/${editId}`)
   }
+
+  // ============================================
+  // CUSTOM DOMAINS METHODS (Phase 5)
+  // ============================================
+
+  async connectDomain(
+    siteId: string,
+    data: {
+      domain: string
+      verification_method?: string
+    }
+  ): Promise<any> {
+    const response = await this.client.post(
+      '/domains/connect',
+      data,
+      { params: { site_id: siteId } }
+    )
+    return response.data
+  }
+
+  async verifyDomain(
+    siteId: string,
+    domain: string
+  ): Promise<any> {
+    const response = await this.client.post(
+      '/domains/verify',
+      { domain },
+      { params: { site_id: siteId } }
+    )
+    return response.data
+  }
+
+  async getDomainStatus(siteId: string): Promise<any> {
+    const response = await this.client.get('/domains/status', {
+      params: { site_id: siteId }
+    })
+    return response.data
+  }
+
+  async disconnectDomain(siteId: string): Promise<any> {
+    const response = await this.client.delete('/domains/disconnect', {
+      params: { site_id: siteId }
+    })
+    return response.data
+  }
 }
 
 // Export singleton instance
