@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     TWILIO_PHONE_NUMBER: Optional[str] = None  # Your Twilio number (e.g., +12345678900)
     SMS_COST_PER_SEGMENT: float = 0.0079  # Twilio US SMS cost
     MAX_SMS_DAILY_BUDGET: float = 50.00  # Maximum daily SMS spend in USD
+    SMS_DAILY_BUDGET: Optional[float] = None  # Alias for MAX_SMS_DAILY_BUDGET
+    SMS_MAX_COST_PER_MESSAGE: float = 0.05  # Maximum cost per single message
+    SMS_ENABLE_COST_ALERTS: bool = True  # Send alerts when approaching budget limits
+    SMS_ENFORCE_BUSINESS_HOURS: bool = True  # Only send SMS during business hours (9 AM - 9 PM)
+    SMS_DEFAULT_TIMEZONE: str = "America/Chicago"  # Timezone for business hours enforcement
     DEFAULT_CAMPAIGN_CHANNEL: str = "auto"  # auto, email, sms, both
     API_URL: str = "https://api.lavish.solutions"  # For Twilio webhooks
     
