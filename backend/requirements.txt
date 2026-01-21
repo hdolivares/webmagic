@@ -41,6 +41,7 @@ playwright==1.41.2
 # Utilities
 python-slugify==8.0.1
 pytz==2024.1
+dnspython==2.4.2  # DNS verification for custom domains
 
 # Development
 pytest==7.4.4

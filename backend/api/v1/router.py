@@ -18,7 +18,8 @@ from api.v1 import (
     webhooks,  # Phase 2: Payment webhooks
     subscriptions,  # Phase 3: Subscriptions
     edit_requests,  # Phase 4: AI-powered edits
-    preview  # Phase 4: Preview system
+    preview,  # Phase 4: Preview system
+    domains  # Phase 5: Custom domains
 )
 
 api_router = APIRouter()
@@ -30,6 +31,7 @@ api_router.include_router(site_purchase.router)  # Site purchase (Phase 2)
 api_router.include_router(subscriptions.router)  # Subscriptions (Phase 3)
 api_router.include_router(edit_requests.router)  # AI-powered edits (Phase 4)
 api_router.include_router(preview.router)  # Preview system (Phase 4)
+api_router.include_router(domains.router)  # Custom domains (Phase 5)
 api_router.include_router(webhooks.router)  # Webhooks (Phase 2)
 api_router.include_router(businesses.router)
 api_router.include_router(coverage.router)
