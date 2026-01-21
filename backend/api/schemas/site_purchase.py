@@ -35,7 +35,7 @@ class PurchaseCheckoutRequest(BaseModel):
     )
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "customer_email": "john@example.com",
                 "customer_name": "John Doe",
@@ -53,7 +53,7 @@ class SubscriptionCreateRequest(BaseModel):
     )
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "payment_method_token": "tok_abc123..."
             }
@@ -82,8 +82,8 @@ class SiteResponse(BaseModel):
     created_at: datetime
     
     class Config:
-        orm_mode = True
-        schema_extra = {
+        from_attributes = True
+        json_schema_extra = {
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174000",
                 "slug": "la-plumbing-pros",
@@ -132,7 +132,7 @@ class PurchaseCheckoutResponse(BaseModel):
     )
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "checkout_id": "chk_abc123...",
                 "checkout_url": "https://app.recurrente.com/checkout/abc123",
@@ -155,8 +155,8 @@ class SiteVersionResponse(BaseModel):
     created_at: datetime
     
     class Config:
-        orm_mode = True
-        schema_extra = {
+        from_attributes = True
+        json_schema_extra = {
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174000",
                 "version_number": 1,
@@ -179,7 +179,7 @@ class SubscriptionResponse(BaseModel):
     ends_at: Optional[datetime]
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "subscription_id": "sub_abc123...",
                 "status": "active",
@@ -201,7 +201,7 @@ class PurchaseStatisticsResponse(BaseModel):
     recent_purchases: list
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "status_counts": {
                     "preview": 10,
