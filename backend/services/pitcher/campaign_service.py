@@ -1,6 +1,6 @@
 """
 Campaign management service.
-Orchestrates email generation, sending, and tracking.
+Orchestrates multi-channel (email + SMS) generation, sending, and tracking.
 """
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,22 +15,37 @@ from models.site import GeneratedSite
 from services.pitcher.email_generator import EmailGenerator
 from services.pitcher.email_sender import EmailSender
 from services.pitcher.tracking import EmailTracker
+from services.pitcher.sms_campaign_helper import SMSCampaignHelper
+from services.sms import SMSGenerator, SMSSender, PhoneValidator, SMSComplianceService
 from core.exceptions import DatabaseException, ValidationException
+from core.config import get_settings
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 class CampaignService:
     """
-    Campaign management service.
-    Handles creation, sending, and tracking of email campaigns.
+    Multi-channel campaign management service.
+    
+    Supports:
+    - Email campaigns (primary)
+    - SMS campaigns (for businesses without email)
+    - Intelligent channel selection (auto)
     """
     
     def __init__(self, db: AsyncSession):
         self.db = db
+        
+        # Email services (lazy-loaded)
         self.email_generator = EmailGenerator()
-        self._email_sender = None  # Lazy-loaded when needed
+        self._email_sender = None
         self.tracker = EmailTracker(db)
+        
+        # SMS services (lazy-loaded)
+        self._sms_generator = None
+        self._sms_sender = None
+        self._sms_compliance = None
     
     @property
     def email_sender(self) -> EmailSender:
@@ -46,50 +61,179 @@ class CampaignService:
                 )
         return self._email_sender
     
+    @property
+    def sms_generator(self) -> SMSGenerator:
+        """Lazy-load SMS generator only when needed."""
+        if self._sms_generator is None:
+            try:
+                self._sms_generator = SMSGenerator()
+            except Exception as e:
+                logger.error(f"Failed to initialize SMS generator: {e}")
+                raise ValueError(
+                    "SMS generator not configured. Set ANTHROPIC_API_KEY in .env."
+                )
+        return self._sms_generator
+    
+    @property
+    def sms_sender(self) -> SMSSender:
+        """Lazy-load SMS sender only when needed."""
+        if self._sms_sender is None:
+            try:
+                self._sms_sender = SMSSender()
+            except Exception as e:
+                logger.error(f"Failed to initialize SMS sender: {e}")
+                raise ValueError(
+                    "SMS sender not configured. Set TWILIO_ACCOUNT_SID, "
+                    "TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in .env to send SMS."
+                )
+        return self._sms_sender
+    
+    @property
+    def sms_compliance(self) -> SMSComplianceService:
+        """Lazy-load SMS compliance service only when needed."""
+        if self._sms_compliance is None:
+            self._sms_compliance = SMSComplianceService(self.db)
+        return self._sms_compliance
+    
     async def create_campaign(
         self,
         business_id: UUID,
         site_id: Optional[UUID] = None,
+        channel: str = "auto",
         variant: str = "default",
         scheduled_for: Optional[datetime] = None
     ) -> Campaign:
         """
-        Create a new email campaign for a business.
+        Create a new multi-channel campaign for a business.
         
         Args:
             business_id: Business UUID
             site_id: Optional generated site UUID
-            variant: Email variant (default, direct, story, value)
+            channel: Channel selection ("auto", "email", "sms", "both")
+            variant: Campaign variant (default, direct, story, value, professional, friendly, urgent)
             scheduled_for: Optional schedule time
             
         Returns:
             Created Campaign instance
+            
+        Raises:
+            ValidationException: If business not found or no contact method available
         """
-        logger.info(f"Creating campaign for business: {business_id}")
+        logger.info(f"Creating {channel} campaign for business: {business_id}")
         
         # Get business
-        business_result = await self.db.execute(
+        business = await self._get_business(business_id)
+        
+        # Determine channel based on available contact methods
+        selected_channel = self._select_channel(channel, business)
+        
+        # Get site URL if provided
+        site_url = await self._get_site_url(site_id) if site_id else None
+        
+        # Create campaign based on selected channel
+        if selected_channel == "email":
+            return await self._create_email_campaign(
+                business=business,
+                site_id=site_id,
+                site_url=site_url,
+                variant=variant,
+                scheduled_for=scheduled_for
+            )
+        elif selected_channel == "sms":
+            return await self._create_sms_campaign(
+                business=business,
+                site_id=site_id,
+                site_url=site_url,
+                variant=variant,
+                scheduled_for=scheduled_for
+            )
+        else:
+            raise ValidationException(f"Invalid channel: {selected_channel}")
+    
+    # ========================================================================
+    # HELPER METHODS - Channel Selection & Campaign Creation
+    # ========================================================================
+    
+    async def _get_business(self, business_id: UUID) -> Business:
+        """Get business by ID."""
+        result = await self.db.execute(
             select(Business).where(Business.id == business_id)
         )
-        business = business_result.scalar_one_or_none()
+        business = result.scalar_one_or_none()
         
         if not business:
             raise ValidationException(f"Business not found: {business_id}")
         
-        if not business.email:
-            raise ValidationException(f"Business has no email: {business.name}")
+        return business
+    
+    async def _get_site_url(self, site_id: UUID) -> Optional[str]:
+        """Get site URL by ID."""
+        result = await self.db.execute(
+            select(GeneratedSite).where(GeneratedSite.id == site_id)
+        )
+        site = result.scalar_one_or_none()
+        return site.full_url if site else None
+    
+    def _select_channel(self, requested_channel: str, business: Business) -> str:
+        """
+        Select appropriate channel based on request and business contact info.
         
-        # Get site if provided
-        site_url = None
-        if site_id:
-            site_result = await self.db.execute(
-                select(GeneratedSite).where(GeneratedSite.id == site_id)
+        Args:
+            requested_channel: User's channel preference (auto, email, sms, both)
+            business: Business instance
+        
+        Returns:
+            Selected channel: "email" or "sms"
+        
+        Raises:
+            ValidationException: If no valid channel available
+        """
+        has_email = bool(business.email)
+        has_phone = bool(business.phone)
+        
+        if requested_channel == "auto":
+            # Prefer email (free), fallback to SMS
+            if has_email:
+                logger.info(f"Auto-selected email for {business.name}")
+                return "email"
+            elif has_phone:
+                logger.info(f"Auto-selected SMS for {business.name} (no email)")
+                return "sms"
+            else:
+                raise ValidationException(
+                    f"Business {business.name} has no email or phone"
+                )
+        
+        elif requested_channel == "email":
+            if not has_email:
+                raise ValidationException(
+                    f"Business {business.name} has no email address"
+                )
+            return "email"
+        
+        elif requested_channel == "sms":
+            if not has_phone:
+                raise ValidationException(
+                    f"Business {business.name} has no phone number"
+                )
+            return "sms"
+        
+        else:
+            raise ValidationException(
+                f"Invalid channel: {requested_channel}. "
+                "Valid options: auto, email, sms"
             )
-            site = site_result.scalar_one_or_none()
-            if site:
-                site_url = site.full_url
-        
-        # Prepare business data for email generation
+    
+    async def _create_email_campaign(
+        self,
+        business: Business,
+        site_id: Optional[UUID],
+        site_url: Optional[str],
+        variant: str,
+        scheduled_for: Optional[datetime]
+    ) -> Campaign:
+        """Create email campaign."""
+        # Prepare business data
         business_data = {
             "name": business.name,
             "category": business.category,
@@ -99,7 +243,7 @@ class CampaignService:
             "review_count": business.review_count
         }
         
-        # Generate email
+        # Generate email content
         email = await self.email_generator.generate_email(
             business_data=business_data,
             site_url=site_url,
@@ -109,8 +253,9 @@ class CampaignService:
         
         # Create campaign
         campaign = Campaign(
-            business_id=business_id,
+            business_id=business.id,
             site_id=site_id,
+            channel="email",
             subject_line=email["subject_line"],
             email_body=email["email_body"],
             preview_text=email.get("preview_text"),
@@ -126,18 +271,87 @@ class CampaignService:
         await self.db.flush()
         await self.db.refresh(campaign)
         
-        logger.info(f"Campaign created: {campaign.id}")
+        logger.info(f"Email campaign created: {campaign.id}")
         return campaign
+    
+    async def _create_sms_campaign(
+        self,
+        business: Business,
+        site_id: Optional[UUID],
+        site_url: Optional[str],
+        variant: str,
+        scheduled_for: Optional[datetime]
+    ) -> Campaign:
+        """Create SMS campaign with compliance checks."""
+        # Validate phone number
+        is_valid, formatted_phone, error = PhoneValidator.validate_and_format(
+            business.phone
+        )
+        
+        if not is_valid:
+            raise ValidationException(f"Invalid phone number: {error}")
+        
+        # Check compliance (opt-out, business hours)
+        can_send, reason = await self.sms_compliance.check_can_send(
+            phone_number=formatted_phone,
+            timezone_str="America/Chicago"  # TODO: Get from business location
+        )
+        
+        if not can_send:
+            raise ValidationException(f"Cannot send SMS: {reason}")
+        
+        # Prepare business data
+        business_data = {
+            "name": business.name,
+            "category": business.category,
+            "city": business.city,
+            "state": business.state,
+            "rating": float(business.rating) if business.rating else 0
+        }
+        
+        # Generate SMS content
+        sms_body = await self.sms_generator.generate_sms(
+            business_data=business_data,
+            site_url=site_url,
+            variant=variant
+        )
+        
+        # Create campaign
+        campaign = Campaign(
+            business_id=business.id,
+            site_id=site_id,
+            channel="sms",
+            sms_body=sms_body,
+            business_name=business.name,
+            recipient_phone=formatted_phone,
+            variant=variant,
+            scheduled_for=scheduled_for,
+            status="scheduled" if scheduled_for else "pending"
+        )
+        
+        self.db.add(campaign)
+        await self.db.flush()
+        await self.db.refresh(campaign)
+        
+        logger.info(f"SMS campaign created: {campaign.id} ({len(sms_body)} chars)")
+        return campaign
+    
+    # ========================================================================
+    # SENDING METHODS
+    # ========================================================================
     
     async def send_campaign(self, campaign_id: UUID) -> bool:
         """
-        Send an email campaign.
+        Send a campaign (email or SMS based on channel).
         
         Args:
             campaign_id: Campaign UUID
             
         Returns:
             True if sent successfully
+        
+        Raises:
+            ValidationException: If campaign not found or invalid status
         """
         logger.info(f"Sending campaign: {campaign_id}")
         
@@ -151,11 +365,23 @@ class CampaignService:
             raise ValidationException(f"Campaign not found: {campaign_id}")
         
         if campaign.status not in ["pending", "scheduled"]:
-            raise ValidationException(f"Campaign already sent or invalid status: {campaign.status}")
+            raise ValidationException(
+                f"Campaign already sent or invalid status: {campaign.status}"
+            )
         
+        # Send based on channel
+        if campaign.channel == "email":
+            return await self._send_email_campaign(campaign)
+        elif campaign.channel == "sms":
+            return await self._send_sms_campaign(campaign)
+        else:
+            raise ValidationException(f"Unsupported channel: {campaign.channel}")
+    
+    async def _send_email_campaign(self, campaign: Campaign) -> bool:
+        """Send email campaign (extracted from original send_campaign)."""
         try:
             # Generate tracking pixel
-            tracking_pixel = self.tracker.generate_tracking_pixel_url(campaign_id)
+            tracking_pixel = self.tracker.generate_tracking_pixel_url(campaign.id)
             
             # Convert to HTML
             body_html = self.email_sender.generate_html_from_text(campaign.email_body)
@@ -172,7 +398,7 @@ class CampaignService:
             # Update campaign
             await self.db.execute(
                 update(Campaign)
-                .where(Campaign.id == campaign_id)
+                .where(Campaign.id == campaign.id)
                 .values(
                     status="sent",
                     sent_at=datetime.utcnow(),
@@ -183,16 +409,16 @@ class CampaignService:
             )
             await self.db.commit()
             
-            logger.info(f"Campaign sent successfully: {campaign_id}")
+            logger.info(f"Email campaign sent successfully: {campaign.id}")
             return True
             
         except Exception as e:
-            logger.error(f"Failed to send campaign: {str(e)}")
+            logger.error(f"Failed to send email campaign: {str(e)}")
             
             # Update campaign with error
             await self.db.execute(
                 update(Campaign)
-                .where(Campaign.id == campaign_id)
+                .where(Campaign.id == campaign.id)
                 .values(
                     status="failed",
                     error_message=str(e),
@@ -203,6 +429,19 @@ class CampaignService:
             await self.db.commit()
             
             return False
+    
+    async def _send_sms_campaign(self, campaign: Campaign) -> bool:
+        """Send SMS campaign with compliance checks and tracking."""
+        return await SMSCampaignHelper.send_sms_campaign(
+            campaign=campaign,
+            sms_sender=self.sms_sender,
+            sms_compliance=self.sms_compliance,
+            db=self.db
+        )
+    
+    # ========================================================================
+    # CAMPAIGN RETRIEVAL METHODS
+    # ========================================================================
     
     async def get_campaign(self, campaign_id: UUID) -> Optional[Campaign]:
         """Get campaign by ID."""
