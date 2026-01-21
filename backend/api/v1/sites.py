@@ -238,3 +238,217 @@ async def deploy_site(
 
 
 from datetime import datetime
+from pydantic import BaseModel, Field
+from services.creative.image_service import ImageGenerationService
+from fastapi.responses import Response
+
+
+class ImageGenerationRequest(BaseModel):
+    """Request for testing image generation."""
+    business_name: str = Field(..., description="Business name")
+    category: str = Field(..., description="Business category (e.g., 'restaurant', 'spa')")
+    brand_archetype: str = Field(
+        default="Regular Guy",
+        description="Brand archetype (Explorer, Creator, Caregiver, etc.)"
+    )
+    color_primary: str = Field(default="#2563eb", description="Primary color hex")
+    color_secondary: str = Field(default="#7c3aed", description="Secondary color hex")
+    color_accent: str = Field(default="#f59e0b", description="Accent color hex")
+    image_type: str = Field(
+        default="hero",
+        description="Type of image to generate (hero, background, product, icon)"
+    )
+    aspect_ratio: str = Field(default="16:9", description="Image aspect ratio")
+
+
+class ImageGenerationResponse(BaseModel):
+    """Response for image generation test."""
+    success: bool
+    message: str
+    size_bytes: Optional[int] = None
+    aspect_ratio: Optional[str] = None
+    image_type: str
+
+
+@router.post("/test-image-generation", response_model=ImageGenerationResponse)
+async def test_image_generation(
+    request: ImageGenerationRequest,
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Test image generation endpoint.
+    Generates an AI image based on parameters and returns metadata.
+    Protected by authentication - only logged-in admins can use this.
+    """
+    logger.info(f"Testing image generation for {request.business_name}")
+    
+    # Initialize image service
+    try:
+        image_service = ImageGenerationService()
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Image generation service not available: {str(e)}"
+        )
+    
+    # Prepare color palette
+    color_palette = {
+        "primary": request.color_primary,
+        "secondary": request.color_secondary,
+        "accent": request.color_accent
+    }
+    
+    try:
+        # Generate image based on type
+        image_bytes = None
+        
+        if request.image_type == "hero":
+            image_bytes = await image_service.generate_hero_image(
+                business_name=request.business_name,
+                category=request.category,
+                brand_archetype=request.brand_archetype,
+                color_palette=color_palette,
+                aspect_ratio=request.aspect_ratio
+            )
+        
+        elif request.image_type == "background":
+            image_bytes = await image_service.generate_section_background(
+                section_type="about",
+                mood="professional",
+                color_palette=color_palette,
+                aspect_ratio=request.aspect_ratio
+            )
+        
+        elif request.image_type == "product":
+            image_bytes = await image_service.generate_product_image(
+                product_description=f"{request.category} service",
+                style="professional",
+                aspect_ratio=request.aspect_ratio
+            )
+        
+        elif request.image_type == "icon":
+            image_bytes = await image_service.generate_icon(
+                icon_description=f"{request.category} icon",
+                style="modern minimalist"
+            )
+        
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid image_type: {request.image_type}"
+            )
+        
+        if not image_bytes:
+            return ImageGenerationResponse(
+                success=False,
+                message="Image generation failed - no data returned",
+                image_type=request.image_type
+            )
+        
+        return ImageGenerationResponse(
+            success=True,
+            message=f"Image generated successfully",
+            size_bytes=len(image_bytes),
+            aspect_ratio=request.aspect_ratio,
+            image_type=request.image_type
+        )
+    
+    except Exception as e:
+        logger.error(f"Image generation error: {str(e)}")
+        return ImageGenerationResponse(
+            success=False,
+            message=f"Image generation failed: {str(e)}",
+            image_type=request.image_type
+        )
+
+
+@router.post("/test-image-generation/download")
+async def test_image_generation_download(
+    request: ImageGenerationRequest,
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Test image generation and return the actual image file.
+    Protected by authentication - only logged-in admins can use this.
+    """
+    logger.info(f"Generating image download for {request.business_name}")
+    
+    # Initialize image service
+    try:
+        image_service = ImageGenerationService()
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Image generation service not available: {str(e)}"
+        )
+    
+    # Prepare color palette
+    color_palette = {
+        "primary": request.color_primary,
+        "secondary": request.color_secondary,
+        "accent": request.color_accent
+    }
+    
+    try:
+        # Generate image based on type
+        image_bytes = None
+        
+        if request.image_type == "hero":
+            image_bytes = await image_service.generate_hero_image(
+                business_name=request.business_name,
+                category=request.category,
+                brand_archetype=request.brand_archetype,
+                color_palette=color_palette,
+                aspect_ratio=request.aspect_ratio
+            )
+        
+        elif request.image_type == "background":
+            image_bytes = await image_service.generate_section_background(
+                section_type="about",
+                mood="professional",
+                color_palette=color_palette,
+                aspect_ratio=request.aspect_ratio
+            )
+        
+        elif request.image_type == "product":
+            image_bytes = await image_service.generate_product_image(
+                product_description=f"{request.category} service",
+                style="professional",
+                aspect_ratio=request.aspect_ratio
+            )
+        
+        elif request.image_type == "icon":
+            image_bytes = await image_service.generate_icon(
+                icon_description=f"{request.category} icon",
+                style="modern minimalist"
+            )
+        
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid image_type: {request.image_type}"
+            )
+        
+        if not image_bytes:
+            raise HTTPException(
+                status_code=500,
+                detail="Image generation failed - no data returned"
+            )
+        
+        # Return image as PNG
+        return Response(
+            content=image_bytes,
+            media_type="image/png",
+            headers={
+                "Content-Disposition": f"attachment; filename={request.image_type}-{request.business_name.replace(' ', '-').lower()}.png"
+            }
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Image generation error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Image generation failed: {str(e)}"
+        )

@@ -2,13 +2,16 @@
 Architect Agent - generates HTML/CSS/JS code for websites.
 Creates responsive, animated, semantic websites based on design brief.
 """
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import logging
 
 from services.creative.agents.base import BaseAgent
 from services.creative.prompts.builder import PromptBuilder
+from services.creative.image_service import ImageGenerationService
+from core.config import get_settings
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 class ArchitectAgent(BaseAgent):
@@ -27,20 +30,31 @@ class ArchitectAgent(BaseAgent):
             max_tokens=8192  # Need more tokens for code
         )
         self.prompt_builder = prompt_builder
+        
+        # Initialize image generation service if API key is configured
+        self.image_service = None
+        if settings.GEMINI_API_KEY:
+            try:
+                self.image_service = ImageGenerationService()
+                logger.info("Image generation service initialized")
+            except Exception as e:
+                logger.warning(f"Image generation service not available: {e}")
     
     async def generate_website(
         self,
         business_data: Dict[str, Any],
         creative_dna: Dict[str, Any],
-        design_brief: Dict[str, Any]
+        design_brief: Dict[str, Any],
+        subdomain: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Generate complete website code.
+        Generate complete website code with AI-generated images.
         
         Args:
             business_data: Original business data
             creative_dna: Output from Concept agent
             design_brief: Output from Art Director agent
+            subdomain: Site subdomain (for saving generated images)
                 
         Returns:
             Dictionary with:
@@ -48,6 +62,7 @@ class ArchitectAgent(BaseAgent):
                 - css: Complete CSS code (Tailwind + custom)
                 - js: JavaScript code (GSAP animations)
                 - assets_needed: List of assets (images, fonts)
+                - generated_images: List of AI-generated image paths
                 - meta: Meta tags and SEO data
         """
         logger.info(f"Generating website for: {business_data.get('name')}")
@@ -79,8 +94,23 @@ class ArchitectAgent(BaseAgent):
         try:
             result = await self.generate_json(system_prompt, user_prompt)
             
+            # Generate AI images if service is available and subdomain provided
+            generated_images = []
+            if self.image_service and subdomain:
+                generated_images = await self._generate_images(
+                    business_data,
+                    creative_dna,
+                    design_brief,
+                    subdomain
+                )
+            
             # Validate and enhance
             website = self._validate_website(result, business_data, design_brief)
+            
+            # Add generated images to result
+            if generated_images:
+                website["generated_images"] = generated_images
+                logger.info(f"Generated {len(generated_images)} AI images")
             
             logger.info(
                 f"Website generated: {len(website.get('html', ''))} chars HTML, "
@@ -375,3 +405,90 @@ function claimSite() {
                 "fallback": True
             }
         }
+    
+    async def _generate_images(
+        self,
+        business_data: Dict[str, Any],
+        creative_dna: Dict[str, Any],
+        design_brief: Dict[str, Any],
+        subdomain: str
+    ) -> List[Dict[str, str]]:
+        """
+        Generate AI images for the website.
+        
+        Args:
+            business_data: Business information
+            creative_dna: Brand personality and values
+            design_brief: Design specifications
+            subdomain: Site subdomain for saving images
+            
+        Returns:
+            List of generated image metadata
+        """
+        generated_images = []
+        
+        try:
+            # Extract color palette
+            colors = design_brief.get("colors", {})
+            color_palette = {
+                "primary": colors.get("primary", "#2563eb"),
+                "secondary": colors.get("secondary", "#7c3aed"),
+                "accent": colors.get("accent", "#f59e0b")
+            }
+            
+            # Get brand archetype (default to "Regular Guy" if not found)
+            brand_archetype = creative_dna.get("brand_archetype", "Regular Guy")
+            
+            # 1. Generate hero image
+            logger.info(f"Generating hero image for {business_data.get('name')}...")
+            hero_bytes = await self.image_service.generate_hero_image(
+                business_name=business_data.get("name", "Business"),
+                category=business_data.get("category", "business"),
+                brand_archetype=brand_archetype,
+                color_palette=color_palette,
+                aspect_ratio="16:9"
+            )
+            
+            if hero_bytes:
+                hero_path = await self.image_service.save_image_to_disk(
+                    image_bytes=hero_bytes,
+                    filename="hero.png",
+                    subdomain=subdomain
+                )
+                generated_images.append({
+                    "type": "hero",
+                    "path": hero_path,
+                    "filename": "hero.png",
+                    "size_bytes": len(hero_bytes)
+                })
+                logger.info(f"✅ Hero image generated: {len(hero_bytes):,} bytes")
+            
+            # 2. Generate section background (optional, only if we have time)
+            # This is lighter and faster
+            logger.info("Generating section background...")
+            bg_bytes = await self.image_service.generate_section_background(
+                section_type="about",
+                mood=design_brief.get("vibe", "modern").lower(),
+                color_palette=color_palette,
+                aspect_ratio="16:9"
+            )
+            
+            if bg_bytes:
+                bg_path = await self.image_service.save_image_to_disk(
+                    image_bytes=bg_bytes,
+                    filename="section-bg.png",
+                    subdomain=subdomain
+                )
+                generated_images.append({
+                    "type": "background",
+                    "path": bg_path,
+                    "filename": "section-bg.png",
+                    "size_bytes": len(bg_bytes)
+                })
+                logger.info(f"✅ Background generated: {len(bg_bytes):,} bytes")
+            
+        except Exception as e:
+            logger.error(f"Error generating images: {e}")
+            # Continue without images rather than failing
+        
+        return generated_images
