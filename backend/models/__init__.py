@@ -21,6 +21,7 @@ from models.support_ticket import (
     TicketMessage,
     TicketTemplate
 )
+from models.sms_opt_out import SMSOptOut
 
 __all__ = [
     "BaseModel",
@@ -44,4 +45,6 @@ __all__ = [
     "SupportTicket",
     "TicketMessage",
     "TicketTemplate",
+    # SMS models
+    "SMSOptOut",
 ]

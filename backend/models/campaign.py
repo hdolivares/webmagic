@@ -1,14 +1,16 @@
 """
-Campaign model for email outreach tracking.
+Campaign model for multi-channel outreach tracking (email + SMS).
 """
-from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey
+from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, Numeric
 from sqlalchemy.dialects.postgresql import UUID
 from models.base import BaseModel
 
 
 class Campaign(BaseModel):
     """
-    Email campaign model for tracking outreach.
+    Multi-channel campaign model for tracking outreach.
+    
+    Supports email, SMS, and future channels (WhatsApp, voice, etc.)
     """
     
     __tablename__ = "campaigns"
@@ -28,16 +30,28 @@ class Campaign(BaseModel):
         index=True
     )
     
-    # Email Content
-    subject_line = Column(Text, nullable=False)
-    email_body = Column(Text, nullable=False)
+    # Multi-Channel Support
+    channel = Column(String(20), default="email", nullable=False, index=True)
+    # Options: "email", "sms", "whatsapp", "voice"
+    
+    # Email Content (optional - only for email campaigns)
+    subject_line = Column(Text, nullable=True)  # Was required, now optional
+    email_body = Column(Text, nullable=True)  # Was required, now optional
     preview_text = Column(String(200), nullable=True)
     review_highlight = Column(Text, nullable=True)
+    
+    # SMS Content (optional - only for SMS campaigns)
+    sms_body = Column(Text, nullable=True)
+    sms_provider = Column(String(50), nullable=True)  # "twilio", "messagebird"
+    sms_sid = Column(String(255), nullable=True, index=True)  # Provider message ID
+    sms_segments = Column(Integer, nullable=True)  # Number of SMS segments
+    sms_cost = Column(Numeric(10, 4), nullable=True)  # Actual cost in USD
     
     # Recipient Info
     business_name = Column(String(255), nullable=True)
     recipient_name = Column(String(255), nullable=True)
-    recipient_email = Column(String(255), nullable=False, index=True)
+    recipient_email = Column(String(255), nullable=True, index=True)  # Now optional
+    recipient_phone = Column(String(20), nullable=True, index=True)  # New
     
     # Status: pending, scheduled, sent, delivered, opened, clicked, replied, converted, bounced, failed
     status = Column(String(30), default="pending", nullable=False, index=True)
@@ -67,24 +81,44 @@ class Campaign(BaseModel):
     scheduled_for = Column(DateTime, nullable=True, index=True)
     
     def __repr__(self):
-        return f"<Campaign {self.recipient_email} ({self.status})>"
+        recipient = self.recipient_email or self.recipient_phone or "N/A"
+        return f"<Campaign {self.channel} to {recipient} ({self.status})>"
     
     @property
     def is_delivered(self) -> bool:
-        """Check if email was delivered."""
+        """Check if campaign was delivered."""
         return self.status in ["delivered", "opened", "clicked", "replied", "converted"]
     
     @property
     def is_engaged(self) -> bool:
-        """Check if recipient engaged (opened or clicked)."""
+        """Check if recipient engaged (opened, clicked, or replied)."""
         return self.status in ["opened", "clicked", "replied", "converted"]
     
     @property
     def open_rate(self) -> float:
-        """Calculate open rate (1 if opened, 0 if not)."""
+        """Calculate open rate (1 if opened, 0 if not). Only for email."""
+        if self.channel != "email":
+            return 0.0
         return 1.0 if self.opened_at else 0.0
     
     @property
     def click_rate(self) -> float:
         """Calculate click rate (1 if clicked, 0 if not)."""
         return 1.0 if self.clicked_at else 0.0
+    
+    @property
+    def is_sms(self) -> bool:
+        """Check if this is an SMS campaign."""
+        return self.channel == "sms"
+    
+    @property
+    def is_email(self) -> bool:
+        """Check if this is an email campaign."""
+        return self.channel == "email"
+    
+    @property
+    def cost_per_message(self) -> float:
+        """Get cost per message (0 for email, actual cost for SMS)."""
+        if self.channel == "sms" and self.sms_cost:
+            return float(self.sms_cost)
+        return 0.0
