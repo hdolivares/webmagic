@@ -8,7 +8,7 @@ import { Button } from '@/components/ui'
 
 export const LoginPage = () => {
   const navigate = useNavigate()
-  const { login, isLoading, error, clearError } = useAuth()
+  const { unifiedLogin, isLoading, error, clearError } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
@@ -17,8 +17,14 @@ export const LoginPage = () => {
     clearError()
 
     try {
-      await login({ email, password })
-      navigate('/dashboard')
+      const userType = await unifiedLogin({ email, password })
+      
+      // Redirect based on user type
+      if (userType === 'admin') {
+        navigate('/dashboard')
+      } else if (userType === 'customer') {
+        navigate('/customer/domains')
+      }
     } catch (err) {
       // Error handled by useAuth
     }
@@ -30,7 +36,7 @@ export const LoginPage = () => {
         {/* Logo */}
         <div className="text-center mb-xl">
           <h1 className="text-4xl font-bold text-gradient mb-2">WebMagic</h1>
-          <p className="text-text-secondary">Admin Dashboard</p>
+          <p className="text-text-secondary">Sign in to your account</p>
         </div>
 
         {/* Login form */}

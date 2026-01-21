@@ -7,10 +7,12 @@ import type { User, LoginCredentials } from '@/types'
 
 interface AuthState {
   user: User | null
+  userType: 'admin' | 'customer' | null
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
   login: (credentials: LoginCredentials) => Promise<void>
+  unifiedLogin: (credentials: LoginCredentials) => Promise<'admin' | 'customer'>
   logout: () => void
   fetchUser: () => Promise<void>
   clearError: () => void
@@ -18,6 +20,7 @@ interface AuthState {
 
 export const useAuth = create<AuthState>((set) => ({
   user: null,
+  userType: (localStorage.getItem('user_type') as 'admin' | 'customer' | null),
   isAuthenticated: !!localStorage.getItem('access_token'),
   isLoading: false,
   error: null,
@@ -53,6 +56,51 @@ export const useAuth = create<AuthState>((set) => ({
         isLoading: false,
         isAuthenticated: false,
         user: null,
+        userType: null,
+      })
+      throw error
+    }
+  },
+
+  unifiedLogin: async (credentials) => {
+    set({ isLoading: true, error: null })
+    try {
+      const response = await api.unifiedLogin(credentials)
+      set({ 
+        user: response.user, 
+        userType: response.user_type,
+        isAuthenticated: true, 
+        isLoading: false 
+      })
+      return response.user_type
+    } catch (error: any) {
+      let errorMessage = 'Login failed'
+      
+      // Handle different error response formats
+      if (error.response?.data?.detail) {
+        const detail = error.response.data.detail
+        // If detail is an array of validation errors
+        if (Array.isArray(detail)) {
+          errorMessage = detail.map((err: any) => err.msg).join(', ')
+        } else if (typeof detail === 'string') {
+          errorMessage = detail
+        } else if (typeof detail === 'object') {
+          errorMessage = JSON.stringify(detail)
+        }
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      // Clear any existing token and reset auth state
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('user_type')
+      localStorage.removeItem('user')
+      set({
+        error: errorMessage,
+        isLoading: false,
+        isAuthenticated: false,
+        user: null,
+        userType: null,
       })
       throw error
     }
@@ -60,7 +108,9 @@ export const useAuth = create<AuthState>((set) => ({
 
   logout: () => {
     api.logout()
-    set({ user: null, isAuthenticated: false })
+    localStorage.removeItem('user_type')
+    localStorage.removeItem('user')
+    set({ user: null, userType: null, isAuthenticated: false })
   },
 
   fetchUser: async () => {
