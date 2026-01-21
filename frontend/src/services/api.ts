@@ -375,6 +375,72 @@ class ApiClient {
     const response = await this.client.get(`/system/settings/${category}`)
     return response.data
   }
+
+  // ============================================
+  // EDIT REQUESTS METHODS (Phase 4)
+  // ============================================
+
+  async createEditRequest(
+    siteId: string,
+    data: {
+      request_text: string
+      request_type?: string
+      target_section?: string
+    }
+  ): Promise<any> {
+    const response = await this.client.post(`/sites/${siteId}/edits`, data)
+    return response.data
+  }
+
+  async listEditRequests(
+    siteId: string,
+    params?: {
+      status?: string
+      page?: number
+      page_size?: number
+    }
+  ): Promise<any> {
+    const response = await this.client.get(`/sites/${siteId}/edits`, { params })
+    return response.data
+  }
+
+  async getEditRequest(siteId: string, editId: string): Promise<any> {
+    const response = await this.client.get(`/sites/${siteId}/edits/${editId}`)
+    return response.data
+  }
+
+  async getEditRequestStats(siteId: string): Promise<any> {
+    const response = await this.client.get(`/sites/${siteId}/edits/stats`)
+    return response.data
+  }
+
+  async approveEditRequest(
+    siteId: string,
+    editId: string,
+    feedback?: string
+  ): Promise<any> {
+    const response = await this.client.post(`/sites/${siteId}/edits/${editId}/approve`, {
+      approved: true,
+      feedback,
+    })
+    return response.data
+  }
+
+  async rejectEditRequest(
+    siteId: string,
+    editId: string,
+    reason: string
+  ): Promise<any> {
+    const response = await this.client.post(`/sites/${siteId}/edits/${editId}/reject`, {
+      approved: false,
+      feedback: reason,
+    })
+    return response.data
+  }
+
+  async cancelEditRequest(siteId: string, editId: string): Promise<void> {
+    await this.client.delete(`/sites/${siteId}/edits/${editId}`)
+  }
 }
 
 // Export singleton instance
