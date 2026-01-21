@@ -3,15 +3,17 @@
  * 
  * Tabbed interface for:
  * - Account Settings (password change, profile)
+ * - AI Models (configure LLM and image generation)
  * - Prompt Settings (AI agent configuration)
  */
 import { useState } from 'react'
 import { Card } from '@/components/ui'
-import { User, Key } from 'lucide-react'
+import { User, Key, Bot } from 'lucide-react'
 import { AccountSettings } from './AccountSettings'
+import { AISettingsTab } from './AISettingsTab'
 import { PromptsSettings } from './PromptsSettings'
 
-type SettingsTab = 'account' | 'prompts'
+type SettingsTab = 'account' | 'ai' | 'prompts'
 
 export const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('account')
@@ -22,6 +24,12 @@ export const SettingsPage = () => {
       label: 'Account Settings',
       icon: User,
       description: 'Manage your account and security',
+    },
+    {
+      id: 'ai' as SettingsTab,
+      label: 'AI Models',
+      icon: Bot,
+      description: 'Configure AI providers and models',
     },
     {
       id: 'prompts' as SettingsTab,
@@ -63,6 +71,7 @@ export const SettingsPage = () => {
       {/* Tab Content */}
       <div className="page-content">
         {activeTab === 'account' && <AccountSettings />}
+        {activeTab === 'ai' && <AISettingsTab />}
         {activeTab === 'prompts' && <PromptsSettings />}
       </div>
     </div>
