@@ -138,6 +138,90 @@ class EmailService:
             logger.error(f"Failed to send password reset email to {to_email}: {e}")
             return False
     
+    async def send_subscription_activated_email(
+        self,
+        to_email: str,
+        customer_name: str,
+        site_title: str,
+        site_url: str,
+        next_billing_date: Any
+    ) -> bool:
+        """Send subscription activation confirmation."""
+        try:
+            portal_url = f"{settings.FRONTEND_URL}/dashboard"
+            
+            html_content = self.templates.render_subscription_activated_email(
+                customer_name=customer_name,
+                site_title=site_title,
+                site_url=site_url,
+                next_billing_date=str(next_billing_date),
+                portal_url=portal_url
+            )
+            
+            return await self._send_email(
+                to_email=to_email,
+                subject=f"🎉 Subscription Activated! - {site_title}",
+                html_content=html_content
+            )
+        except Exception as e:
+            logger.error(f"Failed to send subscription activated email: {e}")
+            return False
+    
+    async def send_subscription_payment_failed_email(
+        self,
+        to_email: str,
+        customer_name: str,
+        site_title: str,
+        grace_period_ends: Any,
+        payment_url: str
+    ) -> bool:
+        """Send payment failure notification."""
+        try:
+            html_content = self.templates.render_subscription_payment_failed_email(
+                customer_name=customer_name,
+                site_title=site_title,
+                grace_period_ends=str(grace_period_ends),
+                payment_url=payment_url
+            )
+            
+            return await self._send_email(
+                to_email=to_email,
+                subject=f"⚠️ Payment Failed - Update Payment Method",
+                html_content=html_content
+            )
+        except Exception as e:
+            logger.error(f"Failed to send payment failed email: {e}")
+            return False
+    
+    async def send_subscription_cancelled_email(
+        self,
+        to_email: str,
+        customer_name: str,
+        site_title: str,
+        immediate: bool,
+        ends_at: Any
+    ) -> bool:
+        """Send subscription cancellation confirmation."""
+        try:
+            portal_url = f"{settings.FRONTEND_URL}/dashboard"
+            
+            html_content = self.templates.render_subscription_cancelled_email(
+                customer_name=customer_name,
+                site_title=site_title,
+                immediate=immediate,
+                ends_at=str(ends_at) if ends_at else None,
+                portal_url=portal_url
+            )
+            
+            return await self._send_email(
+                to_email=to_email,
+                subject=f"Subscription Cancelled - {site_title}",
+                html_content=html_content
+            )
+        except Exception as e:
+            logger.error(f"Failed to send cancellation email: {e}")
+            return False
+    
     async def send_purchase_confirmation_email(
         self,
         to_email: str,

@@ -15,7 +15,8 @@ from api.v1 import (
     system,
     customer_auth,  # Phase 2: Customer authentication
     site_purchase,  # Phase 2: Site purchase
-    webhooks  # Phase 2: Payment webhooks
+    webhooks,  # Phase 2: Payment webhooks
+    subscriptions  # Phase 3: Subscriptions
 )
 
 api_router = APIRouter()
@@ -24,6 +25,7 @@ api_router = APIRouter()
 api_router.include_router(auth.router)  # Admin authentication
 api_router.include_router(customer_auth.router)  # Customer authentication (Phase 2)
 api_router.include_router(site_purchase.router)  # Site purchase (Phase 2)
+api_router.include_router(subscriptions.router)  # Subscriptions (Phase 3)
 api_router.include_router(webhooks.router)  # Webhooks (Phase 2)
 api_router.include_router(businesses.router)
 api_router.include_router(coverage.router)
