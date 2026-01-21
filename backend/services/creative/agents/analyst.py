@@ -19,10 +19,10 @@ class AnalystAgent(BaseAgent):
     Output: Brand archetype, emotional triggers, differentiators, sentiment
     """
     
-    def __init__(self, prompt_builder: PromptBuilder):
+    def __init__(self, prompt_builder: PromptBuilder, model: str = "claude-3-5-sonnet-20240620"):
         super().__init__(
             agent_name="analyst",
-            model="claude-3-5-sonnet-20240620",
+            model=model,
             temperature=0.5,  # Lower temp for more analytical output
             max_tokens=2048
         )

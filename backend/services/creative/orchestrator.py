@@ -14,6 +14,7 @@ from services.creative.agents.director import ArtDirectorAgent
 from services.creative.agents.architect import ArchitectAgent
 from services.creative.prompts.loader import PromptLoader
 from services.creative.prompts.builder import PromptBuilder
+from services.system_settings_service import SystemSettingsService
 from core.exceptions import GenerationException
 
 logger = logging.getLogger(__name__)
@@ -25,26 +26,28 @@ class CreativeOrchestrator:
     Chains Analyst → Concept → Art Director → Architect.
     """
     
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, model_override: Optional[str] = None):
         """
         Initialize orchestrator with all agents.
         
         Args:
             db: Database session for prompt loading
+            model_override: Optional model name to override system settings
         """
         self.db = db
+        self.model_override = model_override
         
         # Initialize prompt system
         self.prompt_loader = PromptLoader(db)
         self.prompt_builder = PromptBuilder(self.prompt_loader)
         
-        # Initialize all agents
-        self.analyst = AnalystAgent(self.prompt_builder)
-        self.concept = ConceptAgent(self.prompt_builder)
-        self.director = ArtDirectorAgent(self.prompt_builder)
-        self.architect = ArchitectAgent(self.prompt_builder)
+        # Agents will be initialized with dynamic model in generate_website
+        self.analyst = None
+        self.concept = None
+        self.director = None
+        self.architect = None
         
-        logger.info("Creative Orchestrator initialized with all agents")
+        logger.info("Creative Orchestrator initialized")
     
     async def generate_website(
         self,
@@ -73,12 +76,34 @@ class CreativeOrchestrator:
         business_name = business_data.get("name", "Unknown")
         logger.info(f"Starting website generation for: {business_name}")
         
+        # Load AI model configuration from system settings
+        try:
+            if self.model_override:
+                model = self.model_override
+                logger.info(f"Using model override: {model}")
+            else:
+                ai_config = await SystemSettingsService.get_ai_config(self.db)
+                model = ai_config["llm"]["model"]
+                provider = ai_config["llm"]["provider"]
+                logger.info(f"Using configured model: {provider}/{model}")
+        except Exception as e:
+            # Fallback to default if settings not found
+            model = "claude-3-5-sonnet-20240620"
+            logger.warning(f"Failed to load model config, using default: {model}. Error: {e}")
+        
+        # Initialize agents with dynamic model
+        self.analyst = AnalystAgent(self.prompt_builder, model=model)
+        self.concept = ConceptAgent(self.prompt_builder, model=model)
+        self.director = ArtDirectorAgent(self.prompt_builder, model=model)
+        self.architect = ArchitectAgent(self.prompt_builder, model=model)
+        
         start_time = time.time()
         results = {
             "business_id": business_data.get("id"),
             "business_name": business_name,
             "started_at": datetime.utcnow().isoformat(),
-            "status": "in_progress"
+            "status": "in_progress",
+            "ai_model": model
         }
         
         try:

@@ -24,10 +24,10 @@ class ArchitectAgent(BaseAgent):
     Output: HTML, CSS, JS code + assets list
     """
     
-    def __init__(self, prompt_builder: PromptBuilder):
+    def __init__(self, prompt_builder: PromptBuilder, model: str = "claude-3-5-sonnet-20240620"):
         super().__init__(
             agent_name="architect",
-            model="claude-3-5-sonnet-20240620",
+            model=model,
             temperature=0.4,  # Lower temp for code generation
             max_tokens=8192  # Need more tokens for code
         )
