@@ -21,11 +21,13 @@ from api.schemas.site_purchase import (
     PurchaseCheckoutResponse,
     SiteResponse,
     SiteVersionResponse,
-    MessageResponse,
-    ErrorResponse,
     PurchaseStatisticsResponse
 )
-from api.schemas.customer_auth import CustomerUserResponse
+from api.schemas.customer_auth import (
+    CustomerUserResponse,
+    MessageResponse,
+    ErrorResponse
+)
 from models.site_models import CustomerUser, Site
 from services.site_purchase_service import get_site_purchase_service
 from services.site_service import get_site_service

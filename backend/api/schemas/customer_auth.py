@@ -70,7 +70,7 @@ class CustomerRegisterRequest(BaseModel):
         return v.lower()
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "email": "john@example.com",
                 "password": "SecurePass123!",
@@ -97,7 +97,7 @@ class CustomerLoginRequest(BaseModel):
         return v.lower()
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "email": "john@example.com",
                 "password": "SecurePass123!"
@@ -144,7 +144,7 @@ class ForgotPasswordRequest(BaseModel):
         return v.lower()
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "email": "john@example.com"
             }
@@ -209,7 +209,7 @@ class ChangePasswordRequest(BaseModel):
         return v
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "current_password": "OldPass123!",
                 "new_password": "NewSecurePass123!"
@@ -254,8 +254,8 @@ class CustomerUserResponse(BaseModel):
     created_at: datetime
     
     class Config:
-        orm_mode = True
-        schema_extra = {
+        from_attributes = True
+        json_schema_extra = {
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174000",
                 "email": "john@example.com",
@@ -326,7 +326,7 @@ class MessageResponse(BaseModel):
     )
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "message": "Operation completed successfully",
                 "success": True
@@ -346,7 +346,7 @@ class ErrorResponse(BaseModel):
     )
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "detail": "Email already registered",
                 "error_code": "EMAIL_EXISTS"
