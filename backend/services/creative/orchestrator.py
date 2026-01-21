@@ -11,7 +11,7 @@ from datetime import datetime
 from services.creative.agents.analyst import AnalystAgent
 from services.creative.agents.concept import ConceptAgent
 from services.creative.agents.director import ArtDirectorAgent
-from services.creative.agents.architect import ArchitectAgent
+from services.creative.agents.architect_v2 import ArchitectAgentV2
 from services.creative.prompts.loader import PromptLoader
 from services.creative.prompts.builder import PromptBuilder
 from services.system_settings_service import SystemSettingsService
@@ -95,7 +95,7 @@ class CreativeOrchestrator:
         self.analyst = AnalystAgent(self.prompt_builder, model=model)
         self.concept = ConceptAgent(self.prompt_builder, model=model)
         self.director = ArtDirectorAgent(self.prompt_builder, model=model)
-        self.architect = ArchitectAgent(self.prompt_builder, model=model)
+        self.architect = ArchitectAgentV2(self.prompt_builder, model=model)
         
         start_time = time.time()
         results = {
