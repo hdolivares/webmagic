@@ -176,9 +176,12 @@ async def test_creative_pipeline():
             print("=" * 80)
             
             print(f"\n📊 Content Generated:")
-            print(f"   - HTML: {len(result.get('html', ')):,} characters")
-            print(f"   - CSS: {len(result.get('css', ')):,} characters")
-            print(f"   - JavaScript: {len(result.get('js', ')):,} characters")
+            html_len = len(result.get('html', ''))
+            css_len = len(result.get('css', ''))
+            js_len = len(result.get('js', ''))
+            print(f"   - HTML: {html_len:,} characters")
+            print(f"   - CSS: {css_len:,} characters")
+            print(f"   - JavaScript: {js_len:,} characters")
             
             if result.get("brand_analysis"):
                 analysis = result["brand_analysis"]
@@ -210,7 +213,8 @@ async def test_creative_pipeline():
                 images = result["generated_images"]
                 print(f"\n🖼️  Generated Images: {len(images)}")
                 for img in images:
-                    print(f"   - {img['type'].title()}: {img['filename']} ({img['size_bytes']:,} bytes)")
+                    img_size = img['size_bytes']
+                    print(f"   - {img['type'].title()}: {img['filename']} ({img_size:,} bytes)")
             
             print(f"\n📁 All files saved to: {output_dir.absolute()}")
             
