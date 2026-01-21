@@ -36,6 +36,7 @@ celery_app.autodiscover_tasks([
     "tasks.scraping",
     "tasks.generation",
     "tasks.campaigns",
+    "tasks.sms_campaign_tasks",  # SMS campaigns (Phase 7)
     "tasks.monitoring",
 ])
 
@@ -56,6 +57,16 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.campaigns.send_pending_campaigns",
         "schedule": crontab(minute="*/30"),  # Every 30 minutes
     },
+    # Process scheduled SMS campaigns every minute
+    "process-scheduled-sms": {
+        "task": "tasks.sms.process_scheduled_sms_campaigns",
+        "schedule": crontab(minute="*"),  # Every minute
+    },
+    # Calculate SMS stats daily
+    "calculate-sms-stats": {
+        "task": "tasks.sms.calculate_sms_campaign_stats",
+        "schedule": crontab(minute=0, hour=2),  # 2 AM daily
+    },
     # Clean up old cooldowns daily
     "cleanup-cooldowns": {
         "task": "tasks.scraping.cleanup_expired_cooldowns",
@@ -73,6 +84,7 @@ celery_app.conf.task_routes = {
     "tasks.scraping.*": {"queue": "scraping"},
     "tasks.generation.*": {"queue": "generation"},
     "tasks.campaigns.*": {"queue": "campaigns"},
+    "tasks.sms.*": {"queue": "campaigns"},  # SMS uses same queue as campaigns
     "tasks.monitoring.*": {"queue": "monitoring"},
 }
 
