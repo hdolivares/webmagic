@@ -26,10 +26,9 @@ from api.schemas.edit_request import (
 from models.user import AdminUser
 from services.edit_service import get_edit_service, EditService
 from core.exceptions import (
-    ResourceNotFoundError,
+    NotFoundError,
     ValidationError,
-    PermissionDeniedError,
-    BusinessLogicError
+    ForbiddenError
 )
 
 logger = logging.getLogger(__name__)
@@ -131,17 +130,17 @@ async def create_edit_request(
         
         return EditRequestResponse.model_validate(edit_request)
     
-    except ResourceNotFoundError as e:
+    except NotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
-    except PermissionDeniedError as e:
+    except ForbiddenError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e)
         )
-    except BusinessLogicError as e:
+    except ValidationError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e)
@@ -233,7 +232,7 @@ async def list_edit_requests(
             has_more=(offset + len(items)) < total
         )
     
-    except PermissionDeniedError as e:
+    except ForbiddenError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e)
@@ -291,7 +290,7 @@ async def get_edit_request(
         
         # Verify it belongs to the specified site
         if edit_request.site_id != site_id:
-            raise ResourceNotFoundError(
+            raise NotFoundError(
                 "Edit request not found for this site",
                 resource_type="EditRequest",
                 resource_id=str(request_id)
@@ -299,12 +298,12 @@ async def get_edit_request(
         
         return EditRequestResponse.model_validate(edit_request)
     
-    except ResourceNotFoundError as e:
+    except NotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
-    except PermissionDeniedError as e:
+    except ForbiddenError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e)
@@ -359,7 +358,7 @@ async def get_edit_request_stats(
         
         return EditRequestStats(**stats)
     
-    except PermissionDeniedError as e:
+    except ForbiddenError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e)
@@ -451,17 +450,17 @@ async def approve_edit_request(
         
         return EditRequestResponse.model_validate(edit_request)
     
-    except ResourceNotFoundError as e:
+    except NotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
-    except PermissionDeniedError as e:
+    except ForbiddenError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e)
         )
-    except BusinessLogicError as e:
+    except ValidationError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e)
@@ -540,17 +539,17 @@ async def reject_edit_request(
         
         return EditRequestResponse.model_validate(edit_request)
     
-    except ResourceNotFoundError as e:
+    except NotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
-    except PermissionDeniedError as e:
+    except ForbiddenError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e)
         )
-    except BusinessLogicError as e:
+    except ValidationError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e)
@@ -625,17 +624,17 @@ async def cancel_edit_request(
         # Return 204 No Content
         return None
     
-    except ResourceNotFoundError as e:
+    except NotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
-    except PermissionDeniedError as e:
+    except ForbiddenError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e)
         )
-    except BusinessLogicError as e:
+    except ValidationError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e)

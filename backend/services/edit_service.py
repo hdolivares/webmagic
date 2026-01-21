@@ -25,10 +25,9 @@ from sqlalchemy.orm import selectinload
 
 from models.site_models import EditRequest, Site, SiteVersion
 from core.exceptions import (
-    ResourceNotFoundError,
+    NotFoundError,
     ValidationError,
-    PermissionDeniedError,
-    BusinessLogicError
+    ForbiddenError
 )
 
 logger = logging.getLogger(__name__)
@@ -126,8 +125,8 @@ class EditService:
             Created EditRequest instance
         
         Raises:
-            ResourceNotFoundError: If site doesn't exist
-            PermissionDeniedError: If customer doesn't own the site
+            NotFoundError: If site doesn't exist
+            ForbiddenError: If customer doesn't own the site
             ValidationError: If request is invalid
         """
         # Validate site exists and customer has access
@@ -135,7 +134,7 @@ class EditService:
         
         # Check if site has active subscription (business rule)
         if site.subscription_status != "active":
-            raise BusinessLogicError(
+            raise ValidationError(
                 "Site must have an active subscription to request edits",
                 error_code="INACTIVE_SUBSCRIPTION"
             )
@@ -143,7 +142,7 @@ class EditService:
         # Check for pending requests (rate limiting)
         pending_count = await self._count_pending_requests(site_id)
         if pending_count >= 5:  # Max 5 concurrent requests
-            raise BusinessLogicError(
+            raise ValidationError(
                 "Too many pending edit requests. Please wait for current requests to complete.",
                 error_code="TOO_MANY_PENDING_REQUESTS"
             )
@@ -192,8 +191,8 @@ class EditService:
             EditRequest instance
         
         Raises:
-            ResourceNotFoundError: If request doesn't exist
-            PermissionDeniedError: If customer doesn't own the site
+            NotFoundError: If request doesn't exist
+            ForbiddenError: If customer doesn't own the site
         """
         query = (
             select(EditRequest)
@@ -205,7 +204,7 @@ class EditService:
         edit_request = result.scalar_one_or_none()
         
         if not edit_request:
-            raise ResourceNotFoundError(
+            raise NotFoundError(
                 f"Edit request {request_id} not found",
                 resource_type="EditRequest",
                 resource_id=str(request_id)
@@ -239,7 +238,7 @@ class EditService:
             Tuple of (list of EditRequest, total count)
         
         Raises:
-            PermissionDeniedError: If customer doesn't own the site
+            ForbiddenError: If customer doesn't own the site
         """
         # Verify access
         if customer_id:
@@ -379,7 +378,7 @@ class EditService:
             Updated EditRequest
         
         Raises:
-            ResourceNotFoundError: If request doesn't exist
+            NotFoundError: If request doesn't exist
             ValidationError: If status transition is invalid
         """
         edit_request = await self.get_edit_request(request_id)
@@ -435,15 +434,15 @@ class EditService:
             Updated EditRequest
         
         Raises:
-            ResourceNotFoundError: If request doesn't exist
-            PermissionDeniedError: If customer doesn't own the site
-            BusinessLogicError: If request is not ready for review
+            NotFoundError: If request doesn't exist
+            ForbiddenError: If customer doesn't own the site
+            ValidationError: If request is not ready for review
         """
         edit_request = await self.get_edit_request(request_id, customer_id)
         
         # Verify request is ready for review
         if edit_request.status != EditRequestStatus.READY_FOR_REVIEW:
-            raise BusinessLogicError(
+            raise ValidationError(
                 f"Cannot approve request in status: {edit_request.status}",
                 error_code="INVALID_STATUS_FOR_APPROVAL"
             )
@@ -486,15 +485,15 @@ class EditService:
             Updated EditRequest
         
         Raises:
-            ResourceNotFoundError: If request doesn't exist
-            PermissionDeniedError: If customer doesn't own the site
-            BusinessLogicError: If request is not ready for review
+            NotFoundError: If request doesn't exist
+            ForbiddenError: If customer doesn't own the site
+            ValidationError: If request is not ready for review
         """
         edit_request = await self.get_edit_request(request_id, customer_id)
         
         # Verify request is ready for review
         if edit_request.status != EditRequestStatus.READY_FOR_REVIEW:
-            raise BusinessLogicError(
+            raise ValidationError(
                 f"Cannot reject request in status: {edit_request.status}",
                 error_code="INVALID_STATUS_FOR_REJECTION"
             )
@@ -535,9 +534,9 @@ class EditService:
             customer_id: ID of customer canceling
         
         Raises:
-            ResourceNotFoundError: If request doesn't exist
-            PermissionDeniedError: If customer doesn't own the site
-            BusinessLogicError: If request cannot be canceled
+            NotFoundError: If request doesn't exist
+            ForbiddenError: If customer doesn't own the site
+            ValidationError: If request cannot be canceled
         """
         edit_request = await self.get_edit_request(request_id, customer_id)
         
@@ -546,7 +545,7 @@ class EditService:
             EditRequestStatus.PENDING,
             EditRequestStatus.PROCESSING
         ]:
-            raise BusinessLogicError(
+            raise ValidationError(
                 f"Cannot cancel request in status: {edit_request.status}",
                 error_code="CANNOT_CANCEL_REQUEST"
             )
@@ -582,8 +581,8 @@ class EditService:
             Site instance
         
         Raises:
-            ResourceNotFoundError: If site doesn't exist
-            PermissionDeniedError: If customer doesn't own the site
+            NotFoundError: If site doesn't exist
+            ForbiddenError: If customer doesn't own the site
         """
         query = select(Site).where(Site.id == site_id)
         
@@ -597,13 +596,13 @@ class EditService:
         
         if not site:
             if customer_id:
-                raise PermissionDeniedError(
+                raise ForbiddenError(
                     "You don't have permission to access this site",
                     resource_type="Site",
                     resource_id=str(site_id)
                 )
             else:
-                raise ResourceNotFoundError(
+                raise NotFoundError(
                     f"Site {site_id} not found",
                     resource_type="Site",
                     resource_id=str(site_id)
