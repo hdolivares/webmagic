@@ -1,0 +1,203 @@
+"""
+SMS Campaign Helper Methods.
+
+Separated helper methods for SMS campaign sending to keep CampaignService modular.
+
+Author: WebMagic Team
+Date: January 21, 2026
+"""
+import logging
+from uuid import UUID
+from datetime import datetime
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import update
+
+from models.campaign import Campaign
+from services.sms import SMSSender, SMSComplianceService
+from core.config import get_settings
+from core.exceptions import ExternalAPIException, ValidationException
+
+logger = logging.getLogger(__name__)
+settings = get_settings()
+
+
+class SMSCampaignHelper:
+    """Helper class for SMS campaign operations."""
+    
+    @staticmethod
+    async def send_sms_campaign(
+        campaign: Campaign,
+        sms_sender: SMSSender,
+        sms_compliance: SMSComplianceService,
+        db: AsyncSession
+    ) -> bool:
+        """
+        Send SMS campaign with full compliance checks and tracking.
+        
+        Args:
+            campaign: Campaign instance
+            sms_sender: SMS sender service
+            sms_compliance: Compliance service
+            db: Database session
+        
+        Returns:
+            True if sent successfully
+        
+        Raises:
+            ValidationException: If compliance check fails
+            ExternalAPIException: If SMS sending fails
+        """
+        try:
+            # Final compliance check before sending
+            can_send, reason = await sms_compliance.check_can_send(
+                phone_number=campaign.recipient_phone,
+                timezone_str="America/Chicago"
+            )
+            
+            if not can_send:
+                error_msg = f"Compliance check failed: {reason}"
+                logger.warning(f"Campaign {campaign.id}: {error_msg}")
+                
+                await db.execute(
+                    update(Campaign)
+                    .where(Campaign.id == campaign.id)
+                    .values(
+                        status="failed",
+                        error_message=error_msg
+                    )
+                )
+                await db.commit()
+                
+                raise ValidationException(error_msg)
+            
+            # Build status callback URL for delivery tracking
+            callback_url = (
+                f"{settings.API_URL}/api/v1/webhooks/twilio/status"
+                if settings.API_URL
+                else None
+            )
+            
+            # Send SMS
+            logger.info(
+                f"Sending SMS campaign {campaign.id} to {campaign.recipient_phone}"
+            )
+            
+            result = await sms_sender.send(
+                to_phone=campaign.recipient_phone,
+                body=campaign.sms_body,
+                status_callback=callback_url
+            )
+            
+            # Update campaign with success data
+            await db.execute(
+                update(Campaign)
+                .where(Campaign.id == campaign.id)
+                .values(
+                    status="sent",
+                    sent_at=datetime.utcnow(),
+                    sms_provider=result.get("provider"),
+                    sms_sid=result.get("message_id"),
+                    sms_segments=result.get("segments", 1),
+                    sms_cost=result.get("cost")
+                )
+            )
+            await db.commit()
+            
+            logger.info(
+                f"SMS campaign {campaign.id} sent successfully "
+                f"(SID: {result.get('message_id')}, "
+                f"segments: {result.get('segments')}, "
+                f"cost: ${result.get('cost', 0):.4f})"
+            )
+            
+            return True
+        
+        except ExternalAPIException as e:
+            # SMS provider error
+            error_msg = str(e)
+            logger.error(f"SMS send failed for campaign {campaign.id}: {error_msg}")
+            
+            await db.execute(
+                update(Campaign)
+                .where(Campaign.id == campaign.id)
+                .values(
+                    status="failed",
+                    error_message=error_msg,
+                    retry_count=campaign.retry_count + 1
+                )
+            )
+            await db.commit()
+            
+            raise
+        
+        except Exception as e:
+            # Unexpected error
+            error_msg = f"Unexpected error: {str(e)}"
+            logger.error(f"SMS campaign {campaign.id} failed: {error_msg}")
+            
+            await db.execute(
+                update(Campaign)
+                .where(Campaign.id == campaign.id)
+                .values(
+                    status="failed",
+                    error_message=error_msg,
+                    retry_count=campaign.retry_count + 1
+                )
+            )
+            await db.commit()
+            
+            raise
+    
+    @staticmethod
+    async def handle_sms_reply(
+        phone_number: str,
+        message_body: str,
+        campaign_id: UUID,
+        sms_compliance: SMSComplianceService,
+        db: AsyncSession
+    ) -> dict:
+        """
+        Handle incoming SMS reply (opt-out, feedback, etc.).
+        
+        Args:
+            phone_number: Phone that replied
+            message_body: Reply message
+            campaign_id: Campaign being replied to
+            sms_compliance: Compliance service
+            db: Database session
+        
+        Returns:
+            Dict with action taken and response
+        """
+        action, is_opt_out = await sms_compliance.process_reply(
+            phone_number=phone_number,
+            reply_message=message_body,
+            campaign_id=campaign_id
+        )
+        
+        if is_opt_out:
+            logger.info(f"Phone {phone_number} opted out via reply")
+            
+            return {
+                "action": "opt_out",
+                "message": "You have been unsubscribed. You will not receive any more messages."
+            }
+        
+        # Regular reply - update campaign status
+        await db.execute(
+            update(Campaign)
+            .where(Campaign.id == campaign_id)
+            .values(
+                status="replied",
+                replied_at=datetime.utcnow()
+            )
+        )
+        await db.commit()
+        
+        logger.info(f"Reply received from {phone_number} for campaign {campaign_id}")
+        
+        return {
+            "action": "reply",
+            "message": "Thank you for your reply! We'll get back to you soon."
+        }
+
