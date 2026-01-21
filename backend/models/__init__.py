@@ -16,6 +16,11 @@ from models.site_models import (
     EditRequest,
     DomainVerificationRecord
 )
+from models.support_ticket import (
+    SupportTicket,
+    TicketMessage,
+    TicketTemplate
+)
 
 __all__ = [
     "BaseModel",
@@ -35,4 +40,8 @@ __all__ = [
     "SiteVersion",
     "EditRequest",
     "DomainVerificationRecord",
+    # Phase 6 models
+    "SupportTicket",
+    "TicketMessage",
+    "TicketTemplate",
 ]

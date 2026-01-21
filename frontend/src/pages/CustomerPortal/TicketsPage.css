@@ -1,0 +1,243 @@
+/**
+ * Tickets Page Styles
+ */
+
+.tickets-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.tickets-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.tickets-page-header h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-primary, #1e293b);
+  margin: 0 0 8px 0;
+}
+
+.page-description {
+  font-size: 16px;
+  color: var(--text-secondary, #64748b);
+  margin: 0;
+}
+
+/* Stats Cards */
+
+.tickets-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.stat-card {
+  background: var(--background-paper, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-value {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--text-primary, #1e293b);
+}
+
+.stat-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-open .stat-value {
+  color: var(--primary-color, #6366f1);
+}
+
+.stat-waiting .stat-value {
+  color: var(--warning-color, #f59e0b);
+}
+
+.stat-resolved .stat-value {
+  color: var(--success-color, #10b981);
+}
+
+/* Create Ticket Section */
+
+.create-ticket-section {
+  background: var(--background-paper, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.create-ticket-section h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  margin: 0 0 20px 0;
+}
+
+/* Filters */
+
+.tickets-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.tickets-filters {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 20px;
+  background: var(--background-paper, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 12px;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filter-group label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  white-space: nowrap;
+}
+
+.filter-group select {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-primary, #1e293b);
+  background: var(--background-default, #ffffff);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 150px;
+}
+
+.filter-group select:focus {
+  outline: none;
+  border-color: var(--primary-color, #6366f1);
+}
+
+/* Button Styles */
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--primary-color, #6366f1);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-dark, #4f46e5);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.btn svg {
+  flex-shrink: 0;
+}
+
+/* ===== Responsive Design ===== */
+
+@media (max-width: 768px) {
+  .tickets-page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tickets-page-header h1 {
+    font-size: 28px;
+  }
+
+  .tickets-page-header .btn {
+    width: 100%;
+  }
+
+  .tickets-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-card {
+    padding: 16px;
+  }
+
+  .stat-value {
+    font-size: 28px;
+  }
+
+  .create-ticket-section {
+    padding: 16px;
+  }
+
+  .tickets-filters {
+    flex-direction: column;
+    padding: 16px;
+  }
+
+  .filter-group {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .filter-group select {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .tickets-page-header h1 {
+    font-size: 24px;
+  }
+
+  .page-description {
+    font-size: 14px;
+  }
+
+  .tickets-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-value {
+    font-size: 32px;
+  }
+}
+
