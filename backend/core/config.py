@@ -48,6 +48,16 @@ class Settings(BaseSettings):
     EMAIL_FROM_NAME: str = "WebMagic"
     FRONTEND_URL: str = "https://app.lavish.solutions"  # Frontend URL for email links
     
+    # SMS / Twilio
+    SMS_PROVIDER: str = "twilio"  # Currently only twilio
+    TWILIO_ACCOUNT_SID: Optional[str] = None
+    TWILIO_AUTH_TOKEN: Optional[str] = None
+    TWILIO_PHONE_NUMBER: Optional[str] = None  # Your Twilio number (e.g., +12345678900)
+    SMS_COST_PER_SEGMENT: float = 0.0079  # Twilio US SMS cost
+    MAX_SMS_DAILY_BUDGET: float = 50.00  # Maximum daily SMS spend in USD
+    DEFAULT_CAMPAIGN_CHANNEL: str = "auto"  # auto, email, sms, both
+    API_URL: str = "https://api.lavish.solutions"  # For Twilio webhooks
+    
     # SMTP (development/fallback)
     SMTP_HOST: str = "localhost"
     SMTP_PORT: int = 587
