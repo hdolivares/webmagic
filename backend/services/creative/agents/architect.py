@@ -111,6 +111,9 @@ class ArchitectAgent(BaseAgent):
         )
         
         # STEP 6: Generate code with AI
+        # Add explicit JSON formatting instruction
+        user_prompt += "\n\n**CRITICAL**: Return ONLY valid JSON. Ensure all string values (especially HTML, CSS, JS code) are properly escaped. Use \\n for newlines, \\\" for quotes, \\\\ for backslashes."
+        
         result = await self.generate_json(system_prompt, user_prompt)
         
         # STEP 7: Generate AI images (always, unless photos available)
