@@ -351,6 +351,30 @@ class ApiClient {
     )
     return response.data
   }
+
+  // ============================================
+  // SYSTEM SETTINGS METHODS
+  // ============================================
+
+  async getAIConfig(): Promise<any> {
+    const response = await this.client.get('/system/ai-config')
+    return response.data
+  }
+
+  async getAIProviders(): Promise<any> {
+    const response = await this.client.get('/system/ai-providers')
+    return response.data
+  }
+
+  async updateSystemSetting(key: string, value: string): Promise<any> {
+    const response = await this.client.post('/system/settings', { key, value })
+    return response.data
+  }
+
+  async getSettingsByCategory(category: string): Promise<any> {
+    const response = await this.client.get(`/system/settings/${category}`)
+    return response.data
+  }
 }
 
 // Export singleton instance

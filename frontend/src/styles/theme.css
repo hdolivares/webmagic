@@ -145,6 +145,47 @@
   --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
   
   /* ============================================
+     CONTAINER WIDTHS
+     ============================================ */
+  --container-max-width-sm: 640px;
+  --container-max-width-md: 768px;
+  --container-max-width-lg: 1024px;
+  --container-max-width-xl: 1280px;
+
+  /* ============================================
+     FONT FAMILIES
+     ============================================ */
+  --font-family-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-family-mono: 'Monaco', 'Courier New', monospace;
+
+  /* ============================================
+     LINE HEIGHTS
+     ============================================ */
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* ============================================
+     INFO COLORS
+     ============================================ */
+  --color-info: #3b82f6;
+  --color-info-dark: #60a5fa;
+  --color-bg-info-subtle: #dbeafe;
+  --color-bg-info-subtle-dark: #1e3a8a;
+
+  /* ============================================
+     ADDITIONAL COLORS
+     ============================================ */
+  --color-bg-tertiary: #f1f5f9;
+  --color-bg-secondary-dark: #1e293b;
+  --color-bg-tertiary-dark: #334155;
+  --color-border-hover: #94a3b8;
+  --color-border-dark: #475569;
+  --color-text-inverse: #ffffff;
+  --color-text-primary-dark: #f1f5f9;
+  --shadow-focus: 0 0 0 3px rgba(59, 130, 246, 0.3);
+  
+  /* ============================================
      Z-INDEX SCALE
      ============================================ */
   --z-dropdown: 1000;

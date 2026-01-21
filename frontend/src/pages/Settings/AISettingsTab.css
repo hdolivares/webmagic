@@ -1,0 +1,373 @@
+/**
+ * AI Settings Tab Styles
+ * Uses semantic CSS variables for easy theming
+ * All values are configurable via theme.css variables
+ */
+
+/* ============================================
+   CONTAINER
+   ============================================ */
+
+.ai-settings-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
+  max-width: var(--container-max-width-md);
+  margin: 0 auto;
+}
+
+/* ============================================
+   HEADER
+   ============================================ */
+
+.ai-settings-tab__header {
+  margin-bottom: var(--spacing-4);
+}
+
+.ai-settings-tab__title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-2) 0;
+}
+
+.ai-settings-tab__subtitle {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-relaxed);
+  margin: 0;
+}
+
+/* ============================================
+   MODEL SELECTOR COMPONENT
+   ============================================ */
+
+.model-selector {
+  padding: var(--spacing-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-5);
+}
+
+.model-selector__header {
+  padding-bottom: var(--spacing-4);
+  border-bottom: var(--border-width-sm) solid var(--color-border-light);
+}
+
+.model-selector__label {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-2) 0;
+}
+
+.model-selector__description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  margin: 0;
+  line-height: var(--line-height-relaxed);
+}
+
+/* Form Fields */
+.model-selector__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.model-selector__field-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.model-selector__select {
+  padding: var(--spacing-3) var(--spacing-4);
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+  border: var(--border-width-md) solid var(--color-border-default);
+  border-radius: var(--border-radius-md);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.model-selector__select:hover {
+  border-color: var(--color-border-hover);
+}
+
+.model-selector__select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-focus);
+}
+
+/* Info Message */
+.model-selector__info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-4);
+  background-color: var(--color-bg-info-subtle);
+  border-radius: var(--border-radius-md);
+  border-left: var(--border-width-lg) solid var(--color-info);
+}
+
+.model-selector__info-icon {
+  font-size: var(--font-size-lg);
+  flex-shrink: 0;
+}
+
+.model-selector__info-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.model-selector__info-text code {
+  padding: var(--spacing-1) var(--spacing-2);
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--border-radius-sm);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-primary);
+}
+
+/* ============================================
+   INFO BOX
+   ============================================ */
+
+.ai-settings-tab__info-box {
+  display: flex;
+  gap: var(--spacing-4);
+  padding: var(--spacing-5);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--border-radius-lg);
+  border: var(--border-width-sm) solid var(--color-border-light);
+}
+
+.ai-settings-tab__info-box-icon {
+  font-size: var(--font-size-3xl);
+  flex-shrink: 0;
+}
+
+.ai-settings-tab__info-box-content {
+  flex: 1;
+}
+
+.ai-settings-tab__info-box-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-2) 0;
+}
+
+.ai-settings-tab__info-box-list {
+  margin: 0;
+  padding-left: var(--spacing-5);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+}
+
+.ai-settings-tab__info-box-list li {
+  margin-bottom: var(--spacing-2);
+}
+
+.ai-settings-tab__info-box-list li:last-child {
+  margin-bottom: 0;
+}
+
+/* ============================================
+   ACTION BUTTONS
+   ============================================ */
+
+.ai-settings-tab__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-3);
+  padding: var(--spacing-4);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--border-radius-lg);
+  border: var(--border-width-sm) solid var(--color-border-light);
+  position: sticky;
+  bottom: var(--spacing-4);
+  box-shadow: var(--shadow-lg);
+}
+
+.ai-settings-tab__button {
+  padding: var(--spacing-3) var(--spacing-6);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--border-radius-md);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: inherit;
+}
+
+.ai-settings-tab__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ai-settings-tab__button--secondary {
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  border: var(--border-width-md) solid var(--color-border-default);
+}
+
+.ai-settings-tab__button--secondary:hover:not(:disabled) {
+  background-color: var(--color-bg-tertiary);
+  border-color: var(--color-border-hover);
+}
+
+.ai-settings-tab__button--primary {
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.ai-settings-tab__button--primary:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+  box-shadow: var(--shadow-md);
+}
+
+.ai-settings-tab__button--primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* ============================================
+   CURRENT CONFIGURATION DISPLAY
+   ============================================ */
+
+.ai-settings-tab__current-config {
+  padding: var(--spacing-5);
+}
+
+.ai-settings-tab__current-config-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-4) 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: var(--font-size-xs);
+}
+
+.ai-settings-tab__current-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--spacing-4);
+}
+
+.ai-settings-tab__config-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.ai-settings-tab__config-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+}
+
+.ai-settings-tab__config-value {
+  padding: var(--spacing-2) var(--spacing-3);
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--border-radius-sm);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  border: var(--border-width-sm) solid var(--color-border-light);
+}
+
+/* ============================================
+   LOADING & ERROR STATES
+   ============================================ */
+
+.ai-settings-tab__loading,
+.ai-settings-tab__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-12) var(--spacing-6);
+  gap: var(--spacing-4);
+}
+
+.ai-settings-tab__spinner {
+  width: 40px;
+  height: 40px;
+  border: var(--border-width-lg) solid var(--color-border-light);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ai-settings-tab__error-icon {
+  font-size: var(--font-size-4xl);
+}
+
+.ai-settings-tab__error p {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-base);
+  margin: 0;
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+@media (max-width: 768px) {
+  .ai-settings-tab {
+    gap: var(--spacing-4);
+  }
+
+  .model-selector {
+    padding: var(--spacing-4);
+  }
+
+  .ai-settings-tab__actions {
+    flex-direction: column;
+    position: static;
+  }
+
+  .ai-settings-tab__button {
+    width: 100%;
+  }
+
+  .ai-settings-tab__current-config-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================
+   DARK MODE SUPPORT
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+  .model-selector__select {
+    background-color: var(--color-bg-secondary-dark);
+    color: var(--color-text-primary-dark);
+    border-color: var(--color-border-dark);
+  }
+
+  .model-selector__info {
+    background-color: var(--color-bg-info-subtle-dark);
+  }
+
+  .ai-settings-tab__info-box {
+    background-color: var(--color-bg-secondary-dark);
+    border-color: var(--color-border-dark);
+  }
+
+  .ai-settings-tab__actions {
+    background-color: var(--color-bg-secondary-dark);
+    border-color: var(--color-border-dark);
+  }
+}
