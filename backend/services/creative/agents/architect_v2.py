@@ -220,7 +220,8 @@ This format is much more reliable than JSON-wrapped code. Use exactly these deli
             logger.error(f"[architect] Error parsing delimited output: {str(e)}")
             
             # Save full output for debugging
-            debug_file = Path(__file__).parent.parent.parent / "test_output" / f"debug_architect_parse_{import datetime; datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            from datetime import datetime
+            debug_file = Path(__file__).parent.parent.parent / "test_output" / f"debug_architect_parse_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
             debug_file.parent.mkdir(parents=True, exist_ok=True)
             with open(debug_file, 'w', encoding='utf-8') as f:
                 f.write(f"Failed to parse delimited output\n")
