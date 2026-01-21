@@ -183,7 +183,14 @@ class ImageGenerationService:
                 
                 # Extract image from response
                 if "candidates" in data and len(data["candidates"]) > 0:
-                    parts = data["candidates"][0]["content"]["parts"]
+                    candidate = data["candidates"][0]
+                    
+                    # Check if content exists
+                    if "content" not in candidate:
+                        logger.error(f"No content in candidate. Response: {data}")
+                        return None
+                    
+                    parts = candidate["content"]["parts"]
                     
                     for part in parts:
                         if "inlineData" in part:
@@ -193,11 +200,17 @@ class ImageGenerationService:
                             logger.info(f"Successfully generated image ({len(image_bytes)} bytes)")
                             return image_bytes
                 
-                logger.warning("No image data found in response")
+                logger.warning(f"No image data found in response. Candidates: {len(data.get('candidates', []))}")
                 return None
                 
         except httpx.HTTPError as e:
             logger.error(f"HTTP error generating image: {str(e)}")
+            if hasattr(e, 'response') and e.response:
+                logger.error(f"Response body: {e.response.text}")
+            return None
+        except KeyError as e:
+            logger.error(f"KeyError accessing response data: {str(e)}")
+            logger.error(f"Response structure: {data if 'data' in locals() else 'No data'}")
             return None
         except Exception as e:
             logger.error(f"Error generating image: {str(e)}")
