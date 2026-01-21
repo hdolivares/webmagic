@@ -51,7 +51,7 @@ class ArchitectAgentV2(BaseAgent):
         logger.info(f"Generating website for: {business_data.get('name')}")
         
         # STEP 1: Enhance business data with category intelligence
-        enhanced_data = await CategoryKnowledgeService.enhance_business_data(business_data)
+        enhanced_data = CategoryKnowledgeService.enhance_business_data(business_data)
         
         # STEP 2: Prepare content
         content = self._prepare_content(enhanced_data, creative_dna)
