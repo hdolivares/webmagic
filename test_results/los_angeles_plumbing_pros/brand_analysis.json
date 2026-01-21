@@ -1,0 +1,32 @@
+{
+  "review_highlight": "Customers highly recommend Los Angeles Plumbing Pros for quality Plumber services.",
+  "brand_archetype": "The Everyman",
+  "emotional_triggers": [
+    "trust",
+    "reliability",
+    "quality"
+  ],
+  "key_differentiators": [
+    "experienced",
+    "customer-focused",
+    "reliable"
+  ],
+  "customer_sentiment": "positive",
+  "tone_descriptors": [
+    "professional",
+    "approachable",
+    "trustworthy"
+  ],
+  "content_themes": [
+    "expertise",
+    "customer satisfaction",
+    "quality service"
+  ],
+  "_metadata": {
+    "business_name": "Los Angeles Plumbing Pros",
+    "category": "Plumber",
+    "rating": 5.0,
+    "review_count": 64,
+    "fallback": true
+  }
+}
