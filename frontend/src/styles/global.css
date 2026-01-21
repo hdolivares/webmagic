@@ -341,7 +341,14 @@
   }
 
   .info-banner__subtext {
-    @apply text-xs text-info-dark/70 dark:text-info/70 m-0;
+    @apply text-xs m-0;
+    color: var(--color-info-dark);
+    opacity: 0.7;
+  }
+  
+  .dark .info-banner__subtext {
+    color: var(--color-info);
+    opacity: 0.7;
   }
 
   /* ========== STATS & METRICS ========== */
