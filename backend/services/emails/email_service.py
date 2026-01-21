@@ -293,6 +293,10 @@ class EmailService:
                 return await self._send_via_sendgrid(
                     to_email, subject, html_content, text_content
                 )
+            elif provider == "brevo":
+                return await self._send_via_brevo(
+                    to_email, subject, html_content, text_content
+                )
             elif provider == "ses":
                 return await self._send_via_ses(
                     to_email, subject, html_content, text_content
@@ -344,6 +348,51 @@ class EmailService:
         
         except Exception as e:
             logger.error(f"SendGrid error: {e}")
+            raise
+    
+    async def _send_via_brevo(
+        self,
+        to_email: str,
+        subject: str,
+        html_content: str,
+        text_content: Optional[str]
+    ) -> bool:
+        """Send email via Brevo (formerly Sendinblue)."""
+        try:
+            import sib_api_v3_sdk
+            from sib_api_v3_sdk.rest import ApiException
+            
+            # Configure API key
+            configuration = sib_api_v3_sdk.Configuration()
+            configuration.api_key['api-key'] = settings.BREVO_API_KEY
+            
+            # Create API instance
+            api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
+                sib_api_v3_sdk.ApiClient(configuration)
+            )
+            
+            # Create email
+            send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+                to=[{"email": to_email}],
+                sender={"name": self.from_name, "email": self.from_email},
+                subject=subject,
+                html_content=html_content
+            )
+            
+            if text_content:
+                send_smtp_email.text_content = text_content
+            
+            # Send email
+            response = api_instance.send_transac_email(send_smtp_email)
+            
+            logger.info(f"Brevo email sent to {to_email}: {response.message_id}")
+            return True
+        
+        except ApiException as e:
+            logger.error(f"Brevo API error: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Brevo error: {e}")
             raise
     
     async def _send_via_ses(
