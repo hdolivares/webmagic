@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     # External APIs
     ANTHROPIC_API_KEY: str
     OUTSCRAPER_API_KEY: str
+    GEMINI_API_KEY: Optional[str] = None  # For image generation (Nano Banana)
     
     # Email
     EMAIL_PROVIDER: str = "brevo"  # ses, sendgrid, or brevo
