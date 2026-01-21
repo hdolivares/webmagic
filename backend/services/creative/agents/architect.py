@@ -1,6 +1,7 @@
 """
 Architect Agent - generates HTML/CSS/JS code for websites.
 Creates responsive, animated, semantic websites based on design brief.
+ALWAYS generates full, professional single-page websites - NO FALLBACKS.
 """
 from typing import Dict, Any, List, Optional
 import logging
@@ -8,6 +9,7 @@ import logging
 from services.creative.agents.base import BaseAgent
 from services.creative.prompts.builder import PromptBuilder
 from services.creative.image_service import ImageGenerationService
+from services.creative.category_knowledge import CategoryKnowledgeService
 from core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -48,6 +50,9 @@ class ArchitectAgent(BaseAgent):
         subdomain: Optional[str] = None
     ) -> Dict[str, Any]:
         """
+        Generate a complete, professional single-page website.
+        Uses category knowledge to intelligently fill in missing data.
+        NEVER returns a fallback - always generates a full website.
         Generate complete website code with AI-generated images.
         
         Args:
@@ -67,65 +72,71 @@ class ArchitectAgent(BaseAgent):
         """
         logger.info(f"Generating website for: {business_data.get('name')}")
         
-        # Prepare content
-        content = self._prepare_content(business_data, creative_dna)
+        # STEP 1: Enhance business data with category-specific intelligence
+        enhanced_data = CategoryKnowledgeService.enhance_business_data(business_data)
+        logger.info(f"Enhanced with {len(enhanced_data.get('services', []))} category-specific services")
         
-        # Prepare design specs
+        # STEP 2: Prepare content
+        content = self._prepare_content(enhanced_data, creative_dna)
+        
+        # STEP 3: Prepare design specs
         design_specs = self._prepare_design_specs(design_brief)
         
-        # Build prompts
+        # STEP 4: Prepare services for template
+        services_data = self._prepare_services_data(enhanced_data)
+        
+        # STEP 5: Build prompts with enhanced data
         system_prompt, user_prompt = await self.prompt_builder.build_prompts(
             agent_name="architect",
             data={
-                "name": business_data.get("name"),
-                "category": business_data.get("category"),
-                "location": f"{business_data.get('city', '')}, {business_data.get('state', '')}",
-                "phone": business_data.get("phone", ""),
-                "email": business_data.get("email", ""),
-                "rating": business_data.get("rating", 0),
-                "review_count": business_data.get("review_count", 0),
+                "name": enhanced_data.get("name"),
+                "category": enhanced_data.get("category"),
+                "category_display": enhanced_data.get("category_display"),
+                "location": f"{enhanced_data.get('city', '')}, {enhanced_data.get('state', '')}",
+                "phone": enhanced_data.get("phone", ""),
+                "email": enhanced_data.get("email", ""),
+                "rating": enhanced_data.get("rating", 0),
+                "review_count": enhanced_data.get("review_count", 0),
+                "reviews": enhanced_data.get("reviews_data", []),
+                "hours": enhanced_data.get("hours", ""),
                 "content": content,
                 "design_specs": design_specs,
-                "photos": len(business_data.get("photos_urls", []))
+                "services": services_data,
+                "trust_factors": enhanced_data.get("trust_factors", []),
+                "value_props": enhanced_data.get("value_propositions", []),
+                "process_steps": enhanced_data.get("process_steps", []),
+                "contact_strategy": enhanced_data.get("contact_strategy", {}),
+                "photos": len(enhanced_data.get("photos_urls", []))
             }
         )
         
-        # Generate code
-        try:
-            result = await self.generate_json(system_prompt, user_prompt)
-            
-            # Generate AI images if service is available and subdomain provided
-            generated_images = []
-            if self.image_service and subdomain:
-                generated_images = await self._generate_images(
-                    business_data,
-                    creative_dna,
-                    design_brief,
-                    subdomain
-                )
-            
-            # Validate and enhance
-            website = self._validate_website(result, business_data, design_brief)
-            
-            # Add generated images to result
-            if generated_images:
-                website["generated_images"] = generated_images
-                logger.info(f"Generated {len(generated_images)} AI images")
-            
-            logger.info(
-                f"Website generated: {len(website.get('html', ''))} chars HTML, "
-                f"{len(website.get('css', ''))} chars CSS"
-            )
-            
-            return website
-            
-        except Exception as e:
-            logger.error(f"Website generation failed: {str(e)}")
-            return self._create_fallback_website(
-                business_data,
+        # STEP 6: Generate code with AI
+        result = await self.generate_json(system_prompt, user_prompt)
+        
+        # STEP 7: Generate AI images (always, unless photos available)
+        generated_images = []
+        if self.image_service and subdomain:
+            generated_images = await self._generate_images(
+                enhanced_data,
                 creative_dna,
-                design_brief
+                design_brief,
+                subdomain
             )
+        
+        # STEP 8: Validate and enhance website code
+        website = self._validate_website(result, enhanced_data, design_brief)
+        
+        # STEP 9: Add generated images to result
+        if generated_images:
+            website["generated_images"] = generated_images
+            logger.info(f"Generated {len(generated_images)} AI images")
+        
+        logger.info(
+            f"Website generated: {len(website.get('html', ''))} chars HTML, "
+            f"{len(website.get('css', ''))} chars CSS"
+        )
+        
+        return website
     
     def _prepare_content(
         self,
@@ -133,14 +144,32 @@ class ArchitectAgent(BaseAgent):
         creative_dna: Dict[str, Any]
     ) -> Dict[str, str]:
         """Prepare content structure for website."""
+        contact_strategy = business_data.get("contact_strategy", {})
+        
         return {
-            "headline": f"{business_data.get('name')} - {business_data.get('category')}",
+            "headline": f"{business_data.get('name')}",
             "tagline": creative_dna.get("value_proposition", ""),
-            "about": creative_dna.get("brand_story", ""),
+            "about": business_data.get("about", creative_dna.get("brand_story", "")),
             "differentiators": ", ".join(creative_dna.get("personality_traits", [])),
-            "cta_text": "Get In Touch",
+            "cta_primary": contact_strategy.get("cta_primary", "Get In Touch"),
+            "cta_secondary": contact_strategy.get("cta_secondary", "Learn More"),
             "contact_info": f"{business_data.get('phone', '')} | {business_data.get('email', '')}"
         }
+    
+    def _prepare_services_data(self, business_data: Dict[str, Any]) -> str:
+        """Format services data for the prompt."""
+        services = business_data.get("services", [])
+        if not services:
+            return "No specific services provided."
+        
+        formatted = []
+        for service in services:
+            formatted.append(
+                f"- {service.get('name')}: {service.get('description')} "
+                f"(Icon: {service.get('icon', '⭐')})"
+            )
+        
+        return "\n".join(formatted)
     
     def _prepare_design_specs(self, design_brief: Dict[str, Any]) -> str:
         """Format design specs as readable string for prompt."""
@@ -188,9 +217,10 @@ SPACING: {design_brief.get('spacing', 'comfortable')}
         
         # Validate HTML structure
         if not html or "<html" not in html.lower():
-            logger.warning("Invalid HTML, using fallback")
-            return self._create_fallback_website(
-                business_data, {}, design_brief
+            logger.error("AI generated invalid HTML structure")
+            raise ValueError(
+                "Website generation failed: Invalid HTML structure generated. "
+                "This should not happen with properly configured prompts."
             )
         
         # Add "Claim This Site" bar if not present
@@ -335,75 +365,6 @@ function claimSite() {
             "og:title": f"{name} - {category}",
             "og:description": f"Professional {category} services in {city}, {state}",
             "og:type": "business.business"
-        }
-    
-    def _create_fallback_website(
-        self,
-        business_data: Dict[str, Any],
-        creative_dna: Dict[str, Any],
-        design_brief: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Create fallback website when AI fails."""
-        name = business_data.get("name", "Business")
-        category = business_data.get("category", "Business")
-        city = business_data.get("city", "")
-        state = business_data.get("state", "")
-        phone = business_data.get("phone", "")
-        email = business_data.get("email", "")
-        rating = business_data.get("rating", 0)
-        
-        # Simple but beautiful fallback HTML
-        html = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{name} - {category}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <style>body {{ font-family: 'Inter', sans-serif; }}</style>
-</head>
-<body class="bg-gray-50">
-    <div class="min-h-screen flex items-center justify-center p-8">
-        <div class="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-12">
-            <h1 class="text-5xl font-bold text-gray-900 mb-4">{name}</h1>
-            <p class="text-2xl text-gray-600 mb-8">{category} • {city}, {state}</p>
-            
-            {f'<div class="flex items-center mb-8"><span class="text-3xl font-bold text-yellow-500">{rating}★</span><span class="ml-2 text-gray-600">Rated by customers</span></div>' if rating else ''}
-            
-            <div class="space-y-4 mb-8">
-                {f'<p class="text-lg"><strong>Phone:</strong> {phone}</p>' if phone else ''}
-                {f'<p class="text-lg"><strong>Email:</strong> {email}</p>' if email else ''}
-            </div>
-            
-            <button class="w-full bg-blue-600 text-white py-4 px-8 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors">
-                Get In Touch
-            </button>
-        </div>
-    </div>
-</body>
-</html>"""
-        
-        css = """:root {
-  --color-primary: #2563eb;
-  --color-secondary: #7c3aed;
-  --color-bg: #ffffff;
-  --color-text: #1f2937;
-}"""
-        
-        js = "// Fallback website - no custom JS needed"
-        
-        return {
-            "html": html,
-            "css": css,
-            "js": js,
-            "assets_needed": [],
-            "meta": self._generate_meta_tags(business_data),
-            "_metadata": {
-                "business_name": name,
-                "vibe": "Simple Fallback",
-                "fallback": True
-            }
         }
     
     async def _generate_images(
