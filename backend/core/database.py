@@ -63,3 +63,20 @@ async def init_db() -> None:
     """
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+def get_db_session() -> AsyncSession:
+    """
+    Get a database session for Celery tasks.
+    Returns a new async session that should be closed after use.
+    
+    Usage in Celery tasks:
+        session = get_db_session()
+        try:
+            # Use session
+            result = await session.execute(query)
+            await session.commit()
+        finally:
+            await session.close()
+    """
+    return AsyncSessionLocal()
