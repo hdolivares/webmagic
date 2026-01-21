@@ -22,7 +22,7 @@ class ConceptAgent(BaseAgent):
     def __init__(self, prompt_builder: PromptBuilder):
         super().__init__(
             agent_name="concept",
-            model="claude-3-5-sonnet-20241022",
+            model="claude-3-5-sonnet-20240620",
             temperature=0.8,  # Higher temp for more creative concepts
             max_tokens=3072
         )

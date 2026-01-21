@@ -22,7 +22,7 @@ class AnalystAgent(BaseAgent):
     def __init__(self, prompt_builder: PromptBuilder):
         super().__init__(
             agent_name="analyst",
-            model="claude-3-5-sonnet-20241022",
+            model="claude-3-5-sonnet-20240620",
             temperature=0.5,  # Lower temp for more analytical output
             max_tokens=2048
         )

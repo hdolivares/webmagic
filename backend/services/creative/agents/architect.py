@@ -27,7 +27,7 @@ class ArchitectAgent(BaseAgent):
     def __init__(self, prompt_builder: PromptBuilder):
         super().__init__(
             agent_name="architect",
-            model="claude-3-5-sonnet-20241022",
+            model="claude-3-5-sonnet-20240620",
             temperature=0.4,  # Lower temp for code generation
             max_tokens=8192  # Need more tokens for code
         )
