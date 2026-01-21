@@ -53,8 +53,10 @@ class Settings(BaseSettings):
     RECURRENTE_BASE_URL: str = "https://app.recurrente.com"
     
     # Site Hosting
-    SITES_DOMAIN: str = "sites.webmagic.com"
-    SITES_BASE_PATH: str = "/var/www/sites"
+    SITES_DOMAIN: str = "sites.lavish.solutions"  # Domain for path-based hosting
+    SITES_BASE_PATH: str = "/var/www/sites"  # File system path for site files
+    SITES_BASE_URL: str = "https://sites.lavish.solutions"  # Base URL for customer sites
+    SITES_USE_PATH_ROUTING: bool = True  # True = path-based, False = subdomain-based
     
     # Celery
     CELERY_BROKER_URL: Optional[str] = None
