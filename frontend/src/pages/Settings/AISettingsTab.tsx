@@ -130,13 +130,13 @@ export const AISettingsTab: React.FC = () => {
   // Fetch current AI configuration
   const { data: aiConfig, isLoading: configLoading } = useQuery<AIConfig>({
     queryKey: ['aiConfig'],
-    queryFn: () => api.get('/system/ai-config').then((res) => res.data),
+    queryFn: () => api.getAIConfig(),
   });
 
   // Fetch available providers
   const { data: providers, isLoading: providersLoading } = useQuery<ProvidersData>({
     queryKey: ['aiProviders'],
-    queryFn: () => api.get('/system/ai-providers').then((res) => res.data),
+    queryFn: () => api.getAIProviders(),
   });
 
   // Initialize form state when data loads
@@ -165,7 +165,7 @@ export const AISettingsTab: React.FC = () => {
   // Mutation to update settings
   const updateSettingMutation = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
-      return api.post('/system/settings', { key, value });
+      return api.updateSystemSetting(key, value);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['aiConfig'] });
