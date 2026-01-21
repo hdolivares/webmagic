@@ -16,7 +16,7 @@ import logging
 from typing import List, Dict, Any
 from datetime import datetime
 
-from core.database import get_db_context
+from core.database import get_db_session
 from models.campaign import Campaign
 from services.pitcher.campaign_service import CampaignService
 from core.exceptions import ValidationException, ExternalAPIException
@@ -52,7 +52,7 @@ def send_sms_campaign_task(self, campaign_id: str):
     logger.info(f"[Celery] Sending SMS campaign: {campaign_id}")
     
     async def _send_campaign():
-        async with get_db_context() as db:
+        async with get_db_session() as db:
             campaign_service = CampaignService(db)
             
             try:
@@ -143,7 +143,7 @@ def send_batch_sms_campaigns_task(self, campaign_ids: List[str]):
             "errors": []
         }
         
-        async with get_db_context() as db:
+        async with get_db_session() as db:
             campaign_service = CampaignService(db)
             
             for campaign_id in campaign_ids:
@@ -228,7 +228,7 @@ def process_scheduled_sms_campaigns_task(self):
             "errors": []
         }
         
-        async with get_db_context() as db:
+        async with get_db_session() as db:
             # Find scheduled SMS campaigns that are due
             result = await db.execute(
                 select(Campaign).where(
@@ -316,7 +316,7 @@ def calculate_sms_campaign_stats_task(self):
     async def _calculate_stats():
         from sqlalchemy import func
         
-        async with get_db_context() as db:
+        async with get_db_session() as db:
             # SMS campaigns in last 30 days
             from datetime import timedelta
             cutoff_date = datetime.utcnow() - timedelta(days=30)
