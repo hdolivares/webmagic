@@ -9,7 +9,7 @@ import { useEffect } from 'react'
 
 // Layout
 import { Layout } from '@/components/layout/Layout'
-import { CustomerLayout } from '@/layouts/CustomerLayout'
+import CustomerLayout from '@/layouts/CustomerLayout'
 
 // Admin Pages
 import { LoginPage } from '@/pages/Auth/LoginPage'
@@ -23,9 +23,9 @@ import { SettingsPage } from '@/pages/Settings/SettingsPage'
 import { ImageGenerationPage } from '@/pages/ImageGeneration/ImageGenerationPage'
 
 // Customer Pages
-import { DomainsPage } from '@/pages/CustomerPortal/DomainsPage'
-import { TicketsPage } from '@/pages/CustomerPortal/TicketsPage'
-import { TicketDetailPage } from '@/pages/CustomerPortal/TicketDetailPage'
+import DomainsPage from '@/pages/CustomerPortal/DomainsPage'
+import TicketsPage from '@/pages/CustomerPortal/TicketsPage'
+import TicketDetailPage from '@/pages/CustomerPortal/TicketDetailPage'
 
 // Create React Query client
 const queryClient = new QueryClient({
