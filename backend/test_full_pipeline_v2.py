@@ -193,7 +193,7 @@ async def deploy_to_nginx(output_dir: Path) -> str:
             print_progress(file_name, "Deployed successfully", "✅")
         
         # Generate website URL
-        domain = settings.SITE_BASE_DOMAIN
+        domain = settings.SITES_DOMAIN
         website_url = f"https://{SUBDOMAIN}.{domain}"
         
         print_progress("Deploy", f"Website live at {website_url}", "🌐")

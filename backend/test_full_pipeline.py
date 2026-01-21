@@ -152,7 +152,7 @@ async def deploy_to_nginx(output_dir: Path) -> str:
         print(f"   ✅ Deployed: {file_name}")
     
     # Generate website URL
-    domain = settings.SITE_BASE_DOMAIN
+    domain = settings.SITES_DOMAIN
     website_url = f"https://{SUBDOMAIN}.{domain}"
     
     print(f"\n🌐 Website URL: {website_url}")
