@@ -24,7 +24,7 @@ class ArchitectAgent(BaseAgent):
     Output: HTML, CSS, JS code + assets list
     """
     
-    def __init__(self, prompt_builder: PromptBuilder, model: str = "claude-3-5-sonnet-20240620"):
+    def __init__(self, prompt_builder: PromptBuilder, model: str = "claude-3-5-sonnet-latest"):
         super().__init__(
             agent_name="architect",
             model=model,
