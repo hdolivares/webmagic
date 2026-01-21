@@ -4,6 +4,12 @@ Add updated_at column to edit_requests table.
 This fixes the missing updated_at column that BaseModel expects.
 """
 import asyncio
+import sys
+from pathlib import Path
+
+# Add backend to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import text
 from core.config import get_settings
