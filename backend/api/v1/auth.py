@@ -104,3 +104,51 @@ async def logout():
     by removing the token.
     """
     return {"message": "Successfully logged out"}
+
+
+@router.post("/change-password")
+async def change_password(
+    current_password: str,
+    new_password: str,
+    current_user: AdminUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Change password for currently logged-in user.
+    Requires valid JWT token and current password verification.
+    """
+    from core.security import hash_password
+    
+    # Verify current password
+    if not verify_password(current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect",
+        )
+    
+    # Validate new password
+    if len(new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be at least 8 characters long",
+        )
+    
+    if current_password == new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password",
+        )
+    
+    # Hash new password and update
+    new_password_hash = hash_password(new_password)
+    await db.execute(
+        update(AdminUser)
+        .where(AdminUser.id == current_user.id)
+        .values(
+            password_hash=new_password_hash,
+            updated_at=datetime.utcnow()
+        )
+    )
+    await db.commit()
+    
+    return {"message": "Password changed successfully"}
