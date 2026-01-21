@@ -89,6 +89,30 @@ class ApiClient {
     return response.data
   }
 
+  async unifiedLogin(credentials: LoginCredentials): Promise<{
+    access_token: string
+    token_type: string
+    user_type: 'admin' | 'customer'
+    user: any
+    email_verified: boolean
+  }> {
+    const formData = new FormData()
+    formData.append('username', credentials.email)
+    formData.append('password', credentials.password)
+
+    const response = await this.client.post('/auth/unified-login', formData, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    })
+
+    this.setAuthToken(response.data.access_token)
+    // Store user type for conditional rendering
+    localStorage.setItem('user_type', response.data.user_type)
+    localStorage.setItem('user', JSON.stringify(response.data.user))
+    return response.data
+  }
+
   async getCurrentUser(): Promise<User> {
     const response = await this.client.get<User>('/auth/me')
     return response.data

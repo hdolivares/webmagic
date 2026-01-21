@@ -9,8 +9,9 @@ import { useEffect } from 'react'
 
 // Layout
 import { Layout } from '@/components/layout/Layout'
+import { CustomerLayout } from '@/layouts/CustomerLayout'
 
-// Pages
+// Admin Pages
 import { LoginPage } from '@/pages/Auth/LoginPage'
 import { DashboardPage } from '@/pages/Dashboard/DashboardPage'
 import { BusinessesPage } from '@/pages/Businesses/BusinessesPage'
@@ -20,6 +21,11 @@ import { CustomersPage } from '@/pages/Customers/CustomersPage'
 import { CoveragePage } from '@/pages/Coverage/CoveragePage'
 import { SettingsPage } from '@/pages/Settings/SettingsPage'
 import { ImageGenerationPage } from '@/pages/ImageGeneration/ImageGenerationPage'
+
+// Customer Pages
+import { DomainsPage } from '@/pages/CustomerPortal/DomainsPage'
+import { TicketsPage } from '@/pages/CustomerPortal/TicketsPage'
+import { TicketDetailPage } from '@/pages/CustomerPortal/TicketDetailPage'
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -64,7 +70,7 @@ function App() {
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
 
-          {/* Protected routes */}
+          {/* Admin Protected routes */}
           <Route
             path="/"
             element={
@@ -82,6 +88,21 @@ function App() {
             <Route path="customers" element={<CustomersPage />} />
             <Route path="coverage" element={<CoveragePage />} />
             <Route path="settings" element={<SettingsPage />} />
+          </Route>
+
+          {/* Customer Protected routes */}
+          <Route
+            path="/customer"
+            element={
+              <ProtectedRoute>
+                <CustomerLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Navigate to="/customer/domains" replace />} />
+            <Route path="domains" element={<DomainsPage />} />
+            <Route path="tickets" element={<TicketsPage />} />
+            <Route path="tickets/:ticketId" element={<TicketDetailPage />} />
           </Route>
 
           {/* 404 */}
