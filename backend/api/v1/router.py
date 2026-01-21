@@ -22,6 +22,7 @@ from api.v1 import (
     domains,  # Phase 5: Custom domains
     tickets  # Phase 6: Support tickets
 )
+from api.v1.webhooks import twilio  # Phase 7: SMS webhooks
 
 api_router = APIRouter()
 
@@ -35,6 +36,7 @@ api_router.include_router(preview.router)  # Preview system (Phase 4)
 api_router.include_router(domains.router)  # Custom domains (Phase 5)
 api_router.include_router(tickets.router)  # Support tickets (Phase 6)
 api_router.include_router(webhooks.router)  # Webhooks (Phase 2)
+api_router.include_router(twilio.router)  # SMS webhooks (Phase 7)
 api_router.include_router(businesses.router)
 api_router.include_router(coverage.router)
 api_router.include_router(coverage_campaigns.router)
