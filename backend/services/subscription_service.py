@@ -76,8 +76,8 @@ class SubscriptionService:
         if not customer:
             raise NotFoundError(f"Customer not found: {customer_id}")
         
-        # Validate site ownership
-        if site.customer_id != customer_id:
+        # Validate site ownership (customer has site_id, not site has customer_id)
+        if customer.site_id != site_id:
             raise ValidationError("You don't own this site")
         
         # Validate site status (must be owned, not active already)
@@ -161,7 +161,7 @@ class SubscriptionService:
             raise NotFoundError(f"Site not found: {site_id}")
         
         # Calculate next billing date (30 days from now)
-        started_at = datetime.utcnow()
+        started_at = datetime.now()
         next_billing = (started_at + timedelta(days=30)).date()
         
         # Update site
@@ -260,7 +260,7 @@ class SubscriptionService:
             raise NotFoundError(f"Site not found for subscription: {subscription_id}")
         
         # Start grace period
-        grace_period_end = datetime.utcnow() + timedelta(days=GRACE_PERIOD_DAYS)
+        grace_period_end = datetime.now() + timedelta(days=GRACE_PERIOD_DAYS)
         
         site.subscription_status = "past_due"
         site.grace_period_ends = grace_period_end
@@ -340,7 +340,7 @@ class SubscriptionService:
                     datetime.min.time()
                 )
             else:
-                site.subscription_ends_at = datetime.utcnow()
+                site.subscription_ends_at = datetime.now()
             logger.info(
                 f"Subscription will cancel at period end for site {site.slug}: "
                 f"{site.subscription_ends_at}"

@@ -99,18 +99,18 @@ async def run_tests():
                     site_title="Test Site",
                     site_description="Test site for subscription",
                     status="owned",  # Must be owned to activate subscription
-                    customer_id=test_customer_id,
                     purchase_amount=Decimal("495.00"),
-                    purchased_at=datetime.utcnow()
+                    purchased_at=datetime.now()
                 )
                 session.add(test_site)
                 await session.commit()
                 await session.refresh(test_site)
                 test_site_id = test_site.id
                 
-                # Link customer to site
+                # Link customer to site (customer has site_id, not site has customer_id)
                 test_customer.site_id = test_site_id
                 await session.commit()
+                await session.refresh(test_customer)
                 
                 print_success(f"Test site created: {test_site.slug}, status: {test_site.status}")
                 test_results.append(("Create test site", True))

@@ -225,10 +225,10 @@ async def handle_subscription_activated(
         
         # Send activation email
         email_service = get_email_service()
-        if site.customer:
+        if site.customer_user:
             await email_service.send_subscription_activated_email(
-                to_email=site.customer.email,
-                customer_name=site.customer.full_name or site.customer.email.split('@')[0],
+                to_email=site.customer_user.email,
+                customer_name=site.customer_user.full_name or site.customer_user.email.split('@')[0],
                 site_title=site.site_title or site.slug,
                 site_url=f"https://{settings.SITES_DOMAIN}/{site.slug}",
                 next_billing_date=site.next_billing_date
@@ -312,10 +312,10 @@ async def handle_subscription_payment_failed(
         
         # Send payment failed email
         email_service = get_email_service()
-        if site.customer:
+        if site.customer_user:
             await email_service.send_subscription_payment_failed_email(
-                to_email=site.customer.email,
-                customer_name=site.customer.full_name or site.customer.email.split('@')[0],
+                to_email=site.customer_user.email,
+                customer_name=site.customer_user.full_name or site.customer_user.email.split('@')[0],
                 site_title=site.site_title or site.slug,
                 grace_period_ends=site.grace_period_ends,
                 payment_url=f"{settings.FRONTEND_URL}/dashboard/billing"
