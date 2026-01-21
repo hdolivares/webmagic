@@ -23,7 +23,7 @@ from api.schemas.edit_request import (
     EditRequestApproval,
     EditRequestStats
 )
-from models.user_models import AdminUser
+from models.user import AdminUser
 from services.edit_service import get_edit_service, EditService
 from core.exceptions import (
     ResourceNotFoundError,
