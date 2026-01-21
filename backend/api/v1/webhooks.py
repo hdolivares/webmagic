@@ -22,6 +22,7 @@ from core.database import get_db
 from core.config import get_settings
 from services.payments.recurrente_client import RecurrenteClient
 from services.site_purchase_service import get_site_purchase_service
+from services.emails.email_service import get_email_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -147,9 +148,19 @@ async def handle_payment_succeeded(
             payment_data=event_data
         )
         
-        # TODO: Send welcome email
+        # Send purchase confirmation email
+        email_service = get_email_service()
+        await email_service.send_purchase_confirmation_email(
+            to_email=result['customer_email'],
+            customer_name=result['customer_name'],
+            site_title=result['site_title'],
+            site_url=result['site_url'],
+            purchase_amount=result['purchase_amount'],
+            transaction_id=payment_id
+        )
+        
         logger.info(
-            f"Purchase completed: Site {result['site_slug']} "
+            f"Purchase completed and confirmation sent: Site {result['site_slug']} "
             f"by {result['customer_email']}"
         )
         

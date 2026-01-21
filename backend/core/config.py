@@ -38,13 +38,22 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = None  # For image generation (Nano Banana)
     
     # Email
-    EMAIL_PROVIDER: str = "brevo"  # ses, sendgrid, or brevo
+    EMAIL_PROVIDER: str = "brevo"  # ses, sendgrid, smtp, or brevo
     AWS_ACCESS_KEY_ID: Optional[str] = None
     AWS_SECRET_ACCESS_KEY: Optional[str] = None
     AWS_REGION: str = "us-east-1"
     SENDGRID_API_KEY: Optional[str] = None
     BREVO_API_KEY: Optional[str] = None
     EMAIL_FROM: str = "hugo@webmagic.com"
+    EMAIL_FROM_NAME: str = "WebMagic"
+    FRONTEND_URL: str = "https://app.lavish.solutions"  # Frontend URL for email links
+    
+    # SMTP (development/fallback)
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_TLS: bool = True
     
     # Recurrente
     RECURRENTE_PUBLIC_KEY: str

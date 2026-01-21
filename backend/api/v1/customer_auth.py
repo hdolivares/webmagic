@@ -34,6 +34,7 @@ from api.schemas.customer_auth import (
 )
 from models.site_models import CustomerUser
 from services.customer_auth_service import CustomerAuthService
+from services.emails.email_service import get_email_service
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +83,14 @@ async def register(
             email=user.email
         )
         
-        # TODO: Send verification email
-        logger.info(f"Customer registered: {user.email}")
+        # Send welcome email with verification link
+        email_service = get_email_service()
+        await email_service.send_welcome_email(
+            to_email=user.email,
+            customer_name=user.full_name or user.email.split('@')[0],
+            verification_token=user.verification_token
+        )
+        logger.info(f"Customer registered and welcome email sent: {user.email}")
         
         return CustomerLoginResponse(
             access_token=access_token,
@@ -289,7 +296,13 @@ async def resend_verification(
             email=request.email
         )
         
-        # TODO: Send verification email
+        # Send verification email
+        email_service = get_email_service()
+        await email_service.send_verification_email(
+            to_email=user.email,
+            customer_name=user.full_name or user.email.split('@')[0],
+            verification_token=user.verification_token
+        )
         logger.info(f"Verification email resent: {user.email}")
         
         return MessageResponse(
@@ -332,8 +345,14 @@ async def forgot_password(
             email=request.email
         )
         
-        # TODO: Send password reset email
-        logger.info(f"Password reset requested: {user.email}")
+        # Send password reset email
+        email_service = get_email_service()
+        await email_service.send_password_reset_email(
+            to_email=user.email,
+            customer_name=user.full_name or user.email.split('@')[0],
+            reset_token=user.reset_token
+        )
+        logger.info(f"Password reset requested and email sent: {user.email}")
     
     except NotFoundError:
         # Don't reveal if email exists (security)
