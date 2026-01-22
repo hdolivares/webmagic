@@ -628,6 +628,60 @@ class ApiClient {
     })
     return response.data
   }
+
+  // Intelligent Campaign Methods
+  async createIntelligentStrategy(data: {
+    city: string
+    state: string
+    category: string
+    population?: number
+    force_regenerate?: boolean
+  }): Promise<any> {
+    const response = await this.client.post('/intelligent-campaigns/strategies', data)
+    return response.data
+  }
+
+  async scrapeIntelligentZone(data: {
+    strategy_id: string
+    limit_per_zone?: number
+  }): Promise<any> {
+    const response = await this.client.post('/intelligent-campaigns/scrape-zone', data)
+    return response.data
+  }
+
+  async batchScrapeIntelligentStrategy(data: {
+    strategy_id: string
+    limit_per_zone?: number
+    max_zones?: number
+  }): Promise<any> {
+    const response = await this.client.post('/intelligent-campaigns/batch-scrape', data)
+    return response.data
+  }
+
+  async getIntelligentStrategy(strategyId: string): Promise<any> {
+    const response = await this.client.get(`/intelligent-campaigns/strategies/${strategyId}`)
+    return response.data
+  }
+
+  async listIntelligentStrategies(params?: {
+    city?: string
+    state?: string
+    category?: string
+    status?: string
+  }): Promise<any> {
+    const response = await this.client.get('/intelligent-campaigns/strategies', { params })
+    return response.data
+  }
+
+  async refineIntelligentStrategy(strategyId: string): Promise<any> {
+    const response = await this.client.post(`/intelligent-campaigns/strategies/${strategyId}/refine`)
+    return response.data
+  }
+
+  async getIntelligentCampaignStats(): Promise<any> {
+    const response = await this.client.get('/intelligent-campaigns/stats')
+    return response.data
+  }
 }
 
 // Export singleton instance
