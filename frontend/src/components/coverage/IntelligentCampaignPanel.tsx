@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui'
 import { api } from '@/services/api'
+import { US_STATES } from '@/data/states'
+import { getCitiesForState } from '@/data/cities'
 import './IntelligentCampaignPanel.css'
 
 interface Zone {
@@ -61,15 +63,44 @@ interface ScrapeResult {
 }
 
 export function IntelligentCampaignPanel() {
-  const [city, setCity] = useState('Los Angeles')
   const [state, setState] = useState('CA')
+  const [city, setCity] = useState('Los Angeles')
   const [category, setCategory] = useState('plumbers')
   const [population, setPopulation] = useState<number | string>(3800000)
+  
+  const [availableCities, setAvailableCities] = useState<string[]>([])
+  const [businessCategories, setBusinessCategories] = useState<string[]>([])
   
   const [loading, setLoading] = useState(false)
   const [strategy, setStrategy] = useState<Strategy | null>(null)
   const [scrapeResult, setScrapeResult] = useState<ScrapeResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Load business categories on mount
+  useEffect(() => {
+    loadBusinessCategories()
+  }, [])
+
+  // Update available cities when state changes
+  useEffect(() => {
+    const cities = getCitiesForState(state)
+    setAvailableCities(cities)
+    // Set first city as default if current city not in list
+    if (cities.length > 0 && !cities.includes(city)) {
+      setCity(cities[0])
+    }
+  }, [state])
+
+  const loadBusinessCategories = async () => {
+    try {
+      const categories = await api.getBusinessCategorySearchTerms()
+      setBusinessCategories(categories)
+    } catch (err) {
+      console.error('Failed to load business categories:', err)
+      // Fallback to some default categories
+      setBusinessCategories(['plumbers', 'electricians', 'hvac', 'roofers', 'lawyers', 'dentists'])
+    }
+  }
 
   const handleCreateStrategy = async () => {
     setLoading(true)
@@ -148,7 +179,7 @@ export function IntelligentCampaignPanel() {
           <h2>🤖 Intelligent Campaign Orchestration</h2>
           <p className="subtitle">
             Claude analyzes your city and generates the optimal scraping strategy.
-            You pick the city, Claude handles the rest.
+            You pick the city + category, Claude handles the rest.
           </p>
         </div>
 
@@ -156,39 +187,50 @@ export function IntelligentCampaignPanel() {
         <div className="form-section">
           <div className="form-row">
             <div className="form-field">
-              <label>City</label>
-              <input
-                type="text"
+              <label>State *</label>
+              <select
                 className="form-input"
-                value={city}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCity(e.target.value)}
-                placeholder="Los Angeles"
-              />
+                value={state}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setState(e.target.value)}
+              >
+                {US_STATES.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.name} ({s.code})
+                  </option>
+                ))}
+              </select>
             </div>
             
             <div className="form-field">
-              <label>State</label>
-              <input
-                type="text"
+              <label>City *</label>
+              <select
                 className="form-input"
-                value={state}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setState(e.target.value)}
-                placeholder="CA"
-                maxLength={2}
-              />
+                value={city}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCity(e.target.value)}
+              >
+                {availableCities.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
           <div className="form-row">
             <div className="form-field">
-              <label>Business Category</label>
-              <input
-                type="text"
+              <label>Business Category *</label>
+              <select
                 className="form-input"
                 value={category}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCategory(e.target.value)}
-                placeholder="plumbers"
-              />
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCategory(e.target.value)}
+              >
+                {businessCategories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </option>
+                ))}
+              </select>
             </div>
             
             <div className="form-field">
@@ -200,6 +242,7 @@ export function IntelligentCampaignPanel() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPopulation(e.target.value ? parseInt(e.target.value) : '')}
                 placeholder="3800000"
               />
+              <small className="form-help">Helps Claude optimize zone placement</small>
             </div>
           </div>
 
@@ -208,7 +251,7 @@ export function IntelligentCampaignPanel() {
             disabled={loading || !city || !state || !category}
             className="create-strategy-btn"
           >
-            {loading ? '⏳ Generating...' : '🧠 Generate Intelligent Strategy'}
+            {loading ? '⏳ Generating Strategy...' : '🧠 Generate Intelligent Strategy'}
           </button>
         </div>
 
