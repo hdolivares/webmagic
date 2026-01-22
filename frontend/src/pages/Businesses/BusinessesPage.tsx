@@ -82,7 +82,7 @@ export const BusinessesPage = () => {
     if (selectAll) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(businesses.map((b: Business) => b.id)))
+      setSelectedIds(new Set(businesses.map((b) => b.id)))
     }
     setSelectAll(!selectAll)
   }
@@ -281,7 +281,7 @@ export const BusinessesPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {businesses.map((business: Business) => (
+                  {businesses.map((business) => (
                     <tr
                       key={business.id}
                       className={selectedIds.has(business.id) ? 'selected' : ''}
