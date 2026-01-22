@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import UUID, JSONB
 from datetime import datetime
 import uuid
 
-from database import BaseModel
+from models.base import BaseModel
 
 
 class GeoStrategy(BaseModel):
