@@ -13,7 +13,7 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID
 import logging
 
-from database import get_db
+from core.database import get_db
 from models.user import AdminUser
 from api.v1.auth import get_current_user
 from services.hunter.hunter_service import HunterService
