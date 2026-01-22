@@ -269,6 +269,10 @@ def get_geocoding_service() -> GeocodingService:
     return _geocoding_service
 
 
+# Export singleton instance for direct import
+geocoding_service = get_geocoding_service()
+
+
 async def geocode_city(city: str, state: str, country: str = "United States") -> Optional[CityData]:
     """
     Convenience function to geocode a city.
