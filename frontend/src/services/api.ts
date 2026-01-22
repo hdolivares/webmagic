@@ -682,6 +682,17 @@ class ApiClient {
     const response = await this.client.get('/intelligent-campaigns/stats')
     return response.data
   }
+
+  // Business Categories
+  async getBusinessCategories(): Promise<any[]> {
+    const response = await this.client.get('/business-categories/')
+    return response.data
+  }
+
+  async getBusinessCategorySearchTerms(): Promise<string[]> {
+    const response = await this.client.get('/business-categories/search-terms')
+    return response.data
+  }
 }
 
 // Export singleton instance

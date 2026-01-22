@@ -7,9 +7,7 @@
 import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui'
 import { api } from '@/services/api'
-import { GeoGridPanel } from '@/components/coverage/GeoGridPanel'
 import { IntelligentCampaignPanel } from '@/components/coverage/IntelligentCampaignPanel'
-import '@/components/coverage/GeoGridPanel.css'
 import '@/components/coverage/IntelligentCampaignPanel.css'
 
 interface CampaignStats {
@@ -214,15 +212,13 @@ export function CoveragePage() {
       {/* Intelligent Campaign Panel - Claude-powered */}
       <IntelligentCampaignPanel />
 
-      {/* Geo-Grid Scraping Panel - Manual mode */}
-      <GeoGridPanel onScrapeComplete={loadCampaignData} />
-
-      {/* Manual Testing Section */}
+      {/* Quick Validation Section - Simplified */}
       <Card>
-        <div className="card-header">
-          <h2 className="card-title">🧪 Manual Testing</h2>
-          <p className="text-sm text-secondary">Test the system before enabling autopilot</p>
-        </div>
+        <details className="validation-section">
+          <summary className="card-header" style={{ cursor: 'pointer' }}>
+            <h2 className="card-title">🔍 Quick Validation (Optional)</h2>
+            <p className="text-sm text-secondary">Spot-check the system with a few test searches</p>
+          </summary>
         <div className="card-body space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Test Controls */}
@@ -247,30 +243,39 @@ export function CoveragePage() {
                 </div>
               </div>
 
-              <button
-                onClick={runTestSearches}
-                disabled={testRunning}
-                className="btn btn-primary w-full"
-              >
-                {testRunning ? (
-                  <>
-                    <span className="spinner-sm"></span>
-                    Running {testSearchCount} searches...
-                  </>
-                ) : (
-                  `🚀 Test ${testSearchCount} Search${testSearchCount > 1 ? 'es' : ''}`
-                )}
-              </button>
+              <div className="test-buttons" style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  onClick={() => { setTestSearchCount(5); runTestSearches(); }}
+                  disabled={testRunning}
+                  className="btn btn-secondary"
+                >
+                  Test 5 Searches
+                </button>
+                <button
+                  onClick={() => { setTestSearchCount(10); runTestSearches(); }}
+                  disabled={testRunning}
+                  className="btn btn-secondary"
+                >
+                  Test 10 Searches
+                </button>
+                <button
+                  onClick={() => { setTestSearchCount(25); runTestSearches(); }}
+                  disabled={testRunning}
+                  className="btn btn-secondary"
+                >
+                  Test 25 Searches
+                </button>
+              </div>
+
+              {testRunning && (
+                <div className="alert alert-info text-sm">
+                  <span className="spinner-sm"></span>
+                  Running {testSearchCount} test searches...
+                </div>
+              )}
 
               <div className="alert alert-info text-sm">
-                <p><strong>What this does:</strong></p>
-                <ul className="list-disc list-inside mt-2 space-y-1">
-                  <li>Selects {testSearchCount} highest-priority locations</li>
-                  <li>Scrapes ~50 businesses per location</li>
-                  <li>Qualifies leads automatically</li>
-                  <li>Returns immediate results</li>
-                  <li>Cost: ~${(testSearchCount * 0.50).toFixed(2)} in API credits</li>
-                </ul>
+                <p><strong>Quick validation:</strong> Tests {testSearchCount} high-priority locations to verify the system is working. Cost: ~${(testSearchCount * 0.50).toFixed(2)}</p>
               </div>
             </div>
 
@@ -323,7 +328,7 @@ export function CoveragePage() {
               )}
             </div>
           </div>
-        </div>
+        </details>
       </Card>
 
       {/* Progress Bar */}

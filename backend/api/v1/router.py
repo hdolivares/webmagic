@@ -6,6 +6,7 @@ from fastapi import APIRouter
 from api.v1 import (
     auth,
     businesses,
+    business_categories,  # Business categories list
     coverage,
     coverage_campaigns,
     geo_grid,  # Geo-grid scraping system
@@ -40,6 +41,7 @@ api_router.include_router(tickets.router)  # Support tickets (Phase 6)
 api_router.include_router(webhooks.router)  # Webhooks (Phase 2)
 api_router.include_router(twilio.router)  # SMS webhooks (Phase 7)
 api_router.include_router(businesses.router)
+api_router.include_router(business_categories.router)  # Business categories
 api_router.include_router(coverage.router)
 api_router.include_router(coverage_campaigns.router)
 api_router.include_router(geo_grid.router)  # Geo-grid scraping

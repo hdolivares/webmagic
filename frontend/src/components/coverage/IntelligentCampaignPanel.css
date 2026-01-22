@@ -54,6 +54,14 @@
   margin-bottom: 0.5rem;
 }
 
+.form-help {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #6b7280);
+  margin-top: 0.25rem;
+  font-style: italic;
+}
+
 .create-strategy-btn {
   width: 100%;
   margin-top: 1rem;
