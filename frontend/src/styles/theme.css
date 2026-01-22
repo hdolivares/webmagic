@@ -224,6 +224,63 @@
   /* Progress indicator */
   --progress-bar-bg: var(--color-secondary-200);
   --progress-bar-fill: var(--color-primary-600);
+
+  /* ============================================
+     CRM STATUS COLORS
+     ============================================ */
+  /* Contact status colors */
+  --crm-status-pending-bg: var(--color-secondary-100);
+  --crm-status-pending-text: var(--color-secondary-700);
+  --crm-status-pending-border: var(--color-secondary-300);
+  
+  --crm-status-emailed-bg: #dbeafe;
+  --crm-status-emailed-text: #1e40af;
+  --crm-status-emailed-border: #93c5fd;
+  
+  --crm-status-sms-bg: #f3e8ff;
+  --crm-status-sms-text: #6b21a8;
+  --crm-status-sms-border: #c084fc;
+  
+  --crm-status-opened-bg: #cffafe;
+  --crm-status-opened-text: #155e75;
+  --crm-status-opened-border: #67e8f9;
+  
+  --crm-status-clicked-bg: #e0e7ff;
+  --crm-status-clicked-text: #3730a3;
+  --crm-status-clicked-border: #a5b4fc;
+  
+  --crm-status-replied-bg: #d1fae5;
+  --crm-status-replied-text: #065f46;
+  --crm-status-replied-border: #6ee7b7;
+  
+  --crm-status-customer-bg: #fef3c7;
+  --crm-status-customer-text: #92400e;
+  --crm-status-customer-border: #fcd34d;
+  
+  --crm-status-bounced-bg: #fee2e2;
+  --crm-status-bounced-text: #991b1b;
+  --crm-status-bounced-border: #fca5a5;
+  
+  --crm-status-unsubscribed-bg: #f3f4f6;
+  --crm-status-unsubscribed-text: #374151;
+  --crm-status-unsubscribed-border: #d1d5db;
+  
+  /* Contact indicator colors */
+  --crm-indicator-has-bg: #d1fae5;
+  --crm-indicator-has-text: #065f46;
+  --crm-indicator-missing-bg: #fee2e2;
+  --crm-indicator-missing-text: #991b1b;
+  
+  /* Data quality colors */
+  --crm-quality-excellent-color: #10b981;  /* 80-100% */
+  --crm-quality-good-color: #3b82f6;       /* 60-79% */
+  --crm-quality-fair-color: #f59e0b;       /* 40-59% */
+  --crm-quality-poor-color: #ef4444;       /* 0-39% */
+  
+  /* Filter preset colors */
+  --crm-filter-active-bg: var(--color-primary-100);
+  --crm-filter-active-text: var(--color-primary-700);
+  --crm-filter-hover-bg: var(--color-secondary-100);
 }
 
 /* ============================================
@@ -315,4 +372,52 @@
   --image-preview-loading-bg: var(--color-surface);
   --skeleton-base: var(--color-secondary-700);
   --skeleton-highlight: var(--color-secondary-600);
+
+  /* CRM Status Colors - Dark Mode */
+  --crm-status-pending-bg: #334155;
+  --crm-status-pending-text: #cbd5e1;
+  --crm-status-pending-border: #475569;
+  
+  --crm-status-emailed-bg: #1e3a8a;
+  --crm-status-emailed-text: #bfdbfe;
+  --crm-status-emailed-border: #3b82f6;
+  
+  --crm-status-sms-bg: #581c87;
+  --crm-status-sms-text: #e9d5ff;
+  --crm-status-sms-border: #a855f7;
+  
+  --crm-status-opened-bg: #164e63;
+  --crm-status-opened-text: #a5f3fc;
+  --crm-status-opened-border: #06b6d4;
+  
+  --crm-status-clicked-bg: #312e81;
+  --crm-status-clicked-text: #c7d2fe;
+  --crm-status-clicked-border: #6366f1;
+  
+  --crm-status-replied-bg: #064e3b;
+  --crm-status-replied-text: #a7f3d0;
+  --crm-status-replied-border: #10b981;
+  
+  --crm-status-customer-bg: #78350f;
+  --crm-status-customer-text: #fde68a;
+  --crm-status-customer-border: #f59e0b;
+  
+  --crm-status-bounced-bg: #7f1d1d;
+  --crm-status-bounced-text: #fecaca;
+  --crm-status-bounced-border: #ef4444;
+  
+  --crm-status-unsubscribed-bg: #374151;
+  --crm-status-unsubscribed-text: #e5e7eb;
+  --crm-status-unsubscribed-border: #6b7280;
+  
+  /* Contact indicator colors - Dark Mode */
+  --crm-indicator-has-bg: #064e3b;
+  --crm-indicator-has-text: #a7f3d0;
+  --crm-indicator-missing-bg: #7f1d1d;
+  --crm-indicator-missing-text: #fecaca;
+  
+  /* Filter preset colors - Dark Mode */
+  --crm-filter-active-bg: var(--color-primary-900);
+  --crm-filter-active-text: var(--color-primary-300);
+  --crm-filter-hover-bg: var(--color-secondary-700);
 }

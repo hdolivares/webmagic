@@ -1,0 +1,133 @@
+/**
+ * CRM Status Badge Styles
+ * Uses semantic CSS variables for consistent theming
+ */
+
+/* Base badge styles */
+.crm-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-xs);
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+}
+
+/* Status-specific badge styles */
+.crm-badge-pending {
+  background-color: var(--crm-status-pending-bg);
+  color: var(--crm-status-pending-text);
+  border-color: var(--crm-status-pending-border);
+}
+
+.crm-badge-emailed {
+  background-color: var(--crm-status-emailed-bg);
+  color: var(--crm-status-emailed-text);
+  border-color: var(--crm-status-emailed-border);
+}
+
+.crm-badge-sms {
+  background-color: var(--crm-status-sms-bg);
+  color: var(--crm-status-sms-text);
+  border-color: var(--crm-status-sms-border);
+}
+
+.crm-badge-opened {
+  background-color: var(--crm-status-opened-bg);
+  color: var(--crm-status-opened-text);
+  border-color: var(--crm-status-opened-border);
+}
+
+.crm-badge-clicked {
+  background-color: var(--crm-status-clicked-bg);
+  color: var(--crm-status-clicked-text);
+  border-color: var(--crm-status-clicked-border);
+}
+
+.crm-badge-replied {
+  background-color: var(--crm-status-replied-bg);
+  color: var(--crm-status-replied-text);
+  border-color: var(--crm-status-replied-border);
+}
+
+.crm-badge-customer {
+  background-color: var(--crm-status-customer-bg);
+  color: var(--crm-status-customer-text);
+  border-color: var(--crm-status-customer-border);
+}
+
+.crm-badge-bounced {
+  background-color: var(--crm-status-bounced-bg);
+  color: var(--crm-status-bounced-text);
+  border-color: var(--crm-status-bounced-border);
+}
+
+.crm-badge-unsubscribed {
+  background-color: var(--crm-status-unsubscribed-bg);
+  color: var(--crm-status-unsubscribed-text);
+  border-color: var(--crm-status-unsubscribed-border);
+}
+
+/* ============================================
+   STATUS INDICATOR (Compact Dot)
+   ============================================ */
+.crm-status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+}
+
+.crm-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.crm-status-indicator.crm-badge-pending .crm-status-dot {
+  background-color: var(--crm-status-pending-text);
+}
+
+.crm-status-indicator.crm-badge-emailed .crm-status-dot {
+  background-color: var(--crm-status-emailed-text);
+}
+
+.crm-status-indicator.crm-badge-sms .crm-status-dot {
+  background-color: var(--crm-status-sms-text);
+}
+
+.crm-status-indicator.crm-badge-opened .crm-status-dot {
+  background-color: var(--crm-status-opened-text);
+}
+
+.crm-status-indicator.crm-badge-clicked .crm-status-dot {
+  background-color: var(--crm-status-clicked-text);
+}
+
+.crm-status-indicator.crm-badge-replied .crm-status-dot {
+  background-color: var(--crm-status-replied-text);
+}
+
+.crm-status-indicator.crm-badge-customer .crm-status-dot {
+  background-color: var(--crm-status-customer-text);
+}
+
+.crm-status-indicator.crm-badge-bounced .crm-status-dot {
+  background-color: var(--crm-status-bounced-text);
+}
+
+.crm-status-indicator.crm-badge-unsubscribed .crm-status-dot {
+  background-color: var(--crm-status-unsubscribed-text);
+}
+
+.crm-status-label {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-normal);
+}
+

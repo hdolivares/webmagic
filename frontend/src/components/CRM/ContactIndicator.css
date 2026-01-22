@@ -1,0 +1,190 @@
+/**
+ * CRM Contact Indicator Styles
+ * Shows email/phone availability with visual indicators
+ */
+
+/* ============================================
+   CONTACT INDICATOR (Icon View)
+   ============================================ */
+.crm-contact-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.crm-contact-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.crm-contact-item .icon {
+  flex-shrink: 0;
+}
+
+.crm-contact-item .label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+/* Has contact (green) */
+.crm-contact-item.has-contact {
+  background-color: var(--crm-indicator-has-bg);
+  color: var(--crm-indicator-has-text);
+}
+
+.crm-contact-item.has-contact .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Missing contact (red) */
+.crm-contact-item.missing-contact {
+  background-color: var(--crm-indicator-missing-bg);
+  color: var(--crm-indicator-missing-text);
+  opacity: 0.6;
+}
+
+.crm-contact-item.missing-contact .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Hover effects */
+.crm-contact-item:hover {
+  transform: scale(1.05);
+}
+
+/* Size variants */
+.crm-contact-indicator-sm .crm-contact-item .icon {
+  width: 12px;
+  height: 12px;
+}
+
+.crm-contact-indicator-sm .crm-contact-item .label {
+  font-size: var(--font-size-xs);
+}
+
+.crm-contact-indicator-md .crm-contact-item .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.crm-contact-indicator-md .crm-contact-item .label {
+  font-size: var(--font-size-sm);
+}
+
+.crm-contact-indicator-lg .crm-contact-item .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.crm-contact-indicator-lg .crm-contact-item .label {
+  font-size: var(--font-size-base);
+}
+
+/* ============================================
+   CONTACT INFO ROW (Expanded View)
+   ============================================ */
+.crm-contact-info-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.crm-contact-detail {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.crm-contact-detail .icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+}
+
+.crm-contact-detail .value {
+  color: var(--color-text-primary);
+}
+
+.crm-contact-detail .empty {
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+/* ============================================
+   DATA COMPLETENESS
+   ============================================ */
+.crm-data-completeness {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 120px;
+}
+
+.completeness-bar {
+  flex: 1;
+  height: 8px;
+  background-color: var(--color-secondary-200);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.completeness-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width var(--transition-base), background-color var(--transition-base);
+}
+
+.completeness-fill.quality-excellent {
+  background-color: var(--crm-quality-excellent-color);
+}
+
+.completeness-fill.quality-good {
+  background-color: var(--crm-quality-good-color);
+}
+
+.completeness-fill.quality-fair {
+  background-color: var(--crm-quality-fair-color);
+}
+
+.completeness-fill.quality-poor {
+  background-color: var(--crm-quality-poor-color);
+}
+
+.completeness-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  min-width: 32px;
+  text-align: right;
+}
+
+.completeness-label.quality-excellent {
+  color: var(--crm-quality-excellent-color);
+}
+
+.completeness-label.quality-good {
+  color: var(--crm-quality-good-color);
+}
+
+.completeness-label.quality-fair {
+  color: var(--crm-quality-fair-color);
+}
+
+.completeness-label.quality-poor {
+  color: var(--crm-quality-poor-color);
+}
+
+/* Dark mode adjustments */
+.dark .completeness-bar {
+  background-color: var(--color-secondary-700);
+}
+
