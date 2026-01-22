@@ -1,5 +1,9 @@
 """
 Generated Sites API endpoints.
+
+Updated: January 22, 2026
+- Integrated CRM services for automated lifecycle tracking
+- Ensures all site generations have associated business records
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +25,7 @@ from api.schemas.site import (
 from services.hunter.business_service import BusinessService
 from services.creative.site_service import SiteService
 from services.creative.orchestrator import CreativeOrchestrator
+from services.crm import BusinessLifecycleService
 from models.user import AdminUser
 
 router = APIRouter(prefix="/sites", tags=["sites"])
@@ -61,8 +66,13 @@ async def generate_site(
     # Generate site in background
     async def generate_task():
         try:
-            # Initialize orchestrator
+            # Initialize services
             orchestrator = CreativeOrchestrator(db)
+            lifecycle_service = BusinessLifecycleService(db)
+            
+            # Update business status: none → generating
+            await lifecycle_service.mark_website_generating(business.id)
+            await db.commit()
             
             # Prepare business data
             business_data = {
@@ -101,19 +111,20 @@ async def generate_site(
                 status="preview"
             )
             
-            # Update business status
-            await business_service.update_business(
-                business.id,
-                {"website_status": "generated"}
-            )
-            
+            # Update business status: generating → generated
+            await lifecycle_service.mark_website_generated(business.id)
             await db.commit()
             
-            logger.info(f"Site generated successfully: {subdomain}")
+            logger.info(
+                f"Site generated successfully: {subdomain} "
+                f"(Business: {business.name}, Status: generated)"
+            )
             
         except Exception as e:
             logger.error(f"Site generation failed: {str(e)}", exc_info=True)
             await db.rollback()
+            # Note: business status will remain "generating" on failure
+            # Admin can retry or manually update
     
     background_tasks.add_task(generate_task)
     

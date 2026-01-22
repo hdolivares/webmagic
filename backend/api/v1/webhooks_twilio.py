@@ -5,6 +5,10 @@ Handles incoming webhooks from Twilio for:
 - SMS delivery status updates
 - Incoming SMS replies (opt-outs, feedback)
 
+Updated: January 22, 2026
+- Integrated CRM lifecycle service for automated status tracking
+- SMS delivery events now update business contact_status
+
 Author: WebMagic Team  
 Date: January 21, 2026
 """
@@ -19,6 +23,7 @@ from api.deps import get_db
 from models.campaign import Campaign
 from services.sms import SMSComplianceService
 from services.pitcher.sms_campaign_helper import SMSCampaignHelper
+from services.crm import BusinessLifecycleService
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +129,41 @@ async def handle_sms_status_callback(
             f"{campaign.status} -> {new_status}"
         )
         
+        # CRM Integration: Update business contact status
+        if campaign.business_id and message_status in ["delivered", "failed", "undelivered"]:
+            lifecycle_service = BusinessLifecycleService(db)
+            
+            try:
+                if message_status == "delivered":
+                    # SMS was delivered: pending → sms_sent
+                    await lifecycle_service.mark_campaign_sent(
+                        campaign.business_id,
+                        channel="sms"
+                    )
+                    logger.info(
+                        f"Updated business {campaign.business_id}: "
+                        f"contact_status=sms_sent (SMS delivered)"
+                    )
+                elif message_status in ["failed", "undelivered"]:
+                    # SMS bounced/failed
+                    await lifecycle_service.mark_bounced(campaign.business_id)
+                    logger.info(
+                        f"Updated business {campaign.business_id}: "
+                        f"contact_status=bounced (SMS failed)"
+                    )
+                
+                await db.commit()
+            except Exception as e:
+                logger.error(
+                    f"Error updating CRM status for business {campaign.business_id}: {e}",
+                    exc_info=True
+                )
+                # Don't fail the webhook - campaign status was already updated
+        elif not campaign.business_id:
+            logger.warning(
+                f"Campaign {campaign.id} has no business_id for CRM tracking"
+            )
+        
         return {
             "status": "ok",
             "campaign_id": str(campaign.id),
@@ -220,6 +260,34 @@ async def handle_incoming_sms(
         )
         
         logger.info(f"Reply processed: {result['action']} from {from_phone}")
+        
+        # CRM Integration: Update business contact status based on reply
+        if latest_campaign.business_id:
+            lifecycle_service = BusinessLifecycleService(db)
+            
+            try:
+                if result['action'] == 'opt_out':
+                    # Customer opted out: any → unsubscribed
+                    await lifecycle_service.mark_unsubscribed(latest_campaign.business_id)
+                    logger.info(
+                        f"Updated business {latest_campaign.business_id}: "
+                        f"contact_status=unsubscribed (SMS opt-out)"
+                    )
+                elif result['action'] == 'reply':
+                    # Customer replied: any → replied
+                    await lifecycle_service.mark_replied(latest_campaign.business_id)
+                    logger.info(
+                        f"Updated business {latest_campaign.business_id}: "
+                        f"contact_status=replied (SMS reply received)"
+                    )
+                
+                await db.commit()
+            except Exception as e:
+                logger.error(
+                    f"Error updating CRM status for business {latest_campaign.business_id}: {e}",
+                    exc_info=True
+                )
+                # Don't fail the webhook
         
         # Return empty TwiML (no auto-reply)
         # In production, you might want to send a confirmation

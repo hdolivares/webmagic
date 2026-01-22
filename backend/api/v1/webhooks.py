@@ -9,6 +9,10 @@ Security:
 - Idempotency handling
 - Error recovery
 
+Updated: January 22, 2026
+- Integrated CRM lifecycle service for automated status tracking
+- All payment events now update business CRM status
+
 Author: WebMagic Team
 Date: January 21, 2026
 """
@@ -24,6 +28,7 @@ from services.payments.recurrente_client import RecurrenteClient
 from services.site_purchase_service import get_site_purchase_service
 from services.subscription_service import get_subscription_service
 from services.emails.email_service import get_email_service
+from services.crm import BusinessLifecycleService
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -252,7 +257,9 @@ async def handle_subscription_cancelled(
     1. Update subscription status
     2. Downgrade site if immediate
     3. Send cancellation confirmation
+    4. Update CRM status: website_status → archived
     """
+    from datetime import datetime
     subscription_id = event_data.get('id')
     
     logger.info(f"Subscription cancelled: {subscription_id}")
@@ -268,7 +275,7 @@ async def handle_subscription_cancelled(
         site = result.scalar_one_or_none()
         
         if site:
-            # Update status
+            # Update subscription status
             site.subscription_status = "cancelled"
             
             # If no end date set, cancel immediately
@@ -277,6 +284,21 @@ async def handle_subscription_cancelled(
                 site.subscription_ends_at = datetime.utcnow()
             
             await db.commit()
+            
+            # CRM Integration: Update business lifecycle status
+            if site.business_id:
+                lifecycle_service = BusinessLifecycleService(db)
+                await lifecycle_service.mark_website_archived(site.business_id)
+                await db.commit()
+                logger.info(
+                    f"Updated business {site.business_id}: "
+                    f"website_status=archived (subscription cancelled)"
+                )
+            else:
+                logger.warning(
+                    f"Site {site.slug} cancelled but has no business_id for CRM update"
+                )
+            
             logger.info(f"Subscription cancelled in database: {subscription_id}")
     
     except Exception as e:

@@ -3,6 +3,9 @@ SMS Campaign Helper Methods.
 
 Separated helper methods for SMS campaign sending to keep CampaignService modular.
 
+Updated: January 22, 2026
+- Integrated CRM lifecycle service for automated status tracking
+
 Author: WebMagic Team
 Date: January 21, 2026
 """
@@ -14,6 +17,7 @@ from sqlalchemy import update
 
 from models.campaign import Campaign
 from services.sms import SMSSender, SMSComplianceService
+from services.crm import BusinessLifecycleService
 from core.config import get_settings
 from core.exceptions import ExternalAPIException, ValidationException
 
@@ -102,6 +106,33 @@ class SMSCampaignHelper:
                 )
             )
             await db.commit()
+            
+            # CRM Integration: Update business contact status
+            # Note: SMS status will be updated to "delivered" by Twilio webhook
+            # Here we just mark it as sent (pending → sms_sent happens on delivery)
+            if campaign.business_id:
+                lifecycle_service = BusinessLifecycleService(db)
+                try:
+                    # Mark as sent - will be updated to delivered/failed by webhook
+                    await lifecycle_service.mark_campaign_sent(
+                        campaign.business_id,
+                        channel="sms"
+                    )
+                    await db.commit()
+                    logger.info(
+                        f"Updated business {campaign.business_id}: "
+                        f"contact_status=sms_sent (SMS queued at Twilio)"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error updating CRM status for business {campaign.business_id}: {e}",
+                        exc_info=True
+                    )
+                    # Don't fail the campaign - SMS was already sent
+            else:
+                logger.warning(
+                    f"Campaign {campaign.id} has no business_id for CRM tracking"
+                )
             
             logger.info(
                 f"SMS campaign {campaign.id} sent successfully "
