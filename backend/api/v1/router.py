@@ -9,6 +9,7 @@ from api.v1 import (
     coverage,
     coverage_campaigns,
     geo_grid,  # Geo-grid scraping system
+    intelligent_campaigns,  # Claude-powered intelligent strategies
     sites,
     settings,
     campaigns,
@@ -42,6 +43,7 @@ api_router.include_router(businesses.router)
 api_router.include_router(coverage.router)
 api_router.include_router(coverage_campaigns.router)
 api_router.include_router(geo_grid.router)  # Geo-grid scraping
+api_router.include_router(intelligent_campaigns.router)  # Claude-powered intelligent strategies
 api_router.include_router(sites.router)
 api_router.include_router(settings.router)
 api_router.include_router(system.router)
