@@ -1,0 +1,326 @@
+/**
+ * Enhanced Businesses Page Styles
+ * Modern, responsive table layout with CRM indicators
+ */
+
+.businesses-page {
+  padding: var(--spacing-xl);
+}
+
+/* ============================================
+   PAGE HEADER
+   ============================================ */
+.page-header {
+  margin-bottom: var(--spacing-xl);
+}
+
+.page-title {
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.page-subtitle {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+}
+
+/* ============================================
+   BULK ACTIONS BAR
+   ============================================ */
+.bulk-actions-bar {
+  margin-bottom: var(--spacing-md);
+  border: 2px solid var(--color-primary-600);
+  box-shadow: var(--shadow-md);
+}
+
+.selected-count {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary-600);
+  background-color: var(--color-primary-100);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+}
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+/* ============================================
+   TABLE WRAPPER
+   ============================================ */
+.table-wrapper {
+  overflow-x: auto;
+  border-radius: var(--radius-lg);
+}
+
+.crm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+/* Table Header */
+.crm-table thead {
+  background-color: var(--color-background-secondary);
+  border-bottom: 2px solid var(--color-border);
+}
+
+.crm-table th {
+  padding: var(--spacing-md);
+  text-align: left;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.crm-table th.text-center {
+  text-align: center;
+}
+
+.th-checkbox {
+  width: 40px;
+  text-align: center;
+}
+
+/* Table Body */
+.crm-table tbody tr {
+  border-bottom: 1px solid var(--color-border);
+  transition: background-color var(--transition-fast);
+}
+
+.crm-table tbody tr:hover {
+  background-color: var(--color-surface-hover);
+}
+
+.crm-table tbody tr.selected {
+  background-color: var(--color-primary-50);
+}
+
+.crm-table td {
+  padding: var(--spacing-md);
+  vertical-align: middle;
+}
+
+.crm-table td.text-center {
+  text-align: center;
+}
+
+.td-checkbox {
+  width: 40px;
+  text-align: center;
+}
+
+.crm-table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* ============================================
+   TABLE CELLS
+   ============================================ */
+
+/* Business Info */
+.td-business-info {
+  min-width: 250px;
+}
+
+.business-name {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.business-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+/* Contact Info */
+.td-contact {
+  min-width: 120px;
+}
+
+/* Status */
+.td-status {
+  min-width: 150px;
+}
+
+.site-indicator {
+  display: inline-block;
+  margin-left: var(--spacing-xs);
+  font-size: var(--font-size-lg);
+}
+
+/* Qualification Score */
+.td-score {
+  min-width: 80px;
+}
+
+.score-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-sm);
+}
+
+.score-excellent {
+  background-color: var(--crm-indicator-has-bg);
+  color: var(--crm-indicator-has-text);
+}
+
+.score-good {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.score-fair {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.score-poor {
+  background-color: var(--crm-indicator-missing-bg);
+  color: var(--crm-indicator-missing-text);
+}
+
+/* Data Quality */
+.td-quality {
+  min-width: 140px;
+}
+
+/* Campaigns */
+.td-campaigns {
+  min-width: 100px;
+}
+
+.campaigns-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.campaign-count {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-lg);
+}
+
+.campaign-date {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+/* ============================================
+   EMPTY STATE
+   ============================================ */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-3xl) var(--spacing-xl);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.empty-state p {
+  margin-bottom: var(--spacing-md);
+  font-size: var(--font-size-lg);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 1200px) {
+  .crm-table {
+    font-size: var(--font-size-xs);
+  }
+
+  .td-business-info {
+    min-width: 200px;
+  }
+
+  .business-meta {
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+}
+
+@media (max-width: 768px) {
+  .businesses-page {
+    padding: var(--spacing-md);
+  }
+
+  .page-header {
+    margin-bottom: var(--spacing-md);
+  }
+
+  .page-title {
+    font-size: var(--font-size-3xl);
+  }
+
+  /* Stack table on mobile (alternative: horizontal scroll) */
+  .table-wrapper {
+    overflow-x: scroll;
+  }
+
+  .bulk-actions-bar .flex {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .btn-icon {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ============================================
+   DARK MODE ADJUSTMENTS
+   ============================================ */
+.dark .crm-table tbody tr.selected {
+  background-color: var(--color-primary-900);
+}
+
+.dark .score-excellent {
+  background-color: #064e3b;
+  color: #a7f3d0;
+}
+
+.dark .score-good {
+  background-color: #1e3a8a;
+  color: #bfdbfe;
+}
+
+.dark .score-fair {
+  background-color: #78350f;
+  color: #fde68a;
+}
+
+.dark .score-poor {
+  background-color: #7f1d1d;
+  color: #fecaca;
+}
+
