@@ -25,7 +25,7 @@ import { Download, Mail, MessageSquare, Trash2 } from 'lucide-react'
 import './BusinessesPage.css'
 
 // Enhanced business type with all CRM fields
-interface Business {
+interface EnrichedBusiness {
   id: string
   name: string
   email?: string | null
@@ -72,7 +72,7 @@ export const BusinessesPage = () => {
     queryFn: () => api.getBusinesses({ ...filters, limit: 100 }),
   })
 
-  const businesses = data?.businesses || []
+  const businesses = (data?.businesses as EnrichedBusiness[]) || []
   const total = data?.total || 0
 
   // ============================================
