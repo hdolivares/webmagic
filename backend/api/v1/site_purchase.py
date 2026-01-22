@@ -302,6 +302,75 @@ async def get_site_versions(
         )
 
 
+# Admin endpoint to list all deployed sites
+@router.get(
+    "/admin/sites",
+    response_model=dict,
+    responses={
+        401: {"model": ErrorResponse, "description": "Not authenticated"}
+    },
+    summary="List all deployed sites",
+    description="List all deployed/purchased sites (requires admin auth)."
+)
+async def list_deployed_sites(
+    skip: int = 0,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db)
+    # TODO: Add admin authentication dependency
+):
+    """
+    List all deployed sites.
+    
+    **For admin use only.**
+    
+    Returns list of all purchased/deployed sites with customer info.
+    """
+    try:
+        from sqlalchemy import select, func
+        
+        # Count total
+        count_query = select(func.count(Site.id))
+        total_result = await db.execute(count_query)
+        total = total_result.scalar()
+        
+        # Get sites
+        query = select(Site).order_by(Site.created_at.desc()).offset(skip).limit(limit)
+        result = await db.execute(query)
+        sites = result.scalars().all()
+        
+        # Format response
+        site_service = get_site_service()
+        sites_data = []
+        for site in sites:
+            site_url = site_service.generate_site_url(
+                slug=site.slug,
+                custom_domain=site.custom_domain if site.has_custom_domain else None
+            )
+            sites_data.append({
+                "id": str(site.id),
+                "slug": site.slug,
+                "site_title": site.site_title,
+                "site_url": site_url,
+                "status": site.status,
+                "business_id": str(site.business_id) if site.business_id else None,
+                "subscription_status": site.subscription_status,
+                "purchased_at": site.purchased_at.isoformat() if site.purchased_at else None,
+                "created_at": site.created_at.isoformat() if site.created_at else None,
+            })
+        
+        return {
+            "sites": sites_data,
+            "total": total
+        }
+    
+    except Exception as e:
+        logger.error(f"List deployed sites error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve sites."
+        )
+
+
 # Admin endpoint for purchase statistics
 @router.get(
     "/admin/purchase-statistics",
