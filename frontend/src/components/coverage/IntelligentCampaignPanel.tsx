@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Card, Input, Button, Select, SelectItem, Spinner } from '@/components/ui'
+import { Card } from '@/components/ui'
 import { api } from '@/services/api'
 import './IntelligentCampaignPanel.css'
 
@@ -64,7 +64,7 @@ export function IntelligentCampaignPanel() {
   const [city, setCity] = useState('Los Angeles')
   const [state, setState] = useState('CA')
   const [category, setCategory] = useState('plumbers')
-  const [population, setPopulation] = useState<number | ''>(3800000)
+  const [population, setPopulation] = useState<number | string>(3800000)
   
   const [loading, setLoading] = useState(false)
   const [strategy, setStrategy] = useState<Strategy | null>(null)
@@ -77,15 +77,15 @@ export function IntelligentCampaignPanel() {
     setScrapeResult(null)
     
     try {
-      const response = await api.post('/intelligent-campaigns/strategies', {
+      const response = await api.createIntelligentStrategy({
         city,
         state,
         category,
-        population: population || undefined,
+        population: population ? Number(population) : undefined,
         force_regenerate: false
       })
       
-      setStrategy(response.data)
+      setStrategy(response)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to create strategy')
       console.error('Strategy creation error:', err)
@@ -101,16 +101,16 @@ export function IntelligentCampaignPanel() {
     setError(null)
     
     try {
-      const response = await api.post('/intelligent-campaigns/scrape-zone', {
+      const response = await api.scrapeIntelligentZone({
         strategy_id: strategy.strategy_id,
         limit_per_zone: 50
       })
       
-      setScrapeResult(response.data)
+      setScrapeResult(response)
       
       // Refresh strategy
-      const strategyResponse = await api.get(`/intelligent-campaigns/strategies/${strategy.strategy_id}`)
-      setStrategy(strategyResponse.data)
+      const strategyResponse = await api.getIntelligentStrategy(strategy.strategy_id)
+      setStrategy(strategyResponse)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to scrape zone')
       console.error('Scrape error:', err)
@@ -126,10 +126,10 @@ export function IntelligentCampaignPanel() {
     setError(null)
     
     try {
-      await api.post('/intelligent-campaigns/batch-scrape', {
+      await api.batchScrapeIntelligentStrategy({
         strategy_id: strategy.strategy_id,
         limit_per_zone: 50,
-        max_zones: 5 // Scrape 5 zones at a time
+        max_zones: 5
       })
       
       alert('Batch scraping started! This will run in the background.')
@@ -157,18 +157,22 @@ export function IntelligentCampaignPanel() {
           <div className="form-row">
             <div className="form-field">
               <label>City</label>
-              <Input
+              <input
+                type="text"
+                className="form-input"
                 value={city}
-                onChange={(e) => setCity(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCity(e.target.value)}
                 placeholder="Los Angeles"
               />
             </div>
             
             <div className="form-field">
               <label>State</label>
-              <Input
+              <input
+                type="text"
+                className="form-input"
                 value={state}
-                onChange={(e) => setState(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setState(e.target.value)}
                 placeholder="CA"
                 maxLength={2}
               />
@@ -178,31 +182,34 @@ export function IntelligentCampaignPanel() {
           <div className="form-row">
             <div className="form-field">
               <label>Business Category</label>
-              <Input
+              <input
+                type="text"
+                className="form-input"
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCategory(e.target.value)}
                 placeholder="plumbers"
               />
             </div>
             
             <div className="form-field">
               <label>Population (Optional)</label>
-              <Input
+              <input
                 type="number"
+                className="form-input"
                 value={population}
-                onChange={(e) => setPopulation(e.target.value ? parseInt(e.target.value) : '')}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPopulation(e.target.value ? parseInt(e.target.value) : '')}
                 placeholder="3800000"
               />
             </div>
           </div>
 
-          <Button
+          <button
             onClick={handleCreateStrategy}
             disabled={loading || !city || !state || !category}
             className="create-strategy-btn"
           >
-            {loading ? <Spinner size="sm" /> : '🧠 Generate Intelligent Strategy'}
-          </Button>
+            {loading ? '⏳ Generating...' : '🧠 Generate Intelligent Strategy'}
+          </button>
         </div>
 
         {/* Error Display */}
@@ -288,21 +295,21 @@ export function IntelligentCampaignPanel() {
                 </div>
 
                 <div className="action-buttons">
-                  <Button
+                  <button
                     onClick={handleScrapeNextZone}
                     disabled={loading}
                     className="scrape-btn primary"
                   >
-                    {loading ? <Spinner size="sm" /> : '🎯 Scrape Next Zone'}
-                  </Button>
+                    {loading ? '⏳ Scraping...' : '🎯 Scrape Next Zone'}
+                  </button>
                   
-                  <Button
+                  <button
                     onClick={handleBatchScrape}
                     disabled={loading}
                     className="scrape-btn secondary"
                   >
-                    {loading ? <Spinner size="sm" /> : '⚡ Batch Scrape (5 zones)'}
-                  </Button>
+                    {loading ? '⏳ Starting...' : '⚡ Batch Scrape (5 zones)'}
+                  </button>
                 </div>
               </div>
             )}
@@ -359,4 +366,3 @@ export function IntelligentCampaignPanel() {
     </div>
   )
 }
-
