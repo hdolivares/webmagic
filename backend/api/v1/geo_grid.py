@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 import logging
 
 from api.deps import get_db, get_current_user
-from models.user import User
+from models.user import AdminUser
 from services.hunter.geo_grid import create_city_grid
 from services.hunter.hunter_service import HunterService
 from services.hunter.coverage_service import CoverageService
@@ -79,7 +79,7 @@ class StrategyComparison(BaseModel):
 async def scrape_with_geo_grid(
     request: GeoGridScrapeRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: AdminUser = Depends(get_current_user)
 ):
     """
     Scrape a city using geo-grid subdivision.
@@ -144,7 +144,7 @@ async def compare_strategies(
     city: str = Query(..., description="City name"),
     state: str = Query(..., description="State code"),
     population: int = Query(..., description="City population"),
-    current_user: User = Depends(get_current_user)
+    current_user: AdminUser = Depends(get_current_user)
 ):
     """
     Compare traditional vs geo-grid strategy for a location.
@@ -208,7 +208,7 @@ async def compare_strategies(
 @router.get("/stats")
 async def get_geo_grid_stats(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: AdminUser = Depends(get_current_user)
 ):
     """
     Get geo-grid statistics and metrics.
@@ -275,7 +275,7 @@ async def get_geo_grid_coverage(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: AdminUser = Depends(get_current_user)
 ):
     """
     Get coverage grids with zone information.
