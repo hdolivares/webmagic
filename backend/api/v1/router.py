@@ -22,7 +22,7 @@ from api.v1 import (
     domains,  # Phase 5: Custom domains
     tickets  # Phase 6: Support tickets
 )
-from api.v1.webhooks import twilio  # Phase 7: SMS webhooks
+from api.v1 import webhooks_twilio as twilio  # Phase 7: SMS webhooks
 
 api_router = APIRouter()
 
