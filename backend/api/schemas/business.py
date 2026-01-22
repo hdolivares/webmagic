@@ -61,6 +61,34 @@ class BusinessResponse(BusinessBase):
     created_at: datetime
     updated_at: datetime
     
+    # NEW: Contact data indicators
+    has_email: bool = False
+    has_phone: bool = False
+    
+    # NEW: Contact status indicators
+    was_contacted: bool = False
+    contacted_via_email: bool = False
+    contacted_via_sms: bool = False
+    contact_bounced: bool = False
+    is_unsubscribed: bool = False
+    is_customer: bool = False
+    
+    # NEW: Campaign summary
+    total_campaigns: int = 0
+    last_contact_date: Optional[datetime] = None
+    last_contact_channel: Optional[str] = None
+    
+    # NEW: Site summary
+    has_generated_site: bool = False
+    site_url: Optional[str] = None
+    
+    # NEW: Data quality
+    data_completeness: int = 0
+    
+    # NEW: Human-readable status
+    status_label: str = "New Lead"
+    status_color: str = "gray"
+    
     class Config:
         from_attributes = True
 
