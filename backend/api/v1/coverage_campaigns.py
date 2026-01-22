@@ -107,7 +107,7 @@ async def get_campaign_stats(
     total_locations = locations_result.scalar() or 0
     
     categories_result = await db.execute(
-        select(func.count(func.distinct(CoverageGrid.category)))
+        select(func.count(func.distinct(CoverageGrid.industry_category)))
     )
     total_categories = categories_result.scalar() or 0
     
@@ -215,7 +215,7 @@ async def get_category_coverage(
     Get coverage statistics grouped by category.
     """
     query = select(
-        CoverageGrid.category,
+        CoverageGrid.industry_category,
         func.count(CoverageGrid.id).label("total_locations"),
         func.sum(
             func.case((CoverageGrid.status == "completed", 1), else_=0)
@@ -226,7 +226,7 @@ async def get_category_coverage(
         func.sum(CoverageGrid.businesses_found).label("total_businesses"),
         func.avg(CoverageGrid.businesses_found).label("avg_businesses")
     ).group_by(
-        CoverageGrid.category
+        CoverageGrid.industry_category
     )
     
     result = await db.execute(
@@ -276,7 +276,7 @@ async def get_grid_details(
     if location:
         filters.append(CoverageGrid.location.ilike(f"%{location}%"))
     if category:
-        filters.append(CoverageGrid.category.ilike(f"%{category}%"))
+        filters.append(CoverageGrid.industry_category.ilike(f"%{category}%"))
     if status:
         filters.append(CoverageGrid.status == status)
     if priority_min:
@@ -289,7 +289,7 @@ async def get_grid_details(
     query = query.order_by(
         CoverageGrid.priority.desc(),
         CoverageGrid.location,
-        CoverageGrid.category
+        CoverageGrid.industry_category
     )
     
     result = await db.execute(query.offset(skip).limit(limit))
