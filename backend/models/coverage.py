@@ -18,6 +18,12 @@ class CoverageGrid(BaseModel):
     city = Column(String(100), nullable=False, index=True)
     country = Column(String(50), default="US", nullable=False)
     
+    # Geo-Grid Zone (for subdivided cities)
+    zone_id = Column(String(20), nullable=True, index=True)  # e.g., "2x3" for row 2, col 3
+    zone_lat = Column(String(20), nullable=True)  # Center latitude of zone
+    zone_lon = Column(String(20), nullable=True)  # Center longitude of zone
+    zone_radius_km = Column(String(10), nullable=True)  # Search radius for this zone
+    
     # Industry
     industry = Column(String(100), nullable=False, index=True)
     industry_category = Column(String(100), nullable=True)
@@ -54,7 +60,8 @@ class CoverageGrid(BaseModel):
     error_message = Column(Text, nullable=True)
     
     def __repr__(self):
-        return f"<CoverageGrid {self.city}, {self.state} - {self.industry} ({self.status})>"
+        zone_str = f" Zone {self.zone_id}" if self.zone_id else ""
+        return f"<CoverageGrid {self.city}, {self.state}{zone_str} - {self.industry} ({self.status})>"
     
     @property
     def location_key(self) -> str:
@@ -64,7 +71,8 @@ class CoverageGrid(BaseModel):
     @property
     def full_key(self) -> str:
         """Generate unique coverage key."""
-        return f"{self.country}:{self.state}:{self.city}:{self.industry}"
+        zone_suffix = f":{self.zone_id}" if self.zone_id else ""
+        return f"{self.country}:{self.state}:{self.city}:{self.industry}{zone_suffix}"
     
     @property
     def conversion_rate(self) -> float:

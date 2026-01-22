@@ -77,18 +77,26 @@ class CoverageService:
         state: str,
         city: str,
         industry: str,
-        country: str = "US"
+        country: str = "US",
+        zone_id: Optional[str] = None
     ) -> Optional[CoverageGrid]:
-        """Get coverage by location and industry."""
+        """Get coverage by location, industry, and optionally zone."""
+        conditions = [
+            CoverageGrid.country == country,
+            CoverageGrid.state == state,
+            CoverageGrid.city == city,
+            CoverageGrid.industry == industry
+        ]
+        
+        # If zone_id provided, include it in the search
+        if zone_id:
+            conditions.append(CoverageGrid.zone_id == zone_id)
+        else:
+            # If no zone_id, match entries without a zone
+            conditions.append(CoverageGrid.zone_id.is_(None))
+        
         result = await self.db.execute(
-            select(CoverageGrid).where(
-                and_(
-                    CoverageGrid.country == country,
-                    CoverageGrid.state == state,
-                    CoverageGrid.city == city,
-                    CoverageGrid.industry == industry
-                )
-            )
+            select(CoverageGrid).where(and_(*conditions))
         )
         return result.scalar_one_or_none()
     
@@ -106,7 +114,12 @@ class CoverageService:
         Returns:
             Tuple of (coverage, created_bool)
         """
-        existing = await self.get_coverage_by_key(state, city, industry, country)
+        # Extract zone_id if present to check for existing zone
+        zone_id = kwargs.get("zone_id")
+        
+        existing = await self.get_coverage_by_key(
+            state, city, industry, country, zone_id=zone_id
+        )
         if existing:
             return existing, False
         
