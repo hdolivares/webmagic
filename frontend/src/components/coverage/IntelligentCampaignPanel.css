@@ -1,0 +1,385 @@
+.intelligent-campaign-panel {
+  width: 100%;
+  margin: 2rem 0;
+}
+
+.panel-card {
+  padding: 2rem;
+  background: var(--color-surface, #ffffff);
+  border-radius: var(--border-radius-lg, 12px);
+  border: 1px solid var(--color-border, #e5e7eb);
+  box-shadow: var(--shadow-md, 0 4px 6px rgba(0, 0, 0, 0.1));
+}
+
+.panel-header {
+  margin-bottom: 2rem;
+  border-bottom: 2px solid var(--color-primary-500, #3b82f6);
+  padding-bottom: 1rem;
+}
+
+.panel-header h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #111827);
+  margin: 0 0 0.5rem 0;
+}
+
+.subtitle {
+  font-size: 0.95rem;
+  color: var(--color-text-secondary, #6b7280);
+  margin: 0;
+}
+
+/* Form Section */
+.form-section {
+  margin-bottom: 2rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-field label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #111827);
+  margin-bottom: 0.5rem;
+}
+
+.create-strategy-btn {
+  width: 100%;
+  margin-top: 1rem;
+  padding: 0.875rem;
+  font-size: 1rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--color-primary-600, #2563eb), var(--color-primary-500, #3b82f6));
+  color: white;
+  border: none;
+  border-radius: var(--border-radius-md, 8px);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.create-strategy-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+}
+
+.create-strategy-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Error Message */
+.error-message {
+  padding: 1rem;
+  background: var(--color-error-50, #fef2f2);
+  border: 1px solid var(--color-error-200, #fecaca);
+  border-radius: var(--border-radius-md, 8px);
+  color: var(--color-error-700, #b91c1c);
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+}
+
+/* Strategy Section */
+.strategy-section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 2px solid var(--color-border, #e5e7eb);
+}
+
+.strategy-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.strategy-header h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #111827);
+  margin: 0;
+}
+
+.status-badge {
+  padding: 0.5rem 1rem;
+  border-radius: var(--border-radius-full, 9999px);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-active {
+  background: var(--color-success-100, #dcfce7);
+  color: var(--color-success-700, #15803d);
+}
+
+.status-completed {
+  background: var(--color-primary-100, #dbeafe);
+  color: var(--color-primary-700, #1d4ed8);
+}
+
+/* Analysis Section */
+.analysis-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.analysis-card {
+  padding: 1.25rem;
+  background: var(--color-secondary-50, #f9fafb);
+  border-radius: var(--border-radius-md, 8px);
+  border: 1px solid var(--color-secondary-200, #e5e7eb);
+}
+
+.analysis-card h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #111827);
+  margin: 0 0 0.75rem 0;
+}
+
+.analysis-card p {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary, #6b7280);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Metrics Grid */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.metric-card {
+  padding: 1.25rem;
+  background: linear-gradient(135deg, var(--color-primary-50, #eff6ff), var(--color-secondary-50, #f9fafb));
+  border-radius: var(--border-radius-md, 8px);
+  border: 1px solid var(--color-primary-200, #bfdbfe);
+  text-align: center;
+}
+
+.metric-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-primary-600, #2563eb);
+  margin-bottom: 0.5rem;
+}
+
+.metric-label {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6b7280);
+  font-weight: 500;
+}
+
+/* Action Section */
+.action-section {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: var(--color-secondary-50, #f9fafb);
+  border-radius: var(--border-radius-lg, 12px);
+  border: 2px dashed var(--color-primary-300, #93c5fd);
+}
+
+.next-zone-info {
+  margin-bottom: 1.5rem;
+}
+
+.next-zone-info h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #111827);
+  margin: 0 0 0.5rem 0;
+}
+
+.next-zone-info p {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary, #6b7280);
+  margin: 0.25rem 0;
+}
+
+.zone-reason {
+  font-style: italic;
+  color: var(--color-primary-600, #2563eb);
+  margin-top: 0.5rem !important;
+}
+
+.action-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.scrape-btn {
+  padding: 0.875rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--border-radius-md, 8px);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.scrape-btn.primary {
+  background: var(--color-success-600, #16a34a);
+  color: white;
+}
+
+.scrape-btn.primary:hover:not(:disabled) {
+  background: var(--color-success-700, #15803d);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(22, 163, 74, 0.3);
+}
+
+.scrape-btn.secondary {
+  background: var(--color-primary-600, #2563eb);
+  color: white;
+}
+
+.scrape-btn.secondary:hover:not(:disabled) {
+  background: var(--color-primary-700, #1d4ed8);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3);
+}
+
+.scrape-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.completion-message {
+  padding: 1.5rem;
+  background: var(--color-success-50, #f0fdf4);
+  border: 2px solid var(--color-success-200, #bbf7d0);
+  border-radius: var(--border-radius-lg, 12px);
+  color: var(--color-success-700, #15803d);
+  font-size: 1.125rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Results Section */
+.results-section {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: var(--color-secondary-50, #f9fafb);
+  border-radius: var(--border-radius-lg, 12px);
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+.results-section h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #111827);
+  margin: 0 0 1.5rem 0;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.result-card {
+  padding: 1.25rem;
+  background: white;
+  border-radius: var(--border-radius-md, 8px);
+  border: 1px solid var(--color-border, #e5e7eb);
+  text-align: center;
+}
+
+.result-card.highlight {
+  background: linear-gradient(135deg, var(--color-success-50, #f0fdf4), var(--color-success-100, #dcfce7));
+  border-color: var(--color-success-300, #86efac);
+}
+
+.result-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--color-primary-600, #2563eb);
+  margin-bottom: 0.5rem;
+}
+
+.result-card.highlight .result-value {
+  color: var(--color-success-600, #16a34a);
+}
+
+.result-label {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6b7280);
+  font-weight: 500;
+}
+
+/* Progress Bar */
+.progress-bar-container {
+  margin-top: 1.5rem;
+}
+
+.progress-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #111827);
+  margin-bottom: 0.5rem;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 24px;
+  background: var(--color-secondary-200, #e5e7eb);
+  border-radius: var(--border-radius-full, 9999px);
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-success-500, #22c55e), var(--color-success-600, #16a34a));
+  border-radius: var(--border-radius-full, 9999px);
+  transition: width 0.5s ease;
+}
+
+.progress-stats {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6b7280);
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-section {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .action-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .results-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

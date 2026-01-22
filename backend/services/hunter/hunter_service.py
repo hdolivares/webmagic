@@ -1,5 +1,6 @@
 """
 Main Hunter orchestration service - coordinates scraping workflow.
+Now enhanced with Claude-powered intelligent zone placement strategies.
 """
 from typing import Dict, Any, Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,11 +11,7 @@ from services.hunter.scraper import OutscraperClient
 from services.hunter.filters import LeadQualifier
 from services.hunter.business_service import BusinessService
 from services.hunter.coverage_service import CoverageService
-from services.hunter.geo_grid import (
-    create_city_grid,
-    should_subdivide_city,
-    GeoGrid
-)
+from services.hunter.geo_strategy_service import GeoStrategyService
 from services.hunter.website_validator import WebsiteValidator
 from core.exceptions import ExternalAPIException
 
@@ -24,7 +21,9 @@ logger = logging.getLogger(__name__)
 class HunterService:
     """
     Main orchestration service for the Hunter module.
-    Coordinates scraping, filtering, and storing leads.
+    
+    Now uses Claude to generate intelligent zone placement strategies
+    for maximum business discovery with minimum redundancy.
     """
     
     def __init__(
@@ -50,278 +49,344 @@ class HunterService:
         )
         self.business_service = BusinessService(db)
         self.coverage_service = CoverageService(db)
+        self.geo_strategy_service = GeoStrategyService(db)
+        self.website_validator = WebsiteValidator()
     
-    async def scrape_location_with_zones(
+    async def scrape_with_intelligent_strategy(
         self,
         city: str,
         state: str,
-        industry: str,
+        category: str,
         country: str = "US",
         limit_per_zone: int = 50,
-        priority: int = 0,
         population: Optional[int] = None,
-        city_lat: Optional[float] = None,
-        city_lon: Optional[float] = None
+        center_lat: Optional[float] = None,
+        center_lon: Optional[float] = None,
+        force_new_strategy: bool = False
     ) -> Dict[str, Any]:
         """
-        Scrape a location with automatic geo-grid subdivision for better coverage.
+        Scrape a city using Claude-generated intelligent zone placement strategy.
         
-        For cities with 100K+ population, this subdivides the city into geographic
-        zones and scrapes each zone independently, ensuring comprehensive coverage.
+        This is the NEW recommended method that replaces scrape_location_with_zones.
+        Claude analyzes the city's geography and business distribution patterns to
+        place zones optimally, avoiding wasted searches and ensuring complete coverage.
         
         Args:
             city: City name
             state: State code
-            industry: Industry/category
+            category: Business category
             country: Country code
             limit_per_zone: Maximum results per zone
-            priority: Priority level
-            population: City population (for grid calculation)
-            city_lat: City center latitude
-            city_lon: City center longitude
+            population: City population (optional, helps Claude's analysis)
+            center_lat: City center latitude (will geocode if not provided)
+            center_lon: City center longitude (will geocode if not provided)
+            force_new_strategy: Generate new strategy even if one exists
             
         Returns:
-            Dictionary with aggregated results from all zones
-        """
-        logger.info(f"Starting geo-grid scrape: {city}, {state} - {industry}")
-        
-        # Check if city should be subdivided
-        if population and should_subdivide_city(population) and city_lat and city_lon:
-            # Create geo-grid zones
-            zones = create_city_grid(
-                city=city,
-                state=state,
-                center_lat=city_lat,
-                center_lon=city_lon,
-                population=population
-            )
-            
-            logger.info(f"City subdivided into {len(zones)} zones for comprehensive coverage")
-            
-            # Scrape each zone
-            all_results = []
-            total_scraped = 0
-            total_qualified = 0
-            total_saved = 0
-            
-            for zone in zones:
-                try:
-                    result = await self.scrape_zone(
-                        city=city,
-                        state=state,
-                        industry=industry,
-                        country=country,
-                        zone=zone,
-                        limit=limit_per_zone,
-                        priority=priority
-                    )
-                    
-                    all_results.append(result)
-                    total_scraped += result.get("scraped", 0)
-                    total_qualified += result.get("qualified", 0)
-                    total_saved += result.get("saved", 0)
-                    
-                except Exception as e:
-                    logger.error(f"Failed to scrape zone {zone.zone_id}: {str(e)}")
-                    continue
-            
-            return {
-                "status": "completed",
-                "location": f"{city}, {state}",
-                "industry": industry,
-                "zones_scraped": len(zones),
-                "total_scraped": total_scraped,
-                "total_qualified": total_qualified,
-                "total_saved": total_saved,
-                "zone_results": all_results,
-                "message": f"Scraped {len(zones)} zones, found {total_saved} qualified businesses"
+            Dictionary with results:
+            {
+                "strategy_id": "uuid",
+                "total_zones": 18,
+                "zones_scraped": 1,
+                "zones_remaining": 17,
+                "businesses_found": 47,
+                "qualified_leads": 12,
+                "zone_results": {...},
+                "strategy_status": "active|completed"
             }
-        else:
-            # Fall back to single-zone scrape
-            logger.info("Population below threshold or coordinates missing - using single-zone scrape")
-            return await self.scrape_location(
+        """
+        logger.info(f"Starting intelligent strategy scrape: {city}, {state} - {category}")
+        
+        # Get or create strategy using Claude
+        strategy = await self.geo_strategy_service.get_or_create_strategy(
+            city=city,
+            state=state,
+            category=category,
+            country=country,
+            force_regenerate=force_new_strategy,
+            population=population,
+            center_lat=center_lat,
+            center_lon=center_lon
+        )
+        
+        logger.info(
+            f"Using strategy {strategy.id}: {strategy.total_zones} zones, "
+            f"{strategy.zones_completed} already completed"
+        )
+        
+        # Get next zone to scrape
+        next_zone = strategy.get_next_zone()
+        if not next_zone:
+            logger.info(f"Strategy {strategy.id} is complete - all zones scraped")
+            return {
+                "strategy_id": str(strategy.id),
+                "status": "completed",
+                "message": "All zones in this strategy have been scraped",
+                "total_zones": strategy.total_zones,
+                "zones_completed": strategy.zones_completed,
+                "total_businesses_found": strategy.businesses_found
+            }
+        
+        zone_id = next_zone["zone_id"]
+        zone_lat = next_zone["lat"]
+        zone_lon = next_zone["lon"]
+        zone_radius = next_zone["radius_km"]
+        
+        logger.info(
+            f"Scraping zone {zone_id} ({zone_lat}, {zone_lon}) "
+            f"radius {zone_radius}km, priority: {next_zone.get('priority')}"
+        )
+        
+        # Scrape the zone
+        try:
+            results = await self.scraper.search_businesses(
+                query=category,
                 city=city,
                 state=state,
-                industry=industry,
                 country=country,
                 limit=limit_per_zone,
-                priority=priority
+                latitude=zone_lat,
+                longitude=zone_lon,
+                radius_km=zone_radius
             )
-    
-    async def scrape_zone(
-        self,
-        city: str,
-        state: str,
-        industry: str,
-        zone: GeoGrid,
-        country: str = "US",
-        limit: int = 50,
-        priority: int = 0
-    ) -> Dict[str, Any]:
-        """
-        Scrape a specific geographic zone.
-        
-        Args:
-            city: City name
-            state: State code
-            industry: Industry/category
-            zone: GeoGrid zone to scrape
-            country: Country code
-            limit: Maximum results
-            priority: Priority level
             
-        Returns:
-            Dictionary with zone scraping results
-        """
-        logger.info(f"Scraping zone {zone.zone_id}: {zone.zone_name}")
-        
-        try:
-            # Get or create coverage for this zone
-            coverage, created = await self.coverage_service.get_or_create_coverage(
-                state=state,
+            raw_businesses = results.get("data", [])
+            logger.info(f"Zone {zone_id} returned {len(raw_businesses)} businesses")
+            
+            # Process and qualify leads
+            qualified_count = 0
+            new_businesses = 0
+            
+            for biz_data in raw_businesses:
+                try:
+                    # Validate website if present
+                    website_url = biz_data.get("website")
+                    website_status = "unknown"
+                    
+                    if website_url:
+                        website_status = await self.website_validator.validate_website(website_url)
+                        biz_data["website_status"] = website_status
+                    
+                    # Qualify the lead
+                    is_qualified, score, reasons = self.qualifier.qualify(biz_data)
+                    
+                    # Store if qualified
+                    if is_qualified:
+                        business = await self.business_service.create_or_update_business(
+                            data=biz_data,
+                            source="outscraper_gmaps",
+                            discovery_city=city,
+                            discovery_state=state,
+                            discovery_zone_id=zone_id,
+                            discovery_zone_lat=zone_lat,
+                            discovery_zone_lon=zone_lon,
+                            lead_score=score,
+                            qualification_reasons=reasons
+                        )
+                        
+                        if business:
+                            qualified_count += 1
+                            if hasattr(business, '_is_new') and business._is_new:
+                                new_businesses += 1
+                    
+                except Exception as e:
+                    logger.error(f"Error processing business: {e}")
+                    continue
+            
+            # Update coverage tracking
+            await self.coverage_service.update_coverage_for_zone(
                 city=city,
-                industry=industry,
-                country=country,
-                priority=priority,
-                zone_id=zone.zone_id,
-                zone_lat=str(zone.center_lat),
-                zone_lon=str(zone.center_lon),
-                zone_radius_km=str(zone.radius_km)
-            )
-            
-            # Mark in progress
-            await self.coverage_service.mark_in_progress(coverage.id)
-            
-            # Scrape businesses using geo-coordinates
-            scrape_result = await self.scraper.search_businesses(
-                query=industry,
-                city=city,
                 state=state,
                 country=country,
-                limit=limit,
-                zone_lat=zone.center_lat,
-                zone_lon=zone.center_lon,
-                zone_id=zone.zone_id
+                category=category,
+                zone_id=zone_id,
+                zone_lat=zone_lat,
+                zone_lon=zone_lon,
+                zone_radius_km=zone_radius,
+                total_found=len(raw_businesses),
+                qualified=qualified_count
             )
             
-            raw_businesses = scrape_result.get("businesses", [])
-            
-            if not raw_businesses:
-                await self.coverage_service.mark_completed(
-                    coverage.id,
-                    lead_count=0,
-                    qualified_count=0
-                )
-                return {
-                    "zone_id": zone.zone_id,
-                    "scraped": 0,
-                    "qualified": 0,
-                    "saved": 0
-                }
-            
-            # Filter and qualify
-            qualified_businesses = self.qualifier.filter_batch(
-                raw_businesses,
-                update_in_place=True
+            # Mark zone complete in strategy
+            await self.geo_strategy_service.mark_zone_complete(
+                strategy_id=str(strategy.id),
+                zone_id=zone_id,
+                businesses_found=qualified_count
             )
             
-            # Validate websites for qualified businesses
-            await self.validate_websites(qualified_businesses)
-            
-            # Save to database
-            created_businesses = await self.business_service.bulk_create_businesses(
-                qualified_businesses,
-                coverage_grid_id=coverage.id
-            )
-            
-            # Mark completed
-            await self.coverage_service.mark_completed(
-                coverage.id,
-                lead_count=len(raw_businesses),
-                qualified_count=len(qualified_businesses),
-                cooldown_hours=168
-            )
+            # Refresh strategy to get updated stats
+            await self.db.refresh(strategy)
             
             logger.info(
-                f"Zone {zone.zone_id} complete: "
-                f"{len(created_businesses)} businesses saved"
+                f"Zone {zone_id} complete: {qualified_count} qualified from {len(raw_businesses)} raw "
+                f"({strategy.zones_completed}/{strategy.total_zones} zones done)"
             )
             
             return {
-                "zone_id": zone.zone_id,
-                "coverage_id": str(coverage.id),
-                "scraped": len(raw_businesses),
-                "qualified": len(qualified_businesses),
-                "saved": len(created_businesses),
-                "has_more": scrape_result.get("has_more", False)
+                "strategy_id": str(strategy.id),
+                "status": "active" if strategy.zones_completed < strategy.total_zones else "completed",
+                "city": city,
+                "state": state,
+                "category": category,
+                "zone_scraped": {
+                    "zone_id": zone_id,
+                    "priority": next_zone.get("priority"),
+                    "lat": zone_lat,
+                    "lon": zone_lon,
+                    "radius_km": zone_radius,
+                    "reason": next_zone.get("reason")
+                },
+                "results": {
+                    "raw_businesses": len(raw_businesses),
+                    "qualified_leads": qualified_count,
+                    "new_businesses": new_businesses
+                },
+                "progress": {
+                    "total_zones": strategy.total_zones,
+                    "zones_completed": strategy.zones_completed,
+                    "zones_remaining": strategy.total_zones - strategy.zones_completed,
+                    "total_businesses_found": strategy.businesses_found,
+                    "estimated_total_businesses": strategy.estimated_total_businesses,
+                    "completion_pct": round((strategy.zones_completed / strategy.total_zones) * 100, 1)
+                },
+                "next_zone_preview": strategy.get_next_zone()
             }
             
         except Exception as e:
-            logger.error(f"Zone scraping failed for {zone.zone_id}: {str(e)}")
-            return {
-                "zone_id": zone.zone_id,
-                "scraped": 0,
-                "qualified": 0,
-                "saved": 0,
-                "error": str(e)
-            }
+            logger.error(f"Error scraping zone {zone_id}: {e}")
+            raise ExternalAPIException(f"Failed to scrape zone: {str(e)}")
     
-    async def validate_websites(self, businesses: List[Dict[str, Any]]) -> None:
+    async def scrape_all_zones_for_strategy(
+        self,
+        strategy_id: str,
+        limit_per_zone: int = 50,
+        max_zones: Optional[int] = None
+    ) -> Dict[str, Any]:
         """
-        Validate website URLs for businesses and update their data.
+        Continue scraping zones for an existing strategy until complete (or max reached).
+        
+        This is useful for background tasks that want to execute an entire strategy.
         
         Args:
-            businesses: List of business dictionaries (modified in place)
+            strategy_id: Strategy UUID
+            limit_per_zone: Maximum results per zone
+            max_zones: Maximum zones to scrape in this batch (None = all)
+            
+        Returns:
+            Summary of batch execution
         """
-        # Extract URLs that need validation
-        urls_to_check = []
-        business_map = {}
-        
-        for i, business in enumerate(businesses):
-            url = business.get("website_url")
-            if url:
-                urls_to_check.append(url)
-                business_map[url] = i
-        
-        if not urls_to_check:
-            logger.info("No websites to validate")
-            return
-        
-        logger.info(f"Validating {len(urls_to_check)} website URLs...")
-        
-        # Validate websites
-        async with WebsiteValidator(timeout=8) as validator:
-            results = await validator.validate_batch(urls_to_check, max_concurrent=10)
-        
-        # Update business data based on validation results
-        valid_count = 0
-        invalid_count = 0
-        
-        for result in results:
-            business_idx = business_map.get(result.url)
-            if business_idx is not None:
-                business = businesses[business_idx]
-                
-                if result.is_valid:
-                    # Website is valid - mark as having a real website
-                    business["has_valid_website"] = True
-                    business["website_status"] = "valid"
-                    valid_count += 1
-                else:
-                    # Website is invalid - this business needs a website!
-                    business["has_valid_website"] = False
-                    business["website_status"] = "invalid"
-                    business["website_validation_error"] = result.error_message
-                    invalid_count += 1
-                    
-                    # Increase qualification score (no valid website = better lead!)
-                    if "qualification_score" in business:
-                        business["qualification_score"] = min(100, business["qualification_score"] + 20)
+        strategy = await self.geo_strategy_service.get_strategy_by_id(strategy_id)
+        if not strategy:
+            raise ValueError(f"Strategy not found: {strategy_id}")
         
         logger.info(
-            f"Website validation complete: {valid_count} valid, {invalid_count} invalid/unreachable"
+            f"Starting batch execution for strategy {strategy_id}: "
+            f"{strategy.city}, {strategy.state} - {strategy.category}"
         )
+        
+        zones_scraped = 0
+        total_businesses = 0
+        total_qualified = 0
+        
+        while True:
+            # Check if we've hit the max
+            if max_zones and zones_scraped >= max_zones:
+                logger.info(f"Reached max zones limit ({max_zones})")
+                break
+            
+            # Get next zone
+            next_zone = strategy.get_next_zone()
+            if not next_zone:
+                logger.info(f"Strategy {strategy_id} complete - no more zones")
+                break
+            
+            # Scrape the zone
+            try:
+                result = await self.scrape_with_intelligent_strategy(
+                    city=strategy.city,
+                    state=strategy.state,
+                    category=strategy.category,
+                    country=strategy.country,
+                    limit_per_zone=limit_per_zone,
+                    center_lat=strategy.city_center_lat,
+                    center_lon=strategy.city_center_lon
+                )
+                
+                zones_scraped += 1
+                total_businesses += result["results"]["raw_businesses"]
+                total_qualified += result["results"]["qualified_leads"]
+                
+                # Refresh strategy
+                await self.db.refresh(strategy)
+                
+            except Exception as e:
+                logger.error(f"Error in batch execution for zone {next_zone['zone_id']}: {e}")
+                # Continue with next zone even if one fails
+                continue
+        
+        return {
+            "strategy_id": strategy_id,
+            "city": strategy.city,
+            "state": strategy.state,
+            "category": strategy.category,
+            "batch_results": {
+                "zones_scraped_in_batch": zones_scraped,
+                "businesses_found_in_batch": total_businesses,
+                "qualified_in_batch": total_qualified
+            },
+            "overall_progress": {
+                "total_zones": strategy.total_zones,
+                "zones_completed": strategy.zones_completed,
+                "zones_remaining": strategy.total_zones - strategy.zones_completed,
+                "total_businesses_found": strategy.businesses_found,
+                "completion_pct": round((strategy.zones_completed / strategy.total_zones) * 100, 1)
+            },
+            "status": strategy.is_active
+        }
     
+    async def get_strategy_status(self, strategy_id: str) -> Dict[str, Any]:
+        """
+        Get current status of a strategy.
+        
+        Args:
+            strategy_id: Strategy UUID
+            
+        Returns:
+            Status dictionary
+        """
+        strategy = await self.geo_strategy_service.get_strategy_by_id(strategy_id)
+        if not strategy:
+            raise ValueError(f"Strategy not found: {strategy_id}")
+        
+        return strategy.to_dict()
+    
+    async def list_active_strategies(
+        self,
+        city: Optional[str] = None,
+        state: Optional[str] = None,
+        category: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        List active strategies with optional filters.
+        
+        Args:
+            city: Filter by city
+            state: Filter by state
+            category: Filter by category
+            
+        Returns:
+            List of strategy dictionaries
+        """
+        strategies = await self.geo_strategy_service.list_strategies(
+            city=city,
+            state=state,
+            category=category,
+            status="active"
+        )
+        
+        return [s.to_dict() for s in strategies]
+    
+    # Legacy method - kept for backward compatibility
     async def scrape_location(
         self,
         city: str,
@@ -329,233 +394,77 @@ class HunterService:
         industry: str,
         country: str = "US",
         limit: int = 50,
-        priority: int = 0
+        priority: int = 0,
+        offset: int = 0
     ) -> Dict[str, Any]:
         """
-        Scrape a specific location for an industry.
-        Main entry point for scraping operations.
+        LEGACY: Simple single-query scraping without intelligent strategy.
         
-        Workflow:
-        1. Get or create coverage grid entry
-        2. Mark as in_progress
-        3. Scrape businesses from Outscraper
-        4. Filter/qualify leads
-        5. Save to database
-        6. Mark coverage as completed
-        7. Return results
-        
-        Args:
-            city: City name
-            state: State code
-            industry: Industry/category
-            country: Country code
-            limit: Maximum results to scrape
-            priority: Priority level for coverage
-            
-        Returns:
-            Dictionary with results summary
+        For new code, use scrape_with_intelligent_strategy instead.
+        This method is kept for backward compatibility.
         """
-        logger.info(f"Starting scrape: {city}, {state} - {industry}")
-        
-        try:
-            # 1. Get or create coverage
-            coverage, created = await self.coverage_service.get_or_create_coverage(
-                state=state,
-                city=city,
-                industry=industry,
-                country=country,
-                priority=priority
-            )
-            
-            if created:
-                logger.info(f"Created new coverage entry: {coverage.id}")
-            else:
-                logger.info(f"Using existing coverage entry: {coverage.id}")
-            
-            # 2. Mark in progress
-            await self.coverage_service.mark_in_progress(coverage.id)
-            
-            # 3. Scrape businesses
-            logger.info(f"Scraping from Outscraper (limit: {limit})...")
-            scrape_result = await self.scraper.search_businesses(
-                query=industry,
-                city=city,
-                state=state,
-                country=country,
-                limit=limit
-            )
-            
-            raw_businesses = scrape_result.get("businesses", [])
-            
-            if not raw_businesses:
-                logger.warning("No businesses found")
-                await self.coverage_service.mark_completed(
-                    coverage.id,
-                    lead_count=0,
-                    qualified_count=0
-                )
-                return {
-                    "coverage_id": str(coverage.id),
-                    "status": "completed",
-                    "scraped": 0,
-                    "qualified": 0,
-                    "saved": 0,
-                    "message": "No businesses found"
-                }
-            
-            logger.info(f"Scraped {len(raw_businesses)} businesses")
-            
-            # 4. Filter and qualify
-            logger.info("Filtering and qualifying leads...")
-            qualified_businesses = self.qualifier.filter_batch(
-                raw_businesses,
-                update_in_place=True
-            )
-            
-            # 4.5. Validate websites
-            logger.info("Validating website URLs...")
-            await self.validate_websites(qualified_businesses)
-            
-            logger.info(
-                f"Qualified {len(qualified_businesses)}/{len(raw_businesses)} businesses "
-                f"({len(qualified_businesses)/len(raw_businesses)*100:.1f}%)"
-            )
-            
-            # 5. Save to database
-            logger.info("Saving businesses to database...")
-            created_businesses = await self.business_service.bulk_create_businesses(
-                qualified_businesses,
-                coverage_grid_id=coverage.id
-            )
-            
-            logger.info(f"Saved {len(created_businesses)} new businesses")
-            
-            # 6. Mark coverage as completed
-            await self.coverage_service.mark_completed(
-                coverage.id,
-                lead_count=len(raw_businesses),
-                qualified_count=len(qualified_businesses),
-                cooldown_hours=168  # 7 days
-            )
-            
-            # 7. Prepare results
-            results = {
-                "coverage_id": str(coverage.id),
-                "status": "completed",
-                "location": f"{city}, {state}, {country}",
-                "industry": industry,
-                "scraped": len(raw_businesses),
-                "qualified": len(qualified_businesses),
-                "saved": len(created_businesses),
-                "qualification_rate": (
-                    len(qualified_businesses) / len(raw_businesses) * 100
-                    if raw_businesses else 0
-                ),
-                "message": f"Successfully scraped and saved {len(created_businesses)} businesses"
-            }
-            
-            # Add some sample businesses to results
-            if created_businesses:
-                results["sample_businesses"] = [
-                    {
-                        "id": str(b.id),
-                        "name": b.name,
-                        "email": b.email,
-                        "rating": float(b.rating) if b.rating else None,
-                        "qualification_score": b.qualification_score
-                    }
-                    for b in created_businesses[:5]  # First 5
-                ]
-            
-            logger.info(f"Scraping completed successfully: {results['message']}")
-            return results
-            
-        except ExternalAPIException as e:
-            logger.error(f"Scraping failed: {str(e)}")
-            
-            # Mark coverage as pending again if it exists
-            if 'coverage' in locals():
-                await self.coverage_service.update_coverage(
-                    coverage.id,
-                    {"status": "pending"}
-                )
-            
-            return {
-                "status": "failed",
-                "error": str(e),
-                "message": "Scraping failed"
-            }
-        
-        except Exception as e:
-            logger.error(f"Unexpected error during scraping: {str(e)}", exc_info=True)
-            
-            # Mark coverage as pending again
-            if 'coverage' in locals():
-                await self.coverage_service.update_coverage(
-                    coverage.id,
-                    {"status": "pending"}
-                )
-            
-            return {
-                "status": "failed",
-                "error": str(e),
-                "message": "Unexpected error during scraping"
-            }
-    
-    async def scrape_next_target(self, limit: int = 50) -> Optional[Dict[str, Any]]:
-        """
-        Automatically scrape the next highest-priority target.
-        
-        Args:
-            limit: Maximum results per scrape
-            
-        Returns:
-            Scraping results or None if no targets available
-        """
-        logger.info("Looking for next scraping target...")
-        
-        # Get next target from coverage grid
-        targets = await self.coverage_service.get_next_target(
-            limit=1,
-            exclude_cooldown=True
+        logger.warning(
+            f"Using legacy scrape_location for {industry} in {city}, {state}. "
+            "Consider using scrape_with_intelligent_strategy for better coverage."
         )
         
-        if not targets:
-            logger.info("No scraping targets available")
-            return None
-        
-        target = targets[0]
-        
-        # Scrape the target
-        return await self.scrape_location(
-            city=target.city,
-            state=target.state,
-            industry=target.industry,
-            country=target.country,
+        # Use the old simple approach
+        results = await self.scraper.search_businesses(
+            query=industry,
+            city=city,
+            state=state,
+            country=country,
             limit=limit,
-            priority=target.priority
+            offset=offset
         )
-    
-    async def get_scraping_report(self) -> Dict[str, Any]:
-        """
-        Get comprehensive scraping report.
         
-        Returns:
-            Dictionary with scraping statistics
-        """
-        coverage_stats = await self.coverage_service.get_stats()
-        business_stats = await self.business_service.get_stats()
+        raw_businesses = results.get("data", [])
+        
+        # Process businesses
+        qualified_count = 0
+        for biz_data in raw_businesses:
+            try:
+                # Validate website
+                website_url = biz_data.get("website")
+                if website_url:
+                    website_status = await self.website_validator.validate_website(website_url)
+                    biz_data["website_status"] = website_status
+                
+                # Qualify
+                is_qualified, score, reasons = self.qualifier.qualify(biz_data)
+                
+                if is_qualified:
+                    await self.business_service.create_or_update_business(
+                        data=biz_data,
+                        source="outscraper_gmaps",
+                        discovery_city=city,
+                        discovery_state=state,
+                        lead_score=score,
+                        qualification_reasons=reasons
+                    )
+                    qualified_count += 1
+                    
+            except Exception as e:
+                logger.error(f"Error processing business: {e}")
+                continue
+        
+        # Update coverage
+        await self.coverage_service.update_or_create_coverage(
+            city=city,
+            state=state,
+            country=country,
+            industry=industry,
+            priority=priority,
+            total_found=len(raw_businesses),
+            qualified=qualified_count
+        )
         
         return {
-            "coverage": coverage_stats,
-            "businesses": business_stats,
-            "summary": {
-                "territories_tracked": coverage_stats["total_territories"],
-                "territories_pending": coverage_stats["pending"],
-                "total_leads_scraped": coverage_stats["total_leads"],
-                "total_leads_qualified": coverage_stats["total_qualified"],
-                "total_businesses_in_db": business_stats["total_leads"],
-                "businesses_with_email": business_stats["with_email"],
-                "businesses_without_website": business_stats["without_website"]
+            "city": city,
+            "state": state,
+            "industry": industry,
+            "results": {
+                "total_found": len(raw_businesses),
+                "qualified_leads": qualified_count
             }
         }

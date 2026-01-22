@@ -8,7 +8,9 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui'
 import { api } from '@/services/api'
 import { GeoGridPanel } from '@/components/coverage/GeoGridPanel'
+import { IntelligentCampaignPanel } from '@/components/coverage/IntelligentCampaignPanel'
 import '@/components/coverage/GeoGridPanel.css'
+import '@/components/coverage/IntelligentCampaignPanel.css'
 
 interface CampaignStats {
   total_grids: number
@@ -209,7 +211,10 @@ export function CoveragePage() {
         </Card>
       </div>
 
-      {/* Geo-Grid Scraping Panel */}
+      {/* Intelligent Campaign Panel - Claude-powered */}
+      <IntelligentCampaignPanel />
+
+      {/* Geo-Grid Scraping Panel - Manual mode */}
       <GeoGridPanel onScrapeComplete={loadCampaignData} />
 
       {/* Manual Testing Section */}
