@@ -186,7 +186,25 @@ class LeadQualifier:
         return qualified
     
     def _has_website(self, business: Dict[str, Any]) -> bool:
-        """Check if business has a website."""
+        """
+        Check if business has a valid, working website.
+        
+        Checks website_status if available (from website validation).
+        Falls back to URL pattern checking if not validated yet.
+        """
+        # Check validation status if available
+        website_status = business.get("website_status")
+        if website_status == "valid":
+            return True  # Has valid website
+        elif website_status == "invalid":
+            return False  # Website is invalid/unreachable
+        
+        # Check has_valid_website flag if set
+        has_valid = business.get("has_valid_website")
+        if has_valid is not None:
+            return has_valid
+        
+        # Fall back to URL pattern checking (pre-validation)
         website = business.get("website_url", "")
         if not website:
             return False
@@ -203,7 +221,9 @@ class LeadQualifier:
             "yelp.com",
             "google.com",
             "maps.google.com",
-            "plus.google.com"
+            "plus.google.com",
+            "goo.gl",
+            "g.page"
         ]
         
         for pattern in ignore_patterns:

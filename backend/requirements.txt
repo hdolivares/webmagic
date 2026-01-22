@@ -21,6 +21,7 @@ bcrypt==4.1.2
 
 # HTTP Client
 httpx==0.26.0
+aiohttp==3.9.1  # For website validation
 
 # AI/LLM
 anthropic==0.75.0

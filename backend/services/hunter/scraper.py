@@ -35,8 +35,11 @@ class OutscraperClient:
         state: str,
         country: str = "US",
         limit: int = 50,
-        language: str = "en"
-    ) -> List[Dict[str, Any]]:
+        language: str = "en",
+        zone_lat: Optional[float] = None,
+        zone_lon: Optional[float] = None,
+        zone_id: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Search for businesses on Google Maps.
         
@@ -47,19 +50,32 @@ class OutscraperClient:
             country: Country code (default: "US")
             limit: Maximum number of results
             language: Language code (default: "en")
+            zone_lat: Optional zone center latitude for geo-specific search
+            zone_lon: Optional zone center longitude for geo-specific search
+            zone_id: Optional zone identifier for logging
             
         Returns:
-            List of business dictionaries
+            Dictionary with:
+                - businesses: List of business dictionaries
+                - total_found: Number of businesses found
+                - has_more: Whether more results may be available
+                - search_query: Query that was executed
             
         Raises:
             ExternalAPIException: If the API request fails
         """
         try:
             # Build search query
-            location = f"{city}, {state}, {country}"
-            search_query = f"{query} in {location}"
-            
-            logger.info(f"Searching Outscraper: {search_query} (limit: {limit})")
+            # If zone coordinates provided, use geo-specific search
+            if zone_lat is not None and zone_lon is not None:
+                search_query = f"{query} near {zone_lat},{zone_lon}"
+                zone_str = f" [Zone {zone_id}]" if zone_id else ""
+                logger.info(f"Geo-search: {search_query}{zone_str} (limit: {limit})")
+            else:
+                # Traditional city-based search
+                location = f"{city}, {state}, {country}"
+                search_query = f"{query} in {location}"
+                logger.info(f"City-search: {search_query} (limit: {limit})")
             
             # Run synchronous API call in thread pool
             loop = asyncio.get_event_loop()
@@ -74,8 +90,22 @@ class OutscraperClient:
             # Normalize results
             normalized = self._normalize_results(results)
             
-            logger.info(f"Found {len(normalized)} businesses")
-            return normalized
+            # Determine if more results likely available
+            # If we got exactly the limit, there may be more
+            has_more = len(normalized) >= limit
+            
+            logger.info(
+                f"Found {len(normalized)} businesses "
+                f"(has_more: {has_more})"
+            )
+            
+            return {
+                "businesses": normalized,
+                "total_found": len(normalized),
+                "has_more": has_more,
+                "search_query": search_query,
+                "zone_id": zone_id
+            }
             
         except Exception as e:
             logger.error(f"Outscraper API error: {str(e)}")
