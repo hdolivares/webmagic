@@ -7,6 +7,8 @@
 import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui'
 import { api } from '@/services/api'
+import { GeoGridPanel } from '@/components/coverage/GeoGridPanel'
+import '@/components/coverage/GeoGridPanel.css'
 
 interface CampaignStats {
   total_grids: number
@@ -206,6 +208,9 @@ export function CoveragePage() {
           </div>
         </Card>
       </div>
+
+      {/* Geo-Grid Scraping Panel */}
+      <GeoGridPanel onScrapeComplete={loadCampaignData} />
 
       {/* Manual Testing Section */}
       <Card>

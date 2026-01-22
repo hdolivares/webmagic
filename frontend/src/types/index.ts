@@ -73,6 +73,9 @@ export interface CoverageGrid {
   created_at: string
 }
 
+// Re-export geo-grid types
+export * from './geoGrid'
+
 // ============================================
 // SITE TYPES
 // ============================================
