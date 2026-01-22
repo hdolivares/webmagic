@@ -11,6 +11,7 @@ from api.v1 import (
     coverage_campaigns,
     geo_grid,  # Geo-grid scraping system
     intelligent_campaigns,  # Claude-powered intelligent strategies
+    draft_campaigns,  # Draft mode campaign review workflow
     sites,
     settings,
     campaigns,
@@ -46,6 +47,7 @@ api_router.include_router(coverage.router)
 api_router.include_router(coverage_campaigns.router)
 api_router.include_router(geo_grid.router)  # Geo-grid scraping
 api_router.include_router(intelligent_campaigns.router)  # Claude-powered intelligent strategies
+api_router.include_router(draft_campaigns.router)  # Draft campaign review workflow
 api_router.include_router(sites.router)
 api_router.include_router(settings.router)
 api_router.include_router(system.router)

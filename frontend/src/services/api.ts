@@ -644,6 +644,7 @@ class ApiClient {
   async scrapeIntelligentZone(data: {
     strategy_id: string
     limit_per_zone?: number
+    draft_mode?: boolean
   }): Promise<any> {
     const response = await this.client.post('/intelligent-campaigns/scrape-zone', data)
     return response.data
@@ -653,6 +654,7 @@ class ApiClient {
     strategy_id: string
     limit_per_zone?: number
     max_zones?: number
+    draft_mode?: boolean
   }): Promise<any> {
     const response = await this.client.post('/intelligent-campaigns/batch-scrape', data)
     return response.data
@@ -691,6 +693,43 @@ class ApiClient {
 
   async getBusinessCategorySearchTerms(): Promise<string[]> {
     const response = await this.client.get('/business-categories/search-terms')
+    return response.data
+  }
+
+  // Draft Campaigns
+  async getDraftCampaigns(params?: {
+    city?: string
+    state?: string
+    category?: string
+    limit?: number
+  }): Promise<any> {
+    const response = await this.client.get('/draft-campaigns/pending', { params })
+    return response.data
+  }
+
+  async getDraftCampaignDetail(campaignId: string): Promise<any> {
+    const response = await this.client.get(`/draft-campaigns/${campaignId}`)
+    return response.data
+  }
+
+  async approveDraftCampaign(campaignId: string, reviewNotes?: string): Promise<any> {
+    const response = await this.client.post('/draft-campaigns/approve', {
+      campaign_id: campaignId,
+      review_notes: reviewNotes
+    })
+    return response.data
+  }
+
+  async rejectDraftCampaign(campaignId: string, reviewNotes?: string): Promise<any> {
+    const response = await this.client.post('/draft-campaigns/reject', {
+      campaign_id: campaignId,
+      review_notes: reviewNotes
+    })
+    return response.data
+  }
+
+  async getDraftCampaignStats(): Promise<any> {
+    const response = await this.client.get('/draft-campaigns/stats')
     return response.data
   }
 }
