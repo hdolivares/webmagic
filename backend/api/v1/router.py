@@ -8,6 +8,7 @@ from api.v1 import (
     businesses,
     coverage,
     coverage_campaigns,
+    geo_grid,  # Geo-grid scraping system
     sites,
     settings,
     campaigns,
@@ -40,6 +41,7 @@ api_router.include_router(twilio.router)  # SMS webhooks (Phase 7)
 api_router.include_router(businesses.router)
 api_router.include_router(coverage.router)
 api_router.include_router(coverage_campaigns.router)
+api_router.include_router(geo_grid.router)  # Geo-grid scraping
 api_router.include_router(sites.router)
 api_router.include_router(settings.router)
 api_router.include_router(system.router)

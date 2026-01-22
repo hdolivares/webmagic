@@ -280,6 +280,70 @@ class ApiClient {
     return response.data
   }
 
+  // ============================================
+  // GEO-GRID METHODS
+  // ============================================
+
+  /**
+   * Scrape a city using geo-grid subdivision
+   * Automatically breaks down large cities into zones for comprehensive coverage
+   */
+  async scrapeWithGeoGrid(data: {
+    city: string
+    state: string
+    industry: string
+    population: number
+    city_lat: number
+    city_lon: number
+    limit_per_zone?: number
+    priority?: number
+  }): Promise<any> {
+    const response = await this.client.post('/coverage/geo-grid/scrape', data)
+    return response.data
+  }
+
+  /**
+   * Compare traditional vs geo-grid strategy for a location
+   * Returns cost and coverage comparison
+   */
+  async compareGeoGridStrategy(params: {
+    city: string
+    state: string
+    population: number
+  }): Promise<any> {
+    const response = await this.client.get('/coverage/geo-grid/compare', { params })
+    return response.data
+  }
+
+  /**
+   * Get geo-grid statistics and metrics
+   */
+  async getGeoGridStats(): Promise<{
+    total_zones: number
+    zones_with_data: number
+    zones_pending: number
+    avg_businesses_per_zone: number
+    total_cities_subdivided: number
+  }> {
+    const response = await this.client.get('/coverage/geo-grid/stats')
+    return response.data
+  }
+
+  /**
+   * Get coverage grids with zone information
+   */
+  async getGeoGridCoverage(params?: {
+    city?: string
+    state?: string
+    industry?: string
+    has_zones?: boolean
+    skip?: number
+    limit?: number
+  }): Promise<{ grids: any[]; total: number }> {
+    const response = await this.client.get('/coverage/geo-grid', { params })
+    return response.data
+  }
+
   async createCampaign(data: CreateCampaignRequest): Promise<Campaign> {
     const response = await this.client.post<Campaign>('/campaigns', data)
     return response.data
