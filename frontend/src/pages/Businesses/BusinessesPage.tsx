@@ -36,26 +36,26 @@ interface Business {
   rating?: number
   review_count?: number
   qualification_score?: number
-  contact_status: string
-  website_status: string
+  contact_status?: string
+  website_status?: string
   
-  // NEW: CRM enrichment fields
-  has_email: boolean
-  has_phone: boolean
-  was_contacted: boolean
-  contacted_via_email: boolean
-  contacted_via_sms: boolean
-  contact_bounced: boolean
-  is_unsubscribed: boolean
-  is_customer: boolean
-  total_campaigns: number
+  // NEW: CRM enrichment fields (optional to handle API response)
+  has_email?: boolean
+  has_phone?: boolean
+  was_contacted?: boolean
+  contacted_via_email?: boolean
+  contacted_via_sms?: boolean
+  contact_bounced?: boolean
+  is_unsubscribed?: boolean
+  is_customer?: boolean
+  total_campaigns?: number
   last_contact_date?: string | null
   last_contact_channel?: string | null
-  has_generated_site: boolean
+  has_generated_site?: boolean
   site_url?: string | null
-  data_completeness: number
-  status_label: string
-  status_color: string
+  data_completeness?: number
+  status_label?: string
+  status_color?: string
 }
 
 export const BusinessesPage = () => {
@@ -319,8 +319,8 @@ export const BusinessesPage = () => {
                       {/* Contact Info Indicators */}
                       <td className="td-contact">
                         <ContactIndicator
-                          hasEmail={business.has_email}
-                          hasPhone={business.has_phone}
+                          hasEmail={business.has_email || false}
+                          hasPhone={business.has_phone || false}
                           email={business.email}
                           phone={business.phone}
                         />
@@ -328,7 +328,7 @@ export const BusinessesPage = () => {
 
                       {/* Status Badge */}
                       <td className="td-status">
-                        <StatusBadge status={business.contact_status} />
+                        <StatusBadge status={business.contact_status || 'pending'} />
                         {business.has_generated_site && (
                           <span className="site-indicator" title="Has generated site">
                             🌐
@@ -345,14 +345,14 @@ export const BusinessesPage = () => {
 
                       {/* Data Quality */}
                       <td className="td-quality">
-                        <DataCompleteness score={business.data_completeness} />
+                        <DataCompleteness score={business.data_completeness || 0} />
                       </td>
 
                       {/* Campaign Info */}
                       <td className="td-campaigns text-center">
                         <div className="campaigns-info">
                           <span className="campaign-count">
-                            {business.total_campaigns}
+                            {business.total_campaigns || 0}
                           </span>
                           {business.last_contact_date && (
                             <span className="campaign-date">
