@@ -328,6 +328,7 @@ export function CoveragePage() {
               )}
             </div>
           </div>
+          </div>
         </details>
       </Card>
 
