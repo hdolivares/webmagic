@@ -75,6 +75,7 @@ export interface CoverageGrid {
 
 // Re-export geo-grid types
 export * from './geoGrid'
+export * from './draftCampaign'
 
 // ============================================
 // SITE TYPES

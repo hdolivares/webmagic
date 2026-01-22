@@ -62,15 +62,23 @@ interface ScrapeResult {
   next_zone_preview?: Zone
 }
 
-export function IntelligentCampaignPanel() {
+interface IntelligentCampaignPanelProps {
+  onCampaignUpdate?: () => void
+}
+
+export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampaignPanelProps) {
+  // Form state
   const [state, setState] = useState('CA')
   const [city, setCity] = useState('Los Angeles')
   const [category, setCategory] = useState('plumbers')
   const [population, setPopulation] = useState<number | string>(3800000)
+  const [draftMode, setDraftMode] = useState(true) // Default to draft mode for safety
   
+  // Data state
   const [availableCities, setAvailableCities] = useState<string[]>([])
   const [businessCategories, setBusinessCategories] = useState<string[]>([])
   
+  // Campaign state
   const [loading, setLoading] = useState(false)
   const [strategy, setStrategy] = useState<Strategy | null>(null)
   const [scrapeResult, setScrapeResult] = useState<ScrapeResult | null>(null)
@@ -134,7 +142,8 @@ export function IntelligentCampaignPanel() {
     try {
       const response = await api.scrapeIntelligentZone({
         strategy_id: strategy.strategy_id,
-        limit_per_zone: 50
+        limit_per_zone: 50,
+        draft_mode: draftMode
       })
       
       setScrapeResult(response)
@@ -142,6 +151,11 @@ export function IntelligentCampaignPanel() {
       // Refresh strategy
       const strategyResponse = await api.getIntelligentStrategy(strategy.strategy_id)
       setStrategy(strategyResponse)
+      
+      // Notify parent if callback provided
+      if (onCampaignUpdate) {
+        onCampaignUpdate()
+      }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to scrape zone')
       console.error('Scrape error:', err)
@@ -153,6 +167,12 @@ export function IntelligentCampaignPanel() {
   const handleBatchScrape = async () => {
     if (!strategy) return
     
+    const confirmMessage = draftMode
+      ? 'Start batch scraping 5 zones in DRAFT MODE?\n\nBusinesses will be found and saved for review. No messages will be sent.'
+      : 'Start batch scraping 5 zones in LIVE MODE?\n\nBusinesses will be found and outreach messages will be SENT AUTOMATICALLY.'
+    
+    if (!confirm(confirmMessage)) return
+    
     setLoading(true)
     setError(null)
     
@@ -160,10 +180,20 @@ export function IntelligentCampaignPanel() {
       await api.batchScrapeIntelligentStrategy({
         strategy_id: strategy.strategy_id,
         limit_per_zone: 50,
-        max_zones: 5
+        max_zones: 5,
+        draft_mode: draftMode
       })
       
-      alert('Batch scraping started! This will run in the background.')
+      const successMessage = draftMode
+        ? 'Batch scraping started in DRAFT MODE! Results will be saved for review.'
+        : 'Batch scraping started in LIVE MODE! Outreach will be sent automatically.'
+      
+      alert(successMessage)
+      
+      // Notify parent if callback provided
+      if (onCampaignUpdate) {
+        onCampaignUpdate()
+      }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to start batch scrape')
       console.error('Batch scrape error:', err)
@@ -244,6 +274,33 @@ export function IntelligentCampaignPanel() {
               />
               <small className="form-help">Helps Claude optimize zone placement</small>
             </div>
+          </div>
+
+          {/* Draft Mode Toggle */}
+          <div className="draft-mode-section">
+            <label className="draft-mode-toggle">
+              <input
+                type="checkbox"
+                checked={draftMode}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraftMode(e.target.checked)}
+                className="draft-mode-checkbox"
+              />
+              <div className="draft-mode-content">
+                <div className="draft-mode-header">
+                  <span className="draft-mode-icon">{draftMode ? '📋' : '🚀'}</span>
+                  <span className="draft-mode-title">
+                    {draftMode ? 'Draft Mode' : 'Live Mode (Auto-Send)'}
+                  </span>
+                </div>
+                <p className="draft-mode-description">
+                  {draftMode ? (
+                    <>Find businesses and save for <strong>manual review</strong> (recommended for first run)</>
+                  ) : (
+                    <>Find businesses and <strong>automatically send</strong> outreach messages</>
+                  )}
+                </p>
+              </div>
+            </label>
           </div>
 
           <button

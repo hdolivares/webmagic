@@ -8,7 +8,9 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui'
 import { api } from '@/services/api'
 import { IntelligentCampaignPanel } from '@/components/coverage/IntelligentCampaignPanel'
+import { DraftCampaignsPanel } from '@/components/coverage/DraftCampaignsPanel'
 import '@/components/coverage/IntelligentCampaignPanel.css'
+import '@/components/coverage/DraftCampaignsPanel.css'
 
 interface CampaignStats {
   total_grids: number
@@ -52,10 +54,6 @@ export function CoveragePage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'overview' | 'locations' | 'categories'>('overview')
   
-  // Manual testing
-  const [testSearchCount, setTestSearchCount] = useState(5)
-  const [testRunning, setTestRunning] = useState(false)
-  const [testResults, setTestResults] = useState<any>(null)
   
   // Scheduling settings
   const [scheduledSearches, setScheduledSearches] = useState(100)
@@ -83,40 +81,6 @@ export function CoveragePage() {
     }
   }
 
-  const runTestSearches = async () => {
-    if (!confirm(`Run ${testSearchCount} test searches? This will scrape real businesses and use API credits.`)) return
-    
-    setTestRunning(true)
-    setTestResults(null)
-    
-    try {
-      const response = await fetch(
-        `/api/v1/coverage/campaigns/test-searches?count=${testSearchCount}&priority_min=7`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-          },
-        }
-      )
-      
-      if (response.ok) {
-        const data = await response.json()
-        setTestResults(data)
-        alert(`✅ Completed ${data.searches_completed}/${data.total_requested} searches successfully!`)
-        loadCampaignData() // Refresh stats
-      } else {
-        const error = await response.json()
-        alert(`Failed: ${error.detail || 'Unknown error'}`)
-      }
-    } catch (error) {
-      console.error('Error running test searches:', error)
-      alert('Error running test searches: ' + error)
-    } finally {
-      setTestRunning(false)
-    }
-  }
 
   const startBatchScrape = async (priorityMin: number, limit: number) => {
     if (!confirm(`Start scraping ${limit} high-priority grids?`)) return
@@ -209,128 +173,11 @@ export function CoveragePage() {
         </Card>
       </div>
 
-      {/* Intelligent Campaign Panel - Claude-powered */}
-      <IntelligentCampaignPanel />
+      {/* Intelligent Campaign Panel - Claude-powered with Draft Mode */}
+      <IntelligentCampaignPanel onCampaignUpdate={loadCampaignData} />
 
-      {/* Quick Validation Section - Simplified */}
-      <Card>
-        <details className="validation-section">
-          <summary className="card-header" style={{ cursor: 'pointer' }}>
-            <h2 className="card-title">🔍 Quick Validation (Optional)</h2>
-            <p className="text-sm text-secondary">Spot-check the system with a few test searches</p>
-          </summary>
-          <div className="card-body space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Test Controls */}
-            <div className="space-y-4">
-              <div>
-                <label className="form-label flex items-center justify-between">
-                  <span>Number of Searches</span>
-                  <span className="badge badge-primary">{testSearchCount}</span>
-                </label>
-                <input
-                  type="range"
-                  min="1"
-                  max="25"
-                  value={testSearchCount}
-                  onChange={(e) => setTestSearchCount(parseInt(e.target.value))}
-                  className="w-full"
-                  disabled={testRunning}
-                />
-                <div className="flex justify-between text-xs text-secondary mt-1">
-                  <span>1</span>
-                  <span>25</span>
-                </div>
-              </div>
-
-              <div className="test-buttons" style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
-                  onClick={() => { setTestSearchCount(5); runTestSearches(); }}
-                  disabled={testRunning}
-                  className="btn btn-secondary"
-                >
-                  Test 5 Searches
-                </button>
-                <button
-                  onClick={() => { setTestSearchCount(10); runTestSearches(); }}
-                  disabled={testRunning}
-                  className="btn btn-secondary"
-                >
-                  Test 10 Searches
-                </button>
-                <button
-                  onClick={() => { setTestSearchCount(25); runTestSearches(); }}
-                  disabled={testRunning}
-                  className="btn btn-secondary"
-                >
-                  Test 25 Searches
-                </button>
-              </div>
-
-              {testRunning && (
-                <div className="alert alert-info text-sm">
-                  <span className="spinner-sm"></span>
-                  Running {testSearchCount} test searches...
-                </div>
-              )}
-
-              <div className="alert alert-info text-sm">
-                <p><strong>Quick validation:</strong> Tests {testSearchCount} high-priority locations to verify the system is working. Cost: ~${(testSearchCount * 0.50).toFixed(2)}</p>
-              </div>
-            </div>
-
-            {/* Test Results */}
-            <div>
-              <h3 className="font-semibold mb-3">Last Test Results</h3>
-              {!testResults ? (
-                <div className="text-center py-8 text-secondary">
-                  <p>No test results yet.</p>
-                  <p className="text-sm mt-2">Run a test to see results here.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="stats-grid grid-cols-2">
-                    <div className="stat-card bg-success/10">
-                      <div className="stat-label">Successful</div>
-                      <div className="stat-value text-success">{testResults.searches_completed}</div>
-                    </div>
-                    <div className="stat-card bg-error/10">
-                      <div className="stat-label">Failed</div>
-                      <div className="stat-value text-error">{testResults.searches_failed}</div>
-                    </div>
-                  </div>
-
-                  <div className="max-h-64 overflow-y-auto space-y-2">
-                    {testResults.results?.map((result: any, index: number) => (
-                      <div
-                        key={index}
-                        className={`p-3 rounded-lg border ${
-                          result.status === 'success'
-                            ? 'border-success bg-success/5'
-                            : 'border-error bg-error/5'
-                        }`}
-                      >
-                        <div className="font-semibold">{result.location}</div>
-                        <div className="text-sm text-secondary">{result.industry}</div>
-                        {result.status === 'success' ? (
-                          <div className="text-sm mt-2">
-                            Found: <strong>{result.businesses_found}</strong> | 
-                            Qualified: <strong>{result.qualified}</strong> | 
-                            Rate: <strong>{result.qualification_rate?.toFixed(1)}%</strong>
-                          </div>
-                        ) : (
-                          <div className="text-sm text-error mt-2">{result.error}</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          </div>
-        </details>
-      </Card>
+      {/* Draft Campaigns Panel - Review and Approve */}
+      <DraftCampaignsPanel onCampaignUpdate={loadCampaignData} />
 
       {/* Progress Bar */}
       <Card>

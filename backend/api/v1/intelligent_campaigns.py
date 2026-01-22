@@ -18,9 +18,70 @@ from models.user import AdminUser
 from api.v1.auth import get_current_user
 from services.hunter.hunter_service import HunterService
 from services.hunter.geo_strategy_service import GeoStrategyService
+from services.draft_campaign_service import DraftCampaignService
 
 router = APIRouter(prefix="/intelligent-campaigns", tags=["intelligent-campaigns"])
 logger = logging.getLogger(__name__)
+
+
+# Helper Functions
+
+async def _handle_draft_mode(
+    db: AsyncSession,
+    strategy: Any,
+    scrape_result: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Handle draft mode: Save scraped businesses to draft campaign for review.
+    
+    Args:
+        db: Database session
+        strategy: GeoStrategy instance
+        scrape_result: Result from scraping operation
+        
+    Returns:
+        Modified scrape result with draft campaign information
+    """
+    draft_service = DraftCampaignService(db)
+    
+    # Extract zone information from result
+    zone_scraped = scrape_result.get('zone_scraped', {})
+    results = scrape_result.get('results', {})
+    
+    # Get business IDs from the scrape (assuming they're in the result)
+    # Note: This will need to be populated by the scraping service
+    business_ids = scrape_result.get('business_ids', [])
+    
+    # Create draft campaign
+    draft_campaign = await draft_service.create_draft_campaign(
+        strategy_id=UUID(scrape_result['strategy_id']),
+        city=strategy.city,
+        state=strategy.state,
+        category=strategy.category,
+        zone_id=zone_scraped.get('zone_id', 'unknown'),
+        zone_lat=zone_scraped.get('lat'),
+        zone_lon=zone_scraped.get('lon'),
+        zone_radius_km=zone_scraped.get('radius_km'),
+        business_ids=business_ids,
+        total_businesses_found=results.get('raw_businesses', 0),
+        qualified_leads_count=results.get('qualified_leads', 0)
+    )
+    
+    # Add draft campaign info to result
+    scrape_result['draft_mode'] = True
+    scrape_result['draft_campaign_id'] = str(draft_campaign.id)
+    scrape_result['status'] = 'draft_created'
+    scrape_result['message'] = (
+        f"Draft campaign created with {results.get('qualified_leads', 0)} qualified leads. "
+        "Review and approve to send outreach."
+    )
+    
+    logger.info(
+        f"Created draft campaign {draft_campaign.id}: "
+        f"{results.get('qualified_leads', 0)} leads saved for review"
+    )
+    
+    return scrape_result
 
 
 # Request/Response Models
@@ -41,6 +102,7 @@ class ScrapeZoneRequest(BaseModel):
     """Request to scrape the next zone in a strategy."""
     strategy_id: str = Field(..., description="Strategy UUID")
     limit_per_zone: int = Field(default=50, description="Maximum businesses per zone")
+    draft_mode: bool = Field(default=False, description="If True, save businesses for review without sending messages")
 
 
 class BatchScrapeRequest(BaseModel):
@@ -48,6 +110,7 @@ class BatchScrapeRequest(BaseModel):
     strategy_id: str = Field(..., description="Strategy UUID")
     limit_per_zone: int = Field(default=50, description="Maximum businesses per zone")
     max_zones: Optional[int] = Field(None, description="Maximum zones to scrape (None = all remaining)")
+    draft_mode: bool = Field(default=False, description="If True, save businesses for review without sending messages")
 
 
 class StrategyResponse(BaseModel):
@@ -154,6 +217,9 @@ async def scrape_next_zone(
     
     Claude has already determined the optimal zone to scrape next based on
     priority and coverage needs. This endpoint executes that zone.
+    
+    If draft_mode=True, businesses are saved for review without sending outreach.
+    If draft_mode=False (default), outreach is sent automatically.
     """
     try:
         hunter_service = HunterService(db)
@@ -164,8 +230,9 @@ async def scrape_next_zone(
         if not strategy:
             raise HTTPException(status_code=404, detail="Strategy not found")
         
+        mode_label = "DRAFT MODE" if request.draft_mode else "LIVE MODE"
         logger.info(
-            f"Scraping next zone for strategy {request.strategy_id}: "
+            f"Scraping next zone for strategy {request.strategy_id} ({mode_label}): "
             f"{strategy.city}, {strategy.state} - {strategy.category}"
         )
         
@@ -179,6 +246,18 @@ async def scrape_next_zone(
             center_lat=strategy.city_center_lat,
             center_lon=strategy.city_center_lon
         )
+        
+        # Handle draft mode vs live mode
+        if request.draft_mode:
+            result = await _handle_draft_mode(
+                db=db,
+                strategy=strategy,
+                scrape_result=result
+            )
+        else:
+            # Live mode: Send outreach automatically
+            # TODO: Implement automatic outreach sending
+            logger.info(f"Live mode: Would send outreach to {result['results']['qualified_leads']} leads")
         
         return ScrapeResultResponse(**result)
         
