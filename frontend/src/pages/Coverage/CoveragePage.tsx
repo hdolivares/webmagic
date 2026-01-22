@@ -219,7 +219,7 @@ export function CoveragePage() {
             <h2 className="card-title">🔍 Quick Validation (Optional)</h2>
             <p className="text-sm text-secondary">Spot-check the system with a few test searches</p>
           </summary>
-        <div className="card-body space-y-4">
+          <div className="card-body space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Test Controls */}
             <div className="space-y-4">
