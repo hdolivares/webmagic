@@ -1,6 +1,10 @@
 """
 Campaign management service.
 Orchestrates multi-channel (email + SMS) generation, sending, and tracking.
+
+Updated: January 22, 2026
+- Integrated CRM lifecycle service for automated status tracking
+- Campaign sends now update business contact_status automatically
 """
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +21,7 @@ from services.pitcher.email_sender import EmailSender
 from services.pitcher.tracking import EmailTracker
 from services.pitcher.sms_campaign_helper import SMSCampaignHelper
 from services.sms import SMSGenerator, SMSSender, PhoneValidator, SMSComplianceService
+from services.crm import BusinessLifecycleService
 from core.exceptions import DatabaseException, ValidationException
 from core.config import get_settings
 
@@ -408,6 +413,30 @@ class CampaignService:
                 )
             )
             await self.db.commit()
+            
+            # CRM Integration: Update business contact status
+            if campaign.business_id:
+                lifecycle_service = BusinessLifecycleService(self.db)
+                try:
+                    await lifecycle_service.mark_campaign_sent(
+                        campaign.business_id,
+                        channel="email"
+                    )
+                    await self.db.commit()
+                    logger.info(
+                        f"Updated business {campaign.business_id}: "
+                        f"contact_status=emailed (campaign sent)"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error updating CRM status for business {campaign.business_id}: {e}",
+                        exc_info=True
+                    )
+                    # Don't fail the campaign - email was already sent
+            else:
+                logger.warning(
+                    f"Campaign {campaign.id} has no business_id for CRM tracking"
+                )
             
             logger.info(f"Email campaign sent successfully: {campaign.id}")
             return True

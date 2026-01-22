@@ -8,6 +8,10 @@ Handles the complete site purchase flow:
 4. Associate site with customer
 5. Send welcome email
 
+Updated: January 22, 2026
+- Integrated CRM services to ensure business records always exist
+- Automated contact_status and website_status updates on purchase
+
 Author: WebMagic Team
 Date: January 21, 2026
 """
@@ -24,6 +28,7 @@ from models.site_models import Site, CustomerUser, SiteVersion
 from services.payments.recurrente_client import RecurrenteClient
 from services.customer_auth_service import CustomerAuthService
 from services.site_service import get_site_service
+from services.crm import LeadService, BusinessLifecycleService
 from core.config import get_settings
 from core.exceptions import NotFoundError, ValidationError
 
@@ -193,6 +198,21 @@ class SitePurchaseService:
         await db.commit()
         await db.refresh(site)
         
+        # CRM Integration: Update business lifecycle status
+        if site.business_id:
+            lifecycle_service = BusinessLifecycleService(db)
+            await lifecycle_service.mark_website_sold(site.business_id)
+            await db.commit()
+            logger.info(
+                f"Updated business {site.business_id}: "
+                f"website_status=sold, contact_status=purchased"
+            )
+        else:
+            logger.warning(
+                f"Site {site.slug} purchased but has no business_id! "
+                f"This should not happen after Phase 1 implementation."
+            )
+        
         logger.info(f"Site purchased: {site.slug} by {customer_email}")
         
         return {
@@ -299,31 +319,83 @@ class SitePurchaseService:
         site_title: Optional[str] = None,
         site_description: Optional[str] = None,
         business_id: Optional[UUID] = None,
+        business_data: Optional[Dict[str, Any]] = None,
         html_content: Optional[str] = None
     ) -> Site:
         """
-        Create a new site record (called after generation).
+        Create a new site record with proper CRM integration.
+        
+        IMPORTANT: This method ensures every site has a business record.
+        If business_id is not provided, it will create/get a business using business_data.
         
         Args:
             db: Database session
             slug: Site slug
             site_title: Site title
             site_description: Site description
-            business_id: Associated business ID
+            business_id: Associated business ID (optional if business_data provided)
+            business_data: Business info for creating record (optional if business_id provided)
             html_content: Initial HTML content
         
         Returns:
             Created Site instance
         
         Raises:
-            ValidationError: If slug already exists
+            ValidationError: If slug already exists or business info is invalid
+        
+        Example:
+            >>> # With existing business
+            >>> site = await service.create_site_record(
+            ...     db, "plumbing-pros", business_id=business.id
+            ... )
+            
+            >>> # Without existing business (creates one)
+            >>> site = await service.create_site_record(
+            ...     db, "plumbing-pros",
+            ...     site_title="LA Plumbing Pros",
+            ...     business_data={
+            ...         "name": "LA Plumbing Pros",
+            ...         "phone": "(310) 123-4567",
+            ...         "city": "Los Angeles",
+            ...         "state": "CA"
+            ...     }
+            ... )
         """
         # Check if slug exists
         existing = await self.get_site_by_slug(db, slug)
         if existing:
             raise ValidationError(f"Site with slug already exists: {slug}")
         
-        # Create site
+        # PHASE 1 FIX: Ensure business record exists
+        if not business_id:
+            if not business_data:
+                # Extract business data from site info
+                business_data = {
+                    "name": site_title or slug.replace("-", " ").title(),
+                    "slug": slug
+                }
+                logger.warning(
+                    f"Creating site '{slug}' without explicit business data. "
+                    f"Generating minimal business record."
+                )
+            
+            # Get or create business record
+            lead_service = LeadService(db)
+            business, created = await lead_service.get_or_create_business(business_data)
+            business_id = business.id
+            
+            if created:
+                logger.info(
+                    f"Created new business record for site '{slug}': "
+                    f"{business.name} ({business_id})"
+                )
+            else:
+                logger.info(
+                    f"Using existing business for site '{slug}': "
+                    f"{business.name} ({business_id})"
+                )
+        
+        # Create site with guaranteed business_id
         site = Site(
             slug=slug,
             site_title=site_title,
@@ -335,6 +407,10 @@ class SitePurchaseService:
         db.add(site)
         await db.commit()
         await db.refresh(site)
+        
+        logger.info(
+            f"Created site '{slug}' (ID: {site.id}, Business: {business_id})"
+        )
         
         # Create initial version if HTML provided
         if html_content:
