@@ -28,7 +28,7 @@ class ArtDirectorAgent(BaseAgent):
             agent_name="art_director",
             model=model,
             temperature=0.7,  # Balanced creativity and consistency
-            max_tokens=65536  # Max for Claude Sonnet 4.5
+            max_tokens=64000  # Max for Claude Sonnet 4.5
         )
         self.prompt_builder = prompt_builder
     

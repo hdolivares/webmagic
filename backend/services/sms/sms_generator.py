@@ -99,7 +99,7 @@ class SMSGenerator:
             # Use streaming to avoid timeout limits on large max_tokens
             async with self.client.messages.stream(
                 model=self.model,
-                max_tokens=65536,  # Max for Claude Sonnet 4.5
+                max_tokens=64000,  # Max for Claude Sonnet 4.5
                 temperature=0.7,
                 messages=[{"role": "user", "content": prompt}]
             ) as stream:
