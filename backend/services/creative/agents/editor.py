@@ -235,7 +235,8 @@ class EditorAgent(BaseAgent):
             target_section=target_section
         )
         
-        response = await self.client.messages.create(
+        # Use streaming to avoid timeout limits on large max_tokens
+        async with self.client.messages.stream(
             model=self.model,
             max_tokens=65536,  # Max for Claude Sonnet 4.5
             temperature=self.temperature,
@@ -246,10 +247,8 @@ class EditorAgent(BaseAgent):
                     "content": user_prompt
                 }
             ]
-        )
-        
-        # Parse response
-        analysis_text = response.content[0].text
+        ) as stream:
+            analysis_text = await stream.get_final_text()
         
         try:
             # Try to extract JSON from response
@@ -299,7 +298,8 @@ class EditorAgent(BaseAgent):
             target_section=target_section
         )
         
-        response = await self.client.messages.create(
+        # Use streaming to avoid timeout limits on large max_tokens
+        async with self.client.messages.stream(
             model=self.model,
             max_tokens=65536,  # Max for Claude Sonnet 4.5
             temperature=self.temperature,
@@ -310,10 +310,10 @@ class EditorAgent(BaseAgent):
                     "content": user_prompt
                 }
             ]
-        )
+        ) as stream:
+            response_text = await stream.get_final_text()
         
         # Parse response to extract code
-        response_text = response.content[0].text
         modifications = self._extract_code_from_response(response_text)
         
         return modifications
@@ -386,7 +386,8 @@ Return a JSON object with:
 
 Analyze and return validation result as JSON."""
 
-        response = await self.client.messages.create(
+        # Use streaming to avoid timeout limits on large max_tokens
+        async with self.client.messages.stream(
             model=self.model,
             max_tokens=65536,  # Max for Claude Sonnet 4.5
             temperature=0.1,
@@ -397,9 +398,8 @@ Analyze and return validation result as JSON."""
                     "content": user_prompt
                 }
             ]
-        )
-        
-        response_text = response.content[0].text
+        ) as stream:
+            response_text = await stream.get_final_text()
         
         try:
             validation = json.loads(response_text)

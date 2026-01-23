@@ -201,7 +201,8 @@ Respond in JSON format:
 }}"""
             
             # Get AI response
-            message = await ai_client.messages.create(
+            # Use streaming to avoid timeout limits on large max_tokens
+            async with ai_client.messages.stream(
                 model="claude-sonnet-4-5",
                 max_tokens=65536,  # Max for Claude Sonnet 4.5
                 temperature=0.3,
@@ -209,10 +210,8 @@ Respond in JSON format:
                 messages=[
                     {"role": "user", "content": prompt}
                 ]
-            )
-            
-            # Extract response text
-            response_text = message.content[0].text
+            ) as stream:
+                response_text = await stream.get_final_text()
             
             # Parse AI response
             try:

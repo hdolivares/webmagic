@@ -96,14 +96,14 @@ class SMSGenerator:
         
         # Generate SMS via Claude
         try:
-            message = await self.client.messages.create(
+            # Use streaming to avoid timeout limits on large max_tokens
+            async with self.client.messages.stream(
                 model=self.model,
                 max_tokens=65536,  # Max for Claude Sonnet 4.5
                 temperature=0.7,
                 messages=[{"role": "user", "content": prompt}]
-            )
-            
-            sms_body = message.content[0].text.strip()
+            ) as stream:
+                sms_body = (await stream.get_final_text()).strip()
             
             # Remove quotes if Claude added them
             sms_body = sms_body.strip('"').strip("'")
