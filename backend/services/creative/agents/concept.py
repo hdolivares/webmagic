@@ -24,7 +24,7 @@ class ConceptAgent(BaseAgent):
             agent_name="concept",
             model=model,
             temperature=0.8,  # Higher temp for more creative concepts
-            max_tokens=3072
+            max_tokens=65536  # Max for Claude Sonnet 4.5
         )
         self.prompt_builder = prompt_builder
     

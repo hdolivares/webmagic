@@ -24,7 +24,7 @@ class AnalystAgent(BaseAgent):
             agent_name="analyst",
             model=model,
             temperature=0.5,  # Lower temp for more analytical output
-            max_tokens=2048
+            max_tokens=65536  # Max for Claude Sonnet 4.5
         )
         self.prompt_builder = prompt_builder
     

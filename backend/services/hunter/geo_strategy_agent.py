@@ -78,7 +78,7 @@ class GeoStrategyAgent:
             # Call Claude
             message = await self.client.messages.create(
                 model=self.model,
-                max_tokens=8000,
+                max_tokens=65536,  # Max for Claude Sonnet 4.5
                 temperature=0.7,
                 system=system_prompt,
                 messages=[
@@ -146,7 +146,7 @@ class GeoStrategyAgent:
         try:
             message = await self.client.messages.create(
                 model=self.model,
-                max_tokens=6000,
+                max_tokens=65536,  # Max for Claude Sonnet 4.5
                 temperature=0.7,
                 system=system_prompt,
                 messages=[

@@ -202,8 +202,8 @@ Respond in JSON format:
             
             # Get AI response
             message = await ai_client.messages.create(
-                model="claude-sonnet-3-5-20241022",
-                max_tokens=1500,
+                model="claude-sonnet-4-5",
+                max_tokens=65536,  # Max for Claude Sonnet 4.5
                 temperature=0.3,
                 system="You are a helpful customer support assistant.",
                 messages=[

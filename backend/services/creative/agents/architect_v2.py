@@ -26,7 +26,7 @@ class ArchitectAgentV2(BaseAgent):
             agent_name="architect",
             model=model,
             temperature=0.7,
-            max_tokens=8192  # More tokens for code generation
+            max_tokens=65536  # Max tokens for Claude Sonnet 4.5
         )
         self.prompt_builder = prompt_builder
     
@@ -118,7 +118,7 @@ This format is much more reliable than JSON-wrapped code. Use exactly these deli
 """
         
         # STEP 6: Generate code using text (not JSON)
-        raw_output = await self.generate(system_prompt, user_prompt, max_tokens=8192)
+        raw_output = await self.generate(system_prompt, user_prompt, max_tokens=65536)
         
         # STEP 7: Parse delimited output using LLM-friendly parsing
         website = self._parse_delimited_output(raw_output, enhanced_data)
