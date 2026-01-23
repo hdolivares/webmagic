@@ -58,7 +58,7 @@ class EmailGenerator:
             # Generate email
             message = await self.client.messages.create(
                 model=self.model,
-                max_tokens=2048,
+                max_tokens=65536,  # Max for Claude Sonnet 4.5
                 temperature=0.7,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}]

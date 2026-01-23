@@ -98,7 +98,7 @@ class SMSGenerator:
         try:
             message = await self.client.messages.create(
                 model=self.model,
-                max_tokens=200,
+                max_tokens=65536,  # Max for Claude Sonnet 4.5
                 temperature=0.7,
                 messages=[{"role": "user", "content": prompt}]
             )

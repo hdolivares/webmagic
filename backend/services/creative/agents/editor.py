@@ -237,7 +237,7 @@ class EditorAgent(BaseAgent):
         
         response = await self.client.messages.create(
             model=self.model,
-            max_tokens=2000,
+            max_tokens=65536,  # Max for Claude Sonnet 4.5
             temperature=self.temperature,
             system=system_prompt,
             messages=[
@@ -301,7 +301,7 @@ class EditorAgent(BaseAgent):
         
         response = await self.client.messages.create(
             model=self.model,
-            max_tokens=8000,
+            max_tokens=65536,  # Max for Claude Sonnet 4.5
             temperature=self.temperature,
             system=system_prompt,
             messages=[
@@ -388,7 +388,7 @@ Analyze and return validation result as JSON."""
 
         response = await self.client.messages.create(
             model=self.model,
-            max_tokens=1500,
+            max_tokens=65536,  # Max for Claude Sonnet 4.5
             temperature=0.1,
             system=system_prompt,
             messages=[
