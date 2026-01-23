@@ -204,7 +204,7 @@ Respond in JSON format:
             # Use streaming to avoid timeout limits on large max_tokens
             async with ai_client.messages.stream(
                 model="claude-sonnet-4-5",
-                max_tokens=65536,  # Max for Claude Sonnet 4.5
+                max_tokens=64000,  # Max for Claude Sonnet 4.5
                 temperature=0.3,
                 system="You are a helpful customer support assistant.",
                 messages=[

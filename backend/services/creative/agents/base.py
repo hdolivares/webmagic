@@ -28,7 +28,7 @@ class BaseAgent:
         agent_name: str,
         model: str = "claude-sonnet-4-5",
         temperature: float = 0.7,
-        max_tokens: int = 65536  # Max for Claude Sonnet 4.5
+        max_tokens: int = 64000  # Max for Claude Sonnet 4.5
     ):
         """
         Initialize base agent.

@@ -29,7 +29,7 @@ class ArchitectAgent(BaseAgent):
             agent_name="architect",
             model=model,
             temperature=0.4,  # Lower temp for code generation
-            max_tokens=65536  # Max tokens for Claude Sonnet 4.5
+            max_tokens=64000  # Max for Claude Sonnet 4.5
         )
         self.prompt_builder = prompt_builder
         
