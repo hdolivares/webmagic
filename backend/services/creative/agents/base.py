@@ -57,7 +57,11 @@ class BaseAgent:
         max_tokens: Optional[int] = None
     ) -> str:
         """
-        Generate text completion from Claude.
+        Generate text completion from Claude using streaming.
+        
+        Uses streaming internally to support large max_tokens (up to 64K)
+        without hitting the 10-minute timeout limit for non-streaming requests.
+        Returns the complete response as a single string.
         
         Args:
             system_prompt: System instructions
@@ -76,7 +80,8 @@ class BaseAgent:
             logger.debug(f"System prompt length: {len(system_prompt)} chars")
             logger.debug(f"User prompt length: {len(user_prompt)} chars")
             
-            message = await self.client.messages.create(
+            # Use streaming to avoid timeout limits on large max_tokens
+            async with self.client.messages.stream(
                 model=self.model,
                 max_tokens=max_tokens or self.max_tokens,
                 temperature=temperature or self.temperature,
@@ -87,10 +92,9 @@ class BaseAgent:
                         "content": user_prompt
                     }
                 ]
-            )
-            
-            # Extract text content
-            content = message.content[0].text
+            ) as stream:
+                # Collect complete response from stream
+                content = await stream.get_final_text()
             
             logger.info(
                 f"[{self.agent_name}] Generation complete. "

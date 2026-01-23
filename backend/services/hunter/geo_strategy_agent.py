@@ -76,7 +76,8 @@ class GeoStrategyAgent:
         
         try:
             # Call Claude
-            message = await self.client.messages.create(
+            # Use streaming to avoid timeout limits on large max_tokens
+            async with self.client.messages.stream(
                 model=self.model,
                 max_tokens=65536,  # Max for Claude Sonnet 4.5
                 temperature=0.7,
@@ -84,10 +85,8 @@ class GeoStrategyAgent:
                 messages=[
                     {"role": "user", "content": user_prompt}
                 ]
-            )
-            
-            # Extract response
-            response_text = message.content[0].text
+            ) as stream:
+                response_text = await stream.get_final_text()
             
             # Parse JSON response
             strategy = self._parse_strategy_response(response_text)
@@ -144,7 +143,8 @@ class GeoStrategyAgent:
         )
         
         try:
-            message = await self.client.messages.create(
+            # Use streaming to avoid timeout limits on large max_tokens
+            async with self.client.messages.stream(
                 model=self.model,
                 max_tokens=65536,  # Max for Claude Sonnet 4.5
                 temperature=0.7,
@@ -152,9 +152,9 @@ class GeoStrategyAgent:
                 messages=[
                     {"role": "user", "content": user_prompt}
                 ]
-            )
+            ) as stream:
+                response_text = await stream.get_final_text()
             
-            response_text = message.content[0].text
             refinements = self._parse_refinement_response(response_text)
             
             logger.info(
