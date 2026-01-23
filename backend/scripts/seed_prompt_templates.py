@@ -183,6 +183,9 @@ OUTPUT JSON FORMAT:
 
 Your job is to create a comprehensive design brief based on the Creative DNA.
 
+CRITICAL: Research shows users form 90% of their opinion based on color within 50ms.
+Color psychology is a conversion-rate optimization tool, not just aesthetics.
+
 CORE AESTHETICS:
 {{frontend_aesthetics}}
 
@@ -194,6 +197,10 @@ TYPOGRAPHY RULES:
 
 BANNED PATTERNS (never use):
 {{banned_patterns}}
+
+{{industry_style_guidance}}
+
+{{gradient_best_practices}}
 
 OUTPUT JSON FORMAT:
 {
@@ -207,9 +214,11 @@ OUTPUT JSON FORMAT:
     "primary": "#hex",
     "secondary": "#hex",
     "accent": "#hex",
-    "background": "#hex",
+    "background": "#hex (use off-white #FAFAFA not pure white)",
     "surface": "#hex",
-    "text": "#hex"
+    "text": "#hex",
+    "gradient_start": "#hex",
+    "gradient_end": "#hex"
   },
   "layout": {
     "type": "single-page or multi-section",
@@ -221,7 +230,7 @@ OUTPUT JSON FORMAT:
   "imagery_style": "natural/illustrated/abstract"
 }""",
             output_format="JSON",
-            placeholder_sections=["frontend_aesthetics", "vibe_list", "typography_rules", "banned_patterns"]
+            placeholder_sections=["frontend_aesthetics", "vibe_list", "typography_rules", "banned_patterns", "industry_style_guidance", "gradient_best_practices"]
         )
         session.add(director)
         
@@ -324,6 +333,61 @@ AVOID:
         )
         session.add(banned_patterns_setting)
         
+        # NEW: Industry Style Guidance (injected dynamically by IndustryStyleService)
+        industry_guidance_setting = PromptSetting(
+            agent_name="art_director",
+            section_name="industry_style_guidance",
+            content="""INDUSTRY-SPECIFIC COLOR PSYCHOLOGY:
+
+When industry guidance is provided below, follow it carefully. The recommended colors 
+and fonts are based on neuromarketing research showing that specific industries 
+trigger specific psychological responses:
+
+- LEGAL/FINANCE: Navy + Gold = "My money is safe" (Heritage & Trust)
+- HEALTHCARE/DENTAL: Teal + White = "I won't be hurt here" (Clinical Precision)
+- PLUMBING/HVAC/AUTO: Red + Yellow = "Help is coming fast" (Rapid Response)
+- CONTRACTORS/LANDSCAPING: Green + Orange = "They'll build it right" (Craft & Structure)
+- SALONS/SPAS/EVENTS: Charcoal + Rose = "I want that lifestyle" (Aesthetic & Wellness)
+- PETS/EDUCATION/CAFES: Orange + Green = "The Connection" (Community & Nurture)
+
+You can apply creative vibes ON TOP of these industry palettes, but the core 
+colors should align with psychological expectations for conversion optimization.""",
+            description="Industry-specific color psychology and typography guidance",
+            version=1,
+            is_active=True
+        )
+        session.add(industry_guidance_setting)
+        
+        # NEW: Gradient Best Practices for anti-banding
+        gradient_practices_setting = PromptSetting(
+            agent_name="art_director",
+            section_name="gradient_best_practices",
+            content="""GRADIENT ANTI-BANDING (CRITICAL):
+
+CSS gradients often display visible "bands" instead of smooth transitions.
+To prevent this:
+
+1. USE OFF-COLORS: Never pure #FFFFFF or #000000
+   - Use #FAFAFA or #FFFFF0 instead of pure white
+   - Use #0a0a0f or #1a1a1a instead of pure black
+
+2. ADD NOISE OVERLAY: Specify that gradients should include a subtle 
+   SVG noise pattern overlay with 5% opacity
+
+3. MULTIPLE COLOR STOPS: Use 3-5 color stops for smooth eased transitions
+   instead of just start/end colors
+
+4. BLUR TECHNIQUE: Large gradient backgrounds can use a pseudo-element 
+   with filter: blur(1px) for smoother appearance
+
+When specifying colors, always include gradient_start and gradient_end 
+colors that work well together with anti-banding techniques.""",
+            description="CSS gradient best practices to prevent color banding",
+            version=1,
+            is_active=True
+        )
+        session.add(gradient_practices_setting)
+        
         # ================== ARCHITECT ==================
         architect = PromptTemplate(
             agent_name="architect",
@@ -400,7 +464,44 @@ SEO:
 - Semantic HTML structure
 - Meta tags (title, description, og:image)
 - Schema.org markup for local business
-- Clean, descriptive URLs""",
+- Clean, descriptive URLs
+
+GRADIENT ANTI-BANDING (CRITICAL):
+CSS gradients can display visible "bands" - prevent this:
+
+1. COLOR ENDPOINTS - Never use pure white/black in gradients:
+   - Use #FAFAFA or #FFFFF0 instead of #FFFFFF
+   - Use #0a0a0f or #1a1a1a instead of #000000
+
+2. NOISE OVERLAY - Add subtle noise pattern on gradients:
+   .gradient-smooth {
+     position: relative;
+   }
+   .gradient-smooth::after {
+     content: "";
+     position: absolute;
+     inset: 0;
+     background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+     opacity: 0.03;
+     pointer-events: none;
+   }
+
+3. MULTIPLE COLOR STOPS - Use eased intermediate stops:
+   background: linear-gradient(
+     135deg,
+     var(--gradient-start) 0%,
+     color-mix(in srgb, var(--gradient-start) 70%, var(--gradient-end)) 35%,
+     color-mix(in srgb, var(--gradient-start) 30%, var(--gradient-end)) 65%,
+     var(--gradient-end) 100%
+   );
+
+4. CSS VARIABLES - Always define gradient colors:
+   :root {
+     --gradient-start: #1A2B48;
+     --gradient-end: #2C3E50;
+     --off-white: #FAFAFA;
+     --off-black: #0a0a0f;
+   }""",
             description="Technical requirements and constraints for code generation",
             version=1,
             is_active=True
@@ -462,11 +563,11 @@ SEO:
             print("Created Templates:")
             print(f"  ✓ Analyst (1 setting)")
             print(f"  ✓ Concept (2 settings)")
-            print(f"  ✓ Art Director (4 settings)")
+            print(f"  ✓ Art Director (6 settings - including industry guidance & gradients)")
             print(f"  ✓ Architect (2 settings)")
             print()
             print("=" * 70)
-            print("Total: 4 templates, 9 settings")
+            print("Total: 4 templates, 11 settings")
             print("=" * 70)
         except Exception as e:
             await session.rollback()

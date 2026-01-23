@@ -1,9 +1,13 @@
 """
 Category Knowledge Service - Intelligent content generation based on business type.
 Provides category-specific services, content, and strategies.
+
+Now integrated with IndustryStyleService for color psychology personas.
 """
 from typing import Dict, List, Any, Optional
 import logging
+
+from services.creative.industry_style_service import IndustryStyleService
 
 logger = logging.getLogger(__name__)
 
@@ -416,6 +420,317 @@ class CategoryKnowledgeService:
                 "Pick up your vehicle running great"
             ],
             "typical_about": "Our ASE-certified technicians provide honest, reliable auto repair services. We treat every vehicle like it's our own and stand behind our work with comprehensive warranties."
+        },
+        
+        # ============ NEW CATEGORIES FOR INDUSTRY PERSONAS ============
+        
+        "dentist": {
+            "display_name": "Dental",
+            "services": [
+                {
+                    "name": "General Dentistry",
+                    "description": "Comprehensive dental exams, cleanings, and preventive care for the whole family.",
+                    "icon": "🦷",
+                    "priority": 1
+                },
+                {
+                    "name": "Cosmetic Dentistry",
+                    "description": "Teeth whitening, veneers, and smile makeovers to enhance your confidence.",
+                    "icon": "✨",
+                    "priority": 2
+                },
+                {
+                    "name": "Dental Implants",
+                    "description": "Permanent tooth replacement solutions that look and feel natural.",
+                    "icon": "🔩",
+                    "priority": 3
+                },
+                {
+                    "name": "Emergency Dental Care",
+                    "description": "Same-day appointments for dental emergencies, pain relief, and urgent care.",
+                    "icon": "🚨",
+                    "priority": 4
+                },
+                {
+                    "name": "Invisalign & Orthodontics",
+                    "description": "Clear aligners and braces for straighter teeth and a beautiful smile.",
+                    "icon": "😁",
+                    "priority": 5
+                },
+                {
+                    "name": "Sedation Dentistry",
+                    "description": "Comfortable, anxiety-free dental care with sedation options.",
+                    "icon": "💤",
+                    "priority": 6
+                }
+            ],
+            "contact_preference": "phone",
+            "contact_emphasis": "Schedule Your Appointment",
+            "cta_primary": "Book Your Visit",
+            "cta_secondary": "New Patient Special",
+            "hours_default": "Monday-Friday: 8AM-5PM, Saturday: By Appointment",
+            "trust_factors": [
+                "Gentle, Caring Approach",
+                "State-of-the-Art Technology",
+                "Experienced Dental Team",
+                "Insurance Accepted",
+                "Financing Available"
+            ],
+            "value_props": [
+                "Same-day emergency appointments",
+                "Sedation options available",
+                "New patient specials",
+                "Family-friendly practice"
+            ],
+            "process_steps": [
+                "Schedule your appointment",
+                "Complete new patient forms",
+                "Comprehensive dental exam",
+                "Personalized treatment plan",
+                "Gentle, comfortable care",
+                "Follow-up and preventive care"
+            ],
+            "typical_about": "Our dental practice is committed to providing gentle, personalized care in a comfortable environment. We use the latest technology to ensure the best outcomes for your smile."
+        },
+        
+        "lawyer": {
+            "display_name": "Legal Services",
+            "services": [
+                {
+                    "name": "Free Consultation",
+                    "description": "Confidential case evaluation to understand your legal options.",
+                    "icon": "⚖️",
+                    "priority": 1
+                },
+                {
+                    "name": "Legal Representation",
+                    "description": "Experienced advocacy in court and throughout the legal process.",
+                    "icon": "📜",
+                    "priority": 2
+                },
+                {
+                    "name": "Case Strategy",
+                    "description": "Strategic legal planning tailored to your unique situation.",
+                    "icon": "🎯",
+                    "priority": 3
+                },
+                {
+                    "name": "Settlement Negotiation",
+                    "description": "Skilled negotiation to achieve the best possible outcome.",
+                    "icon": "🤝",
+                    "priority": 4
+                }
+            ],
+            "contact_preference": "phone",
+            "contact_emphasis": "Free Consultation",
+            "cta_primary": "Schedule Free Consultation",
+            "cta_secondary": "Learn About Your Rights",
+            "hours_default": "Monday-Friday: 9AM-6PM",
+            "trust_factors": [
+                "Years of Experience",
+                "Proven Track Record",
+                "No Fee Unless We Win",
+                "Confidential Consultations",
+                "Personalized Attention"
+            ],
+            "value_props": [
+                "Free initial consultation",
+                "Contingency fee arrangements",
+                "24/7 availability for emergencies",
+                "Aggressive representation"
+            ],
+            "process_steps": [
+                "Contact us for free consultation",
+                "We review your case",
+                "Develop legal strategy",
+                "Handle all legal proceedings",
+                "Fight for the best outcome",
+                "No fee unless we win"
+            ],
+            "typical_about": "With years of experience and a commitment to our clients, we provide aggressive legal representation while treating every case with the attention it deserves."
+        },
+        
+        "roofing": {
+            "display_name": "Roofing",
+            "services": [
+                {
+                    "name": "Roof Replacement",
+                    "description": "Complete roof replacement with quality materials and expert installation.",
+                    "icon": "🏠",
+                    "priority": 1
+                },
+                {
+                    "name": "Roof Repair",
+                    "description": "Fast, reliable repairs for leaks, storm damage, and general wear.",
+                    "icon": "🔧",
+                    "priority": 2
+                },
+                {
+                    "name": "Free Roof Inspection",
+                    "description": "Comprehensive roof inspection to assess condition and identify issues.",
+                    "icon": "🔍",
+                    "priority": 3
+                },
+                {
+                    "name": "Storm Damage Repair",
+                    "description": "Emergency repairs and insurance claim assistance for storm damage.",
+                    "icon": "⛈️",
+                    "priority": 4
+                },
+                {
+                    "name": "Gutter Installation",
+                    "description": "Seamless gutter installation and repair to protect your home.",
+                    "icon": "💧",
+                    "priority": 5
+                }
+            ],
+            "contact_preference": "phone",
+            "contact_emphasis": "Free Roof Inspection",
+            "cta_primary": "Get Free Estimate",
+            "cta_secondary": "Schedule Inspection",
+            "hours_default": "Monday-Saturday: 7AM-6PM",
+            "trust_factors": [
+                "Licensed & Insured",
+                "Manufacturer Certified",
+                "Quality Workmanship Warranty",
+                "Local & Trusted",
+                "Insurance Claim Specialists"
+            ],
+            "value_props": [
+                "Free roof inspections",
+                "Financing available",
+                "Insurance claim assistance",
+                "Written warranty on all work"
+            ],
+            "process_steps": [
+                "Schedule free inspection",
+                "Detailed assessment & photos",
+                "Receive honest estimate",
+                "Quality installation",
+                "Final inspection & cleanup",
+                "Warranty documentation"
+            ],
+            "typical_about": "As a locally owned roofing company, we take pride in protecting your home with quality materials and expert craftsmanship. We stand behind every job with comprehensive warranties."
+        },
+        
+        "salon": {
+            "display_name": "Hair Salon",
+            "services": [
+                {
+                    "name": "Haircuts & Styling",
+                    "description": "Expert cuts and styling for all hair types and textures.",
+                    "icon": "✂️",
+                    "priority": 1
+                },
+                {
+                    "name": "Color & Highlights",
+                    "description": "Professional hair color, highlights, and balayage services.",
+                    "icon": "🎨",
+                    "priority": 2
+                },
+                {
+                    "name": "Treatments & Conditioning",
+                    "description": "Deep conditioning, keratin, and restorative hair treatments.",
+                    "icon": "💆",
+                    "priority": 3
+                },
+                {
+                    "name": "Blowouts & Updos",
+                    "description": "Special occasion styling, blowouts, and elegant updos.",
+                    "icon": "👰",
+                    "priority": 4
+                }
+            ],
+            "contact_preference": "phone",
+            "contact_emphasis": "Book Your Appointment",
+            "cta_primary": "Book Now",
+            "cta_secondary": "View Our Work",
+            "hours_default": "Tuesday-Saturday: 9AM-7PM",
+            "trust_factors": [
+                "Award-Winning Stylists",
+                "Premium Products",
+                "Welcoming Atmosphere",
+                "Continuing Education",
+                "Satisfaction Guaranteed"
+            ],
+            "value_props": [
+                "Complimentary consultation",
+                "Premium hair products",
+                "Online booking available",
+                "Referral rewards program"
+            ],
+            "process_steps": [
+                "Book your appointment",
+                "Consultation with stylist",
+                "Relax with complimentary beverage",
+                "Expert service & styling",
+                "Style tips & product recommendations",
+                "Leave feeling beautiful"
+            ],
+            "typical_about": "Our talented stylists create personalized looks that enhance your natural beauty. We use premium products in a welcoming atmosphere where you can relax and enjoy being pampered."
+        },
+        
+        "veterinarian": {
+            "display_name": "Veterinary",
+            "services": [
+                {
+                    "name": "Wellness Exams",
+                    "description": "Comprehensive health checkups to keep your pet healthy and happy.",
+                    "icon": "🩺",
+                    "priority": 1
+                },
+                {
+                    "name": "Vaccinations",
+                    "description": "Core and lifestyle vaccinations to protect against disease.",
+                    "icon": "💉",
+                    "priority": 2
+                },
+                {
+                    "name": "Surgery & Dental",
+                    "description": "Safe surgical procedures and dental care for your pet.",
+                    "icon": "🔬",
+                    "priority": 3
+                },
+                {
+                    "name": "Emergency Care",
+                    "description": "Urgent care when your pet needs help fast.",
+                    "icon": "🚨",
+                    "priority": 4
+                },
+                {
+                    "name": "Grooming & Boarding",
+                    "description": "Professional grooming and comfortable boarding services.",
+                    "icon": "🐕",
+                    "priority": 5
+                }
+            ],
+            "contact_preference": "phone",
+            "contact_emphasis": "Schedule Your Visit",
+            "cta_primary": "Book Appointment",
+            "cta_secondary": "New Patient Info",
+            "hours_default": "Monday-Friday: 8AM-6PM, Saturday: 9AM-2PM",
+            "trust_factors": [
+                "Compassionate Care",
+                "Experienced Veterinarians",
+                "State-of-the-Art Facility",
+                "Fear-Free Certified",
+                "Emergency Services"
+            ],
+            "value_props": [
+                "Same-day sick appointments",
+                "Wellness plan packages",
+                "Pet portal access",
+                "Caring, gentle approach"
+            ],
+            "process_steps": [
+                "Schedule appointment",
+                "Complete pet history forms",
+                "Thorough examination",
+                "Discuss findings & recommendations",
+                "Treatment with gentle care",
+                "Follow-up & preventive care"
+            ],
+            "typical_about": "Our compassionate team treats every pet like family. We provide comprehensive veterinary care in a fear-free environment, ensuring your furry friends feel safe and loved."
         }
     }
     
@@ -572,6 +887,8 @@ class CategoryKnowledgeService:
         """
         Enhance business data with category-specific defaults.
         This fills in missing data intelligently based on business type.
+        
+        Now also includes industry style persona information for color psychology.
         """
         category = business_data.get("category", "")
         enhanced = business_data.copy()
@@ -605,5 +922,23 @@ class CategoryKnowledgeService:
         
         # Add display category name
         enhanced["category_display"] = category_info.get("display_name", category)
+        
+        # NEW: Add industry style persona for color psychology
+        style_overrides = IndustryStyleService.get_style_overrides(category)
+        if style_overrides.get("has_industry_guidance"):
+            enhanced["industry_persona"] = {
+                "name": style_overrides.get("persona_name"),
+                "key": style_overrides.get("persona_key"),
+                "emotional_target": style_overrides.get("emotional_target"),
+                "cta_style": style_overrides.get("cta_style"),
+                "cta_text": style_overrides.get("cta_text"),
+                "vibe_recommendation": style_overrides.get("vibe_recommendation"),
+                "imagery_style": style_overrides.get("imagery_style")
+            }
+            enhanced["recommended_colors"] = style_overrides.get("recommended_colors")
+            enhanced["recommended_typography"] = style_overrides.get("recommended_typography")
+            logger.info(
+                f"Enhanced '{category}' with '{style_overrides.get('persona_name')}' persona"
+            )
         
         return enhanced

@@ -1,12 +1,16 @@
 """
 Art Director Agent - creates detailed design briefs.
 Selects vibe, typography, colors, animations, and visual style.
+
+Enhanced with industry-specific color psychology recommendations based on
+neuromarketing research (users form 90% of opinion based on color within 50ms).
 """
 from typing import Dict, Any, List
 import logging
 
 from services.creative.agents.base import BaseAgent
 from services.creative.prompts.builder import PromptBuilder
+from services.creative.industry_style_service import IndustryStyleService
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +40,9 @@ class ArtDirectorAgent(BaseAgent):
         """
         Create comprehensive design brief.
         
+        Enhanced with industry-specific color psychology recommendations.
+        Research shows users form 90% of their opinion based on color within 50ms.
+        
         Args:
             business_data: Original business data
             creative_dna: Output from Concept agent
@@ -50,10 +57,22 @@ class ArtDirectorAgent(BaseAgent):
                 - interactions: Animation/interaction patterns
                 - imagery: Image treatment style
                 - components: Component styling approach
+                - industry_persona: The matched industry persona (if any)
         """
         logger.info(f"Creating design brief for: {business_data.get('name')}")
         
-        # Build prompts
+        # Get industry-specific style recommendations based on color psychology
+        category = business_data.get("category", "")
+        style_overrides = IndustryStyleService.get_style_overrides(category)
+        gradient_practices = IndustryStyleService.get_gradient_best_practices()
+        
+        if style_overrides.get("has_industry_guidance"):
+            logger.info(
+                f"Applied industry style guidance: {style_overrides.get('persona_name')} persona "
+                f"for category '{category}'"
+            )
+        
+        # Build prompts with industry guidance
         system_prompt, user_prompt = await self.prompt_builder.build_prompts(
             agent_name="art_director",
             data={
@@ -65,7 +84,10 @@ class ArtDirectorAgent(BaseAgent):
                 "story": creative_dna.get("brand_story", ""),
                 "differentiation": creative_dna.get("differentiation_angle", ""),
                 "themes": ", ".join(creative_dna.get("content_pillars", [])),
-                "has_photos": len(business_data.get("photos_urls", [])) > 0
+                "has_photos": len(business_data.get("photos_urls", [])) > 0,
+                # NEW: Industry-specific guidance
+                "industry_style_guidance": style_overrides.get("industry_guidance_text", ""),
+                "gradient_best_practices": gradient_practices
             }
         )
         
@@ -73,8 +95,18 @@ class ArtDirectorAgent(BaseAgent):
         try:
             result = await self.generate_json(system_prompt, user_prompt)
             
-            # Validate and enhance
-            brief = self._validate_brief(result, business_data, creative_dna)
+            # Validate and enhance (pass style overrides for fallback colors)
+            brief = self._validate_brief(result, business_data, creative_dna, style_overrides)
+            
+            # Add industry persona metadata
+            if style_overrides.get("has_industry_guidance"):
+                brief["industry_persona"] = {
+                    "name": style_overrides.get("persona_name"),
+                    "key": style_overrides.get("persona_key"),
+                    "emotional_target": style_overrides.get("emotional_target"),
+                    "cta_style": style_overrides.get("cta_style"),
+                    "cta_text": style_overrides.get("cta_text")
+                }
             
             logger.info(
                 f"Design brief created: {brief.get('vibe')} vibe, "
@@ -85,18 +117,24 @@ class ArtDirectorAgent(BaseAgent):
             
         except Exception as e:
             logger.error(f"Design brief creation failed: {str(e)}")
-            return self._create_fallback_brief(business_data, creative_dna)
+            return self._create_fallback_brief(business_data, creative_dna, style_overrides)
     
     def _validate_brief(
         self,
         result: Dict[str, Any],
         business_data: Dict[str, Any],
-        creative_dna: Dict[str, Any]
+        creative_dna: Dict[str, Any],
+        style_overrides: Dict[str, Any] = None
     ) -> Dict[str, Any]:
-        """Validate and enhance design brief."""
+        """
+        Validate and enhance design brief.
+        Uses industry-specific style overrides if available.
+        """
+        style_overrides = style_overrides or {}
+        
         # Ensure all required sections exist
         brief = {
-            "vibe": result.get("vibe", "Clean Modern"),
+            "vibe": result.get("vibe", style_overrides.get("vibe_recommendation", "Clean Modern")),
             "typography": result.get("typography", {}),
             "colors": result.get("colors", {}),
             "layout": result.get("layout", {}),
@@ -110,14 +148,18 @@ class ArtDirectorAgent(BaseAgent):
             "shadows": result.get("shadows", "soft")
         }
         
-        # Validate typography (ensure no banned fonts)
+        # Validate typography (ensure no banned fonts, use industry fonts as fallback)
+        recommended_typography = style_overrides.get("recommended_typography", {})
         brief["typography"] = self._validate_typography(
-            brief["typography"]
+            brief["typography"],
+            recommended_typography
         )
         
-        # Validate colors (ensure accessibility)
+        # Validate colors (ensure accessibility, use industry colors as fallback)
+        recommended_colors = style_overrides.get("recommended_colors", {})
         brief["colors"] = self._validate_colors(
-            brief["colors"]
+            brief["colors"],
+            recommended_colors
         )
         
         # Add CSS variables structure
@@ -133,25 +175,28 @@ class ArtDirectorAgent(BaseAgent):
         
         return brief
     
-    def _validate_typography(self, typography: Dict[str, Any]) -> Dict[str, Any]:
+    def _validate_typography(
+        self, 
+        typography: Dict[str, Any],
+        recommended: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
         """
         Validate typography choices and ban generic fonts.
+        Uses industry-recommended fonts as fallbacks if provided.
         """
+        recommended = recommended or {}
+        
         # Banned fonts (generic, overused)
         BANNED_FONTS = [
-            "roboto", "open sans", "lato", "montserrat", "poppins",
-            "inter", "space grotesk", "arial", "helvetica", "times new roman"
+            "roboto", "open sans", "lato", "poppins",
+            "space grotesk", "arial", "helvetica", "times new roman"
         ]
+        # Note: montserrat and inter are allowed for specific industry personas
         
-        # Recommended alternatives
+        # Recommended alternatives (general fallbacks)
         DISPLAY_FONTS = [
             "Clash Display", "Cabinet Grotesk", "Syne", "Satoshi",
             "General Sans", "Manrope", "Plus Jakarta Sans"
-        ]
-        
-        SERIF_FONTS = [
-            "DM Serif Display", "Fraunces", "Playfair Display",
-            "Crimson Pro", "Libre Baskerville"
         ]
         
         MONO_FONTS = [
@@ -163,17 +208,18 @@ class ArtDirectorAgent(BaseAgent):
         display = typography.get("display", "")
         if any(banned in display.lower() for banned in BANNED_FONTS):
             logger.warning(f"Banned font detected: {display}, replacing...")
-            typography["display"] = DISPLAY_FONTS[0]
+            # Use industry recommendation if available, otherwise general fallback
+            typography["display"] = recommended.get("display", DISPLAY_FONTS[0])
         
-        # Ensure all required fields
+        # Ensure all required fields - prefer industry recommendations
         if not typography.get("display"):
-            typography["display"] = DISPLAY_FONTS[0]
+            typography["display"] = recommended.get("display", DISPLAY_FONTS[0])
         
         if not typography.get("body"):
-            typography["body"] = "system-ui, -apple-system, sans-serif"
+            typography["body"] = recommended.get("body", "system-ui, -apple-system, sans-serif")
         
         if not typography.get("accent"):
-            typography["accent"] = MONO_FONTS[0]
+            typography["accent"] = recommended.get("accent", MONO_FONTS[0])
         
         # Add font stacks
         typography["display_stack"] = f"\"{typography['display']}\", system-ui, sans-serif"
@@ -182,34 +228,52 @@ class ArtDirectorAgent(BaseAgent):
         
         return typography
     
-    def _validate_colors(self, colors: Dict[str, Any]) -> Dict[str, Any]:
+    def _validate_colors(
+        self, 
+        colors: Dict[str, Any],
+        recommended: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
         """
         Validate color palette and ensure accessibility.
+        Uses industry-recommended colors as fallbacks if provided.
+        
+        Color psychology research shows users form 90% of their opinion
+        based on color within 50ms - industry-appropriate colors matter!
         """
-        # Ensure all required colors
+        recommended = recommended or {}
+        
+        # Ensure all required colors - prefer industry recommendations
         if not colors.get("primary"):
-            colors["primary"] = "#2563eb"  # Default blue
+            colors["primary"] = recommended.get("primary", "#2563eb")
         
         if not colors.get("secondary"):
-            colors["secondary"] = "#7c3aed"  # Default purple
+            colors["secondary"] = recommended.get("secondary", "#7c3aed")
         
         if not colors.get("accent"):
-            colors["accent"] = "#f59e0b"  # Default amber
+            colors["accent"] = recommended.get("accent", "#f59e0b")
         
         if not colors.get("background"):
-            colors["background"] = "#ffffff"
+            # Use off-white instead of pure white to prevent gradient banding
+            colors["background"] = recommended.get("background", "#FAFAFA")
         
         if not colors.get("surface"):
-            colors["surface"] = "#f9fafb"
+            colors["surface"] = recommended.get("surface", "#FFFFFF")
         
         if not colors.get("text"):
-            colors["text"] = "#1f2937"
+            colors["text"] = recommended.get("text", "#1f2937")
         
         if not colors.get("text_muted"):
-            colors["text_muted"] = "#6b7280"
+            colors["text_muted"] = recommended.get("text_muted", "#6b7280")
         
-        # Add light/dark mode variants
-        colors["background_dark"] = colors.get("background_dark", "#0f172a")
+        # Gradient colors for smooth transitions (anti-banding)
+        if not colors.get("gradient_start"):
+            colors["gradient_start"] = recommended.get("gradient_start", colors["primary"])
+        
+        if not colors.get("gradient_end"):
+            colors["gradient_end"] = recommended.get("gradient_end", colors["secondary"])
+        
+        # Add light/dark mode variants (use off-blacks to prevent banding)
+        colors["background_dark"] = colors.get("background_dark", "#0a0a0f")  # Off-black
         colors["surface_dark"] = colors.get("surface_dark", "#1e293b")
         colors["text_dark"] = colors.get("text_dark", "#f1f5f9")
         colors["text_muted_dark"] = colors.get("text_muted_dark", "#94a3b8")
@@ -258,28 +322,60 @@ class ArtDirectorAgent(BaseAgent):
     def _create_fallback_brief(
         self,
         business_data: Dict[str, Any],
-        creative_dna: Dict[str, Any]
+        creative_dna: Dict[str, Any],
+        style_overrides: Dict[str, Any] = None
     ) -> Dict[str, Any]:
-        """Create fallback design brief when AI fails."""
-        return {
-            "vibe": "Clean Modern",
+        """
+        Create fallback design brief when AI fails.
+        Uses industry-specific colors and fonts if available.
+        """
+        style_overrides = style_overrides or {}
+        recommended_colors = style_overrides.get("recommended_colors", {})
+        recommended_typography = style_overrides.get("recommended_typography", {})
+        
+        # Use industry-specific values or defaults
+        vibe = style_overrides.get("vibe_recommendation", "Clean Modern")
+        display_font = recommended_typography.get("display", "Clash Display")
+        body_font = recommended_typography.get("body", "system-ui, -apple-system, sans-serif")
+        accent_font = recommended_typography.get("accent", "JetBrains Mono")
+        
+        primary_color = recommended_colors.get("primary", "#2563eb")
+        secondary_color = recommended_colors.get("secondary", "#7c3aed")
+        accent_color = recommended_colors.get("accent", "#f59e0b")
+        background_color = recommended_colors.get("background", "#FAFAFA")  # Off-white
+        
+        # Build industry persona info if available
+        industry_persona = None
+        if style_overrides.get("has_industry_guidance"):
+            industry_persona = {
+                "name": style_overrides.get("persona_name"),
+                "key": style_overrides.get("persona_key"),
+                "emotional_target": style_overrides.get("emotional_target"),
+                "cta_style": style_overrides.get("cta_style"),
+                "cta_text": style_overrides.get("cta_text")
+            }
+        
+        brief = {
+            "vibe": vibe,
             "typography": {
-                "display": "Clash Display",
-                "body": "system-ui, -apple-system, sans-serif",
-                "accent": "JetBrains Mono",
-                "display_stack": "\"Clash Display\", system-ui, sans-serif",
-                "body_stack": "system-ui, -apple-system, sans-serif",
-                "accent_stack": "\"JetBrains Mono\", monospace"
+                "display": display_font,
+                "body": body_font,
+                "accent": accent_font,
+                "display_stack": f"\"{display_font}\", system-ui, sans-serif",
+                "body_stack": body_font,
+                "accent_stack": f"\"{accent_font}\", monospace"
             },
             "colors": {
-                "primary": "#2563eb",
-                "secondary": "#7c3aed",
-                "accent": "#f59e0b",
-                "background": "#ffffff",
-                "surface": "#f9fafb",
-                "text": "#1f2937",
-                "text_muted": "#6b7280",
-                "background_dark": "#0f172a",
+                "primary": primary_color,
+                "secondary": secondary_color,
+                "accent": accent_color,
+                "background": background_color,
+                "surface": "#FFFFFF",
+                "text": recommended_colors.get("text", "#1f2937"),
+                "text_muted": recommended_colors.get("text_muted", "#6b7280"),
+                "gradient_start": recommended_colors.get("gradient_start", primary_color),
+                "gradient_end": recommended_colors.get("gradient_end", secondary_color),
+                "background_dark": "#0a0a0f",  # Off-black for anti-banding
                 "surface_dark": "#1e293b",
                 "text_dark": "#f1f5f9",
                 "text_muted_dark": "#94a3b8"
@@ -302,7 +398,7 @@ class ArtDirectorAgent(BaseAgent):
                 "hover-lift"
             ],
             "imagery": {
-                "treatment": "natural",
+                "treatment": style_overrides.get("imagery_style", "natural"),
                 "border_radius": "medium",
                 "hover_effect": "zoom"
             },
@@ -321,9 +417,16 @@ class ArtDirectorAgent(BaseAgent):
             "css_variables": {},
             "_metadata": {
                 "business_name": business_data.get("name"),
-                "vibe": "Clean Modern",
-                "primary_font": "Clash Display",
-                "primary_color": "#2563eb",
-                "fallback": True
+                "vibe": vibe,
+                "primary_font": display_font,
+                "primary_color": primary_color,
+                "fallback": True,
+                "used_industry_styling": style_overrides.get("has_industry_guidance", False)
             }
         }
+        
+        # Add industry persona if matched
+        if industry_persona:
+            brief["industry_persona"] = industry_persona
+        
+        return brief
