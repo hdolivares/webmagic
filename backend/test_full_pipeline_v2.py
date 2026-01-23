@@ -59,7 +59,7 @@ BUSINESS_DATA = {
 TEST_EMAIL = "hobeja7@gmail.com"
 
 # Subdomain for this test
-SUBDOMAIN = "laplumbingbros"
+SUBDOMAIN = "laplumbingpros"
 
 
 def print_progress(step, message, status="⏳"):
