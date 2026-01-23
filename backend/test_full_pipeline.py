@@ -151,9 +151,8 @@ async def deploy_to_nginx(output_dir: Path) -> str:
         shutil.copy2(src, dst)
         print(f"   ✅ Deployed: {file_name}")
     
-    # Generate website URL
-    domain = settings.SITES_DOMAIN
-    website_url = f"https://{SUBDOMAIN}.{domain}"
+    # Generate website URL (path-based routing)
+    website_url = f"{settings.SITES_BASE_URL}/{SUBDOMAIN}"
     
     print(f"\n🌐 Website URL: {website_url}")
     

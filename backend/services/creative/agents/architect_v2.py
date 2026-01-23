@@ -91,18 +91,28 @@ Do NOT use JSON. Instead, return your code in clearly delimited sections like th
 
 === HTML ===
 <!DOCTYPE html>
-<html>
-...your HTML code here...
+<html lang="en">
+<head>
+    ...meta tags, title, fonts...
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    ...your HTML content here...
+    <script src="script.js"></script>
+</body>
 </html>
 
 === CSS ===
-/* Your CSS code here */
+/* Your CSS code here - will be saved as styles.css */
+:root {
+  --color-primary: ...;
+}
 body {
   ...
 }
 
 === JS ===
-// Your JavaScript code here
+// Your JavaScript code here - will be saved as script.js
 document.addEventListener('DOMContentLoaded', () => {
   ...
 });
@@ -114,7 +124,10 @@ document.addEventListener('DOMContentLoaded', () => {
   "technologies": ["HTML5", "CSS3", "Vanilla JS"]
 }
 
-This format is much more reliable than JSON-wrapped code. Use exactly these delimiters.
+**IMPORTANT**: 
+1. The HTML MUST include `<link rel="stylesheet" href="styles.css">` in the <head> to load your CSS
+2. The HTML MUST include `<script src="script.js"></script>` before </body> to load your JS
+3. Use exactly these delimiters: === HTML ===, === CSS ===, === JS ===, === METADATA ===
 """
         
         # STEP 6: Generate code using text (not JSON)
