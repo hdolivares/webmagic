@@ -49,9 +49,16 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       (error: AxiosError) => {
+        // Only redirect on 401 for authenticated requests, not login attempts
         if (error.response?.status === 401) {
-          this.clearAuth()
-          window.location.href = '/login'
+          const isLoginEndpoint = error.config?.url?.includes('/auth/login') || 
+                                  error.config?.url?.includes('/auth/unified-login')
+          
+          // Don't redirect if this is a login attempt (let the login page handle the error)
+          if (!isLoginEndpoint) {
+            this.clearAuth()
+            window.location.href = '/login'
+          }
         }
         return Promise.reject(error)
       }
