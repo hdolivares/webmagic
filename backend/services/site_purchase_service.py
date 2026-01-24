@@ -24,7 +24,7 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from models.site_models import Site, CustomerUser, SiteVersion
+from models.site_models import Site, CustomerUser, SiteVersion, CustomerSiteOwnership
 from services.payments.recurrente_client import RecurrenteClient
 from services.customer_auth_service import CustomerAuthService
 from services.site_service import get_site_service
@@ -168,26 +168,73 @@ class SitePurchaseService:
         
         # Create or get customer user
         customer_user = await CustomerAuthService.get_customer_by_email(db, customer_email)
+        is_new_customer = customer_user is None
         
         if not customer_user:
             # Generate a temporary password (customer will set their own via email)
             import secrets
             temp_password = secrets.token_urlsafe(16)
             
+            # Create new customer (without site_id, we'll use junction table)
             customer_user = await CustomerAuthService.create_customer_user(
                 db=db,
                 email=customer_email,
                 password=temp_password,
                 full_name=customer_name,
-                site_id=site.id
+                site_id=None  # Don't set site_id, use junction table instead
             )
+            
+            # Set this as their primary site
+            customer_user.primary_site_id = site.id
+            
             logger.info(f"Created new customer user: {customer_email}")
         else:
-            # Update existing user's site
-            customer_user.site_id = site.id
-            await db.commit()
-            await db.refresh(customer_user)
-            logger.info(f"Associated site with existing customer: {customer_email}")
+            logger.info(f"Existing customer purchasing additional site: {customer_email}")
+        
+        # Check if customer already owns this site (shouldn't happen, but defensive)
+        existing_ownership = await db.execute(
+            select(CustomerSiteOwnership).where(
+                CustomerSiteOwnership.customer_user_id == customer_user.id,
+                CustomerSiteOwnership.site_id == site.id
+            )
+        )
+        if existing_ownership.scalar_one_or_none():
+            logger.warning(f"Customer {customer_email} already owns site {site.slug}")
+            # Don't create duplicate, but continue processing
+            return {
+                "site_id": str(site.id),
+                "site_slug": site.slug,
+                "site_url": self.site_service.generate_site_url(site.slug),
+                "customer_id": str(customer_user.id),
+                "customer_email": customer_user.email,
+                "purchase_amount": float(site.purchase_amount),
+                "transaction_id": transaction_id,
+                "purchased_at": site.purchased_at.isoformat() if site.purchased_at else None,
+                "already_owned": True
+            }
+        
+        # Create ownership record via junction table
+        is_first_site = len(customer_user.owned_sites) == 0
+        ownership = CustomerSiteOwnership(
+            customer_user_id=customer_user.id,
+            site_id=site.id,
+            role="owner",
+            is_primary=is_first_site,  # First site is always primary
+            acquired_at=datetime.utcnow()
+        )
+        db.add(ownership)
+        
+        # If this is their first site, set as primary
+        if is_first_site:
+            customer_user.primary_site_id = site.id
+        
+        await db.commit()
+        await db.refresh(customer_user)
+        
+        logger.info(
+            f"Associated site {site.slug} with customer {customer_email} "
+            f"(primary={is_first_site}, total_sites={len(customer_user.owned_sites)})"
+        )
         
         # Update site status
         site.status = "owned"

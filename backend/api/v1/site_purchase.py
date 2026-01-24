@@ -31,6 +31,7 @@ from api.schemas.customer_auth import (
 from models.site_models import CustomerUser, Site
 from services.site_purchase_service import get_site_purchase_service
 from services.site_service import get_site_service
+from services.customer_site_service import CustomerSiteService
 
 logger = logging.getLogger(__name__)
 
@@ -180,26 +181,72 @@ async def get_site(
 
 
 @router.get(
+    "/customer/my-sites",
+    response_model=dict,
+    responses={
+        401: {"model": ErrorResponse, "description": "Not authenticated"}
+    },
+    summary="Get customer's sites",
+    description="Get all sites owned by authenticated customer (supports multi-site)."
+)
+async def get_my_sites(
+    current_customer: CustomerUser = Depends(get_current_customer),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all sites owned by the current customer.
+    
+    **Multi-Site Support:**
+    Returns a list of all sites the customer owns, with the primary site marked.
+    
+    Requires authentication.
+    """
+    try:
+        customer_site_service = CustomerSiteService()
+        sites = await customer_site_service.get_customer_sites(
+            db=db,
+            customer_user_id=current_customer.id,
+            include_site_details=True
+        )
+        
+        return {
+            "sites": sites,
+            "total": len(sites),
+            "has_multiple_sites": len(sites) > 1
+        }
+    
+    except Exception as e:
+        logger.error(f"Get my sites error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve sites."
+        )
+
+
+@router.get(
     "/customer/my-site",
     response_model=SiteResponse,
     responses={
         401: {"model": ErrorResponse, "description": "Not authenticated"},
         404: {"model": ErrorResponse, "description": "No site found"}
     },
-    summary="Get customer's site",
-    description="Get authenticated customer's owned site."
+    summary="Get customer's primary site",
+    description="Get authenticated customer's primary site (for backwards compatibility)."
 )
 async def get_my_site(
     current_customer: CustomerUser = Depends(get_current_customer),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get current customer's owned site.
+    Get current customer's primary site.
+    
+    **Note:** This endpoint returns the primary site for backwards compatibility.
+    For multi-site support, use GET /customer/my-sites instead.
     
     Requires authentication.
     Returns 404 if customer doesn't own a site yet.
     """
-    if not current_customer.site_id:
+    if not current_customer.primary_site_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="You don't own a site yet. Purchase a site to get started!"
@@ -209,7 +256,7 @@ async def get_my_site(
         purchase_service = get_site_purchase_service()
         site = await purchase_service.get_site_by_id(
             db=db,
-            site_id=current_customer.site_id
+            site_id=current_customer.primary_site_id
         )
         
         if not site:

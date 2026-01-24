@@ -4,12 +4,14 @@ Site management models for Phase 2 customer system.
 Models:
 - Site: Customer site with purchase and subscription tracking
 - CustomerUser: Customer authentication and profile
+- CustomerSiteOwnership: Junction table for multi-site support
 - SiteVersion: Site version history
 - EditRequest: AI-powered edit requests
 - DomainVerificationRecord: Custom domain verification
 
 Author: WebMagic Team
 Date: January 21, 2026
+Updated: January 24, 2026 - Added multi-site support
 """
 from sqlalchemy import (
     Column, String, Integer, Text, DateTime, ForeignKey,
@@ -18,12 +20,16 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from models.base import BaseModel
 
 
 class Site(BaseModel):
-    """Customer site model with purchase and subscription tracking."""
+    """
+    Customer site model with purchase and subscription tracking.
+    
+    Updated for multi-site support: sites can now have multiple owners.
+    """
     
     __tablename__ = "sites"
     
@@ -49,9 +55,9 @@ class Site(BaseModel):
     subscription_id = Column(String(255), nullable=True)
     subscription_started_at = Column(DateTime(timezone=True), nullable=True)
     subscription_ends_at = Column(DateTime(timezone=True), nullable=True)
-    monthly_amount = Column(Numeric(10, 2), default=95.00)
+    monthly_amount = Column(Numeric(10, 2), default=99.00)  # Updated to $99
     next_billing_date = Column(Date, nullable=True)
-    grace_period_ends = Column(DateTime(timezone=True), nullable=True)  # Phase 3: Grace period for failed payments
+    grace_period_ends = Column(DateTime(timezone=True), nullable=True)
     
     # Custom domain
     custom_domain = Column(String(255), unique=True, nullable=True, index=True)
@@ -73,30 +79,35 @@ class Site(BaseModel):
     meta_tags = Column(JSONB, nullable=True)
     
     # Relationships
+    owners = relationship(
+        "CustomerSiteOwnership",
+        back_populates="site",
+        cascade="all, delete-orphan",
+        lazy="selectin"  # Eager load for performance
+    )
+    
     versions = relationship(
         "SiteVersion",
         foreign_keys="SiteVersion.site_id",
         back_populates="site",
         cascade="all, delete-orphan"
     )
+    
     edit_requests = relationship(
         "EditRequest",
         back_populates="site",
         cascade="all, delete-orphan"
     )
+    
     support_tickets = relationship(
         "SupportTicket",
         back_populates="site",
         cascade="all, delete-orphan"
     )
-    customer_user = relationship(
-        "CustomerUser",
-        back_populates="site",
-        uselist=False
-    )
     
     def __repr__(self):
-        return f"<Site {self.slug} ({self.status})>"
+        owner_count = len(self.owners) if self.owners else 0
+        return f"<Site {self.slug} ({self.status}, {owner_count} owners)>"
     
     @property
     def is_preview(self) -> bool:
@@ -117,10 +128,108 @@ class Site(BaseModel):
     def has_custom_domain(self) -> bool:
         """Check if site has custom domain configured."""
         return bool(self.custom_domain and self.domain_verified and self.ssl_provisioned)
+    
+    @property
+    def primary_owner(self) -> Optional:
+        """Get the primary owner of this site."""
+        if not self.owners:
+            return None
+        primary_ownership = next(
+            (ownership for ownership in self.owners if ownership.is_primary),
+            None
+        )
+        return primary_ownership.customer_user if primary_ownership else None
+    
+    @property
+    def all_owners(self) -> List:
+        """Get all customers who own this site."""
+        if not self.owners:
+            return []
+        return [ownership.customer_user for ownership in self.owners]
+    
+    def is_owned_by(self, customer_user_id) -> bool:
+        """Check if this site is owned by a specific customer."""
+        if not self.owners:
+            return False
+        return any(
+            ownership.customer_user_id == customer_user_id 
+            for ownership in self.owners
+        )
+
+
+class CustomerSiteOwnership(BaseModel):
+    """
+    Junction table for multi-site ownership.
+    
+    Allows customers to own multiple websites and tracks
+    which site is their primary one.
+    """
+    
+    __tablename__ = "customer_site_ownership"
+    
+    # Foreign keys
+    customer_user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("customer_users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    
+    site_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("sites.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    
+    # Ownership metadata
+    role = Column(
+        String(50), 
+        default="owner", 
+        nullable=False,
+        comment="Role: owner, collaborator (for future team access)"
+    )
+    
+    is_primary = Column(
+        Boolean, 
+        default=False,
+        comment="True if this is the customer's primary/default site"
+    )
+    
+    # Timestamps
+    acquired_at = Column(
+        DateTime(timezone=True), 
+        nullable=False,
+        comment="When the customer acquired this site"
+    )
+    
+    # Relationships
+    customer_user = relationship(
+        "CustomerUser", 
+        back_populates="owned_sites"
+    )
+    
+    site = relationship(
+        "Site", 
+        back_populates="owners"
+    )
+    
+    def __repr__(self):
+        primary_marker = " [PRIMARY]" if self.is_primary else ""
+        return f"<Ownership {self.customer_user_id} → {self.site_id}{primary_marker}>"
+    
+    @property
+    def is_owner(self) -> bool:
+        """Check if this is an owner relationship (vs collaborator)."""
+        return self.role == "owner"
 
 
 class CustomerUser(BaseModel):
-    """Customer user model for authentication and profile."""
+    """
+    Customer user model for authentication and profile.
+    
+    Updated for multi-site support: customers can now own multiple websites.
+    """
     
     __tablename__ = "customer_users"
     
@@ -132,12 +241,13 @@ class CustomerUser(BaseModel):
     full_name = Column(String(255), nullable=True)
     phone = Column(String(50), nullable=True)
     
-    # Site ownership
-    site_id = Column(
+    # Primary site (for quick access to default site)
+    primary_site_id = Column(
         UUID(as_uuid=True),
         ForeignKey("sites.id", ondelete="SET NULL"),
         nullable=True,
-        index=True
+        index=True,
+        comment="Customer's primary/default website"
     )
     
     # Email verification
@@ -157,16 +267,68 @@ class CustomerUser(BaseModel):
     is_active = Column(Boolean, default=True)
     
     # Relationships
-    site = relationship("Site", back_populates="customer_user")
-    support_tickets = relationship("SupportTicket", back_populates="customer_user", cascade="all, delete-orphan")
+    owned_sites = relationship(
+        "CustomerSiteOwnership",
+        back_populates="customer_user",
+        cascade="all, delete-orphan",
+        lazy="selectin"  # Eager load for performance
+    )
+    
+    primary_site = relationship(
+        "Site", 
+        foreign_keys=[primary_site_id],
+        uselist=False
+    )
+    
+    support_tickets = relationship(
+        "SupportTicket", 
+        back_populates="customer_user", 
+        cascade="all, delete-orphan"
+    )
     
     def __repr__(self):
-        return f"<CustomerUser {self.email}>"
+        site_count = len(self.owned_sites) if self.owned_sites else 0
+        return f"<CustomerUser {self.email} ({site_count} sites)>"
     
     @property
     def has_site(self) -> bool:
-        """Check if user has a site."""
-        return self.site_id is not None
+        """Check if user has at least one site."""
+        return len(self.owned_sites) > 0 if self.owned_sites else False
+    
+    @property
+    def has_multiple_sites(self) -> bool:
+        """Check if customer owns multiple sites."""
+        return len(self.owned_sites) > 1 if self.owned_sites else False
+    
+    @property
+    def sites(self) -> List:
+        """Get all sites owned by this customer."""
+        if not self.owned_sites:
+            return []
+        return [ownership.site for ownership in self.owned_sites]
+    
+    @property
+    def site_count(self) -> int:
+        """Get the number of sites owned by this customer."""
+        return len(self.owned_sites) if self.owned_sites else 0
+    
+    def get_primary_ownership(self):
+        """Get the primary site ownership record."""
+        if not self.owned_sites:
+            return None
+        return next(
+            (ownership for ownership in self.owned_sites if ownership.is_primary),
+            None
+        )
+    
+    def owns_site(self, site_id) -> bool:
+        """Check if customer owns a specific site."""
+        if not self.owned_sites:
+            return False
+        return any(
+            ownership.site_id == site_id 
+            for ownership in self.owned_sites
+        )
     
     def update_last_login(self):
         """Update last login timestamp and increment count."""
