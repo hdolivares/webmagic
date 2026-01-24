@@ -81,7 +81,7 @@ class SMSGenerator:
             ... }
             >>> sms = await generator.generate_sms(business_data)
             >>> print(sms)
-            "ABC Plumbing - We built you a free website! View it: [URL]. Reply STOP to opt out."
+            "ABC Plumbing - We built you a website! Preview: [URL]. Reply STOP to opt out."
         """
         # Get variant description
         tone = self.VARIANTS.get(variant, self.VARIANTS["professional"])
@@ -165,10 +165,11 @@ Website: {site_url or "[creating...]"}
 REQUIREMENTS:
 1. Maximum {max_length} characters (STRICT LIMIT)
 2. Tone: {tone}
-3. Mention we built them a FREE professional website
+3. Mention we built them a professional website they can preview
 4. Include call-to-action (view site or reply)
 5. Include "Reply STOP to opt out" (compliance required)
 6. Be direct and valuable
+7. Do NOT say "free website" - the preview is free, claim is $495
 7. No emojis unless tone is "friendly"
 8. Use proper grammar and punctuation
 
@@ -231,8 +232,8 @@ Return ONLY the SMS message text, no quotes or explanations."""
         
         # Build template
         template = (
-            f"{business_name} - We built you a free {category} website! "
-            f"View: {url_display}. Reply STOP to opt out."
+            f"{business_name} - We built you a {category} website! "
+            f"Preview: {url_display}. Reply STOP to opt out."
         )
         
         # Ensure it fits in single segment
