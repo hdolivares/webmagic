@@ -191,7 +191,7 @@ async def unified_login(
         await db.execute(
             update(CustomerUser)
             .where(CustomerUser.id == customer_user.id)
-            .values(last_login_at=datetime.utcnow())
+            .values(last_login=datetime.utcnow(), login_count=CustomerUser.login_count + 1)
         )
         await db.commit()
         
