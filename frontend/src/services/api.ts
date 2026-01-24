@@ -125,6 +125,11 @@ class ApiClient {
     return response.data
   }
 
+  async getCurrentCustomer(): Promise<any> {
+    const response = await this.client.get('/customer/me')
+    return response.data
+  }
+
   logout() {
     this.clearAuth()
   }

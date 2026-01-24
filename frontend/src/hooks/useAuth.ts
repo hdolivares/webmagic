@@ -66,8 +66,17 @@ export const useAuth = create<AuthState>((set) => ({
     set({ isLoading: true, error: null })
     try {
       const response = await api.unifiedLogin(credentials)
+      
+      // Fetch user profile based on user type
+      let userProfile
+      if (response.user_type === 'customer') {
+        userProfile = await api.getCurrentCustomer()
+      } else {
+        userProfile = await api.getCurrentUser()
+      }
+      
       set({ 
-        user: response.user, 
+        user: userProfile, 
         userType: response.user_type,
         isAuthenticated: true, 
         isLoading: false 
@@ -116,10 +125,18 @@ export const useAuth = create<AuthState>((set) => ({
   fetchUser: async () => {
     set({ isLoading: true })
     try {
-      const user = await api.getCurrentUser()
-      set({ user, isAuthenticated: true, isLoading: false })
+      const userType = localStorage.getItem('user_type') as 'admin' | 'customer' | null
+      let user
+      
+      if (userType === 'customer') {
+        user = await api.getCurrentCustomer()
+      } else {
+        user = await api.getCurrentUser()
+      }
+      
+      set({ user, userType, isAuthenticated: true, isLoading: false })
     } catch (error) {
-      set({ isAuthenticated: false, isLoading: false })
+      set({ isAuthenticated: false, isLoading: false, userType: null })
     }
   },
 
