@@ -10,7 +10,7 @@ from .base import BaseAgent
 from ..prompts.builder import PromptBuilder
 from services.creative.category_knowledge import CategoryKnowledgeService
 from core.exceptions import ValidationException
-from core.config import settings
+from core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -373,7 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
         )
         
         # Build the official claim bar HTML
-        api_url = settings.API_URL
+        api_url = get_settings().API_URL
         checkout_url = f"{api_url}/api/v1/sites/{slug}/purchase"
         
         claim_bar_html = f'''
@@ -428,7 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     def _add_claim_bar_js(self, js: str, slug: str) -> str:
         """Add claim bar click handler."""
-        api_url = settings.API_URL
+        api_url = get_settings().API_URL
         
         claim_js = f'''
 // WebMagic Claim Bar Handler
