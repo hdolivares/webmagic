@@ -2,6 +2,9 @@
 Support Ticket API Endpoints
 
 Customer-facing API for creating and managing support tickets.
+
+Updated: January 24, 2026 - Added multi-site support
+Customers with multiple sites must select which site the ticket is for.
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +29,7 @@ from api.schemas.ticket import (
 )
 from models.site_models import CustomerUser
 from services.support.ticket_service import TicketService
+from services.customer_site_service import CustomerSiteService
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +63,7 @@ async def get_ticket_categories():
     status_code=status.HTTP_201_CREATED,
     summary="Create a new support ticket",
     responses={
-        400: {"model": ErrorResponse, "description": "Validation error"},
+        400: {"model": ErrorResponse, "description": "Validation error or site selection required"},
         401: {"model": ErrorResponse, "description": "Not authenticated"},
         403: {"model": ErrorResponse, "description": "Site not owned by customer"}
     }
@@ -75,7 +79,11 @@ async def create_ticket(
     - **subject**: Brief summary of the issue (5-255 characters)
     - **description**: Detailed description of the issue (minimum 10 characters)
     - **category**: One of: billing, technical_support, site_edit, question, other
-    - **site_id**: Optional - include if ticket is about a specific site
+    - **site_id**: Required if customer owns multiple sites
+    
+    **Multi-Site Support:**
+    If the customer owns multiple websites, they must specify which site the ticket is for.
+    The API will return an error with a list of available sites if site_id is missing.
     
     The ticket will be automatically processed by AI to:
     - Verify the category is correct
@@ -83,28 +91,91 @@ async def create_ticket(
     - Generate an initial response for simple questions
     """
     try:
+        # Determine which site to use for the ticket
+        site_id = request.site_id
+        customer_site_service = CustomerSiteService()
+        
+        # Check if customer has sites
+        if not current_customer.has_site:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You don't own any sites yet. Please purchase a site first."
+            )
+        
+        # Handle site selection for multi-site customers
+        if not site_id:
+            if current_customer.has_multiple_sites:
+                # Customer has multiple sites, must select one
+                customer_sites = await customer_site_service.get_customer_sites(
+                    db=db,
+                    customer_user_id=current_customer.id,
+                    include_site_details=True
+                )
+                
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "error": "site_selection_required",
+                        "message": "You own multiple sites. Please select which site this ticket is for.",
+                        "sites": [
+                            {
+                                "site_id": site["site_id"],
+                                "slug": site.get("slug"),
+                                "site_title": site.get("site_title"),
+                                "is_primary": site.get("is_primary", False)
+                            }
+                            for site in customer_sites
+                        ]
+                    }
+                )
+            else:
+                # Customer has only one site, use primary site
+                if not current_customer.primary_site_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="No site associated with your account"
+                    )
+                site_id = current_customer.primary_site_id
+        
+        # Verify customer owns the site
+        owns_site = await customer_site_service.verify_site_ownership(
+            db=db,
+            customer_user_id=current_customer.id,
+            site_id=site_id
+        )
+        
+        if not owns_site:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't own this site"
+            )
+        
+        # Create the ticket
         ticket = await TicketService.create_ticket(
             db=db,
             customer_user_id=current_customer.id,
             subject=request.subject,
             description=request.description,
             category=request.category,
-            site_id=request.site_id
+            site_id=site_id
         )
         
         logger.info(
             f"Ticket {ticket.ticket_number} created by customer {current_customer.email} "
-            f"(category: {ticket.category})"
+            f"for site {site_id} (category: {ticket.category})"
         )
         
         return ticket
         
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except ValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except ForbiddenError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except Exception as e:
-        logger.error(f"Error creating ticket: {e}")
+        logger.error(f"Error creating ticket: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create ticket"
