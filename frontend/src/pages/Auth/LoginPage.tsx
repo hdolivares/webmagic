@@ -23,7 +23,7 @@ export const LoginPage = () => {
       if (userType === 'admin') {
         navigate('/dashboard')
       } else if (userType === 'customer') {
-        navigate('/customer/domains')
+        navigate('/customer/sites')
       }
     } catch (err) {
       // Error handled by useAuth
