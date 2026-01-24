@@ -421,7 +421,7 @@ IMPORTANT:
 - No placeholders or TODO comments
 - All interactive elements must work
 - Code must be responsive (mobile-first)
-- Include the "Claim This Site" bottom bar
+- DO NOT add a "Claim This Site" bar - it's automatically injected by the system
 - Use semantic HTML5
 - Add ARIA labels for accessibility""",
             output_format="JSON",
@@ -541,14 +541,12 @@ CSS gradients can display visible "bands" - prevent this:
 - Business info, hours, location
 - Social links (if available)
 - Copyright notice
-- "Claim This Site" bar (sticky or fixed bottom)
+- NOTE: DO NOT add a claim bar - it's automatically injected by the system
 
 **Claim Bar Template**:
-```html
-<div class="claim-bar">
-  <p>Is this your business? <a href="{{claim_url}}">Claim this site</a></p>
-</div>
-```""",
+NOTE: The claim bar is automatically injected by the system with proper pricing.
+Do NOT add your own claim bar - it will be added post-generation with correct checkout links.
+The official pricing is: $495 one-time + $99/month for hosting and changes.""",
             description="HTML/CSS templates for common website sections",
             version=1,
             is_active=True

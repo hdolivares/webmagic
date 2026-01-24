@@ -10,6 +10,7 @@ from .base import BaseAgent
 from ..prompts.builder import PromptBuilder
 from services.creative.category_knowledge import CategoryKnowledgeService
 from core.exceptions import ValidationException
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +137,13 @@ document.addEventListener('DOMContentLoaded', () => {
         # STEP 7: Parse delimited output using LLM-friendly parsing
         website = self._parse_delimited_output(raw_output, enhanced_data)
         
-        # STEP 8: Validate
+        # STEP 8: Inject proper claim bar with checkout link
+        slug = enhanced_data.get("slug") or self._generate_slug(enhanced_data.get("name", ""))
+        website["html"] = self._inject_claim_bar(website.get("html", ""), slug)
+        website["css"] = self._add_claim_bar_css(website.get("css", ""))
+        website["js"] = self._add_claim_bar_js(website.get("js", ""), slug)
+        
+        # STEP 9: Validate
         if not website.get('html'):
             raise ValidationException("No HTML generated")
         
@@ -329,3 +336,190 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             for service in services[:6]  # Limit to 6 services
         ]
+    
+    def _generate_slug(self, name: str) -> str:
+        """Generate a URL-safe slug from business name."""
+        import re
+        slug = name.lower().strip()
+        slug = re.sub(r'[^a-z0-9\s-]', '', slug)
+        slug = re.sub(r'[\s_-]+', '-', slug)
+        slug = slug.strip('-')
+        return slug[:50] if slug else "my-business"
+    
+    def _inject_claim_bar(self, html: str, slug: str) -> str:
+        """
+        Inject the proper claim bar with correct pricing and checkout link.
+        Removes any LLM-generated claim bars and adds the official one.
+        """
+        import re
+        
+        # Remove any existing claim bars (various patterns the LLM might generate)
+        patterns_to_remove = [
+            r'<div[^>]*id=["\']?claim[^>]*>.*?</div>',
+            r'<div[^>]*class=["\'][^"\']*claim[^"\']*["\'][^>]*>.*?</div>',
+            r'<!--\s*Claim.*?-->.*?(?=<(?:footer|section|div|script|/body))',
+            r'<div[^>]*>.*?(?:claim|free|FREE).*?(?:website|site).*?</div>',
+        ]
+        
+        for pattern in patterns_to_remove:
+            html = re.sub(pattern, '', html, flags=re.IGNORECASE | re.DOTALL)
+        
+        # Also remove the claimSite function if present
+        html = re.sub(
+            r'<script[^>]*>.*?function\s+claimSite.*?</script>',
+            '',
+            html,
+            flags=re.IGNORECASE | re.DOTALL
+        )
+        
+        # Build the official claim bar HTML
+        api_url = settings.API_URL
+        checkout_url = f"{api_url}/api/v1/sites/{slug}/purchase"
+        
+        claim_bar_html = f'''
+<!-- WebMagic Claim Bar - Official -->
+<div id="webmagic-claim-bar" style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 9999;">
+    <div style="background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%); color: white; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; box-shadow: 0 -4px 20px rgba(0,0,0,0.15);">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <span style="font-size: 20px;">🏢</span>
+            <div>
+                <p style="margin: 0; font-weight: 600; font-size: 15px;">Is this your business?</p>
+                <p style="margin: 0; font-size: 13px; opacity: 0.9;">Claim this website for only <strong>$495</strong> · Then just $99/month for hosting & changes</p>
+            </div>
+        </div>
+        <button id="webmagic-claim-btn" style="background: #fbbf24; color: #1e3a5f; border: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px;">
+            Claim for $495
+        </button>
+    </div>
+</div>
+'''
+        
+        # Insert before closing body tag
+        if "</body>" in html.lower():
+            # Find the position case-insensitively
+            body_pos = html.lower().rfind("</body>")
+            html = html[:body_pos] + claim_bar_html + "\n" + html[body_pos:]
+        else:
+            html += claim_bar_html
+        
+        return html
+    
+    def _add_claim_bar_css(self, css: str) -> str:
+        """Add claim bar hover styles."""
+        claim_css = '''
+/* WebMagic Claim Bar Styles */
+#webmagic-claim-bar button:hover {
+    transform: scale(1.05);
+    background: #f59e0b !important;
+}
+
+@media (max-width: 640px) {
+    #webmagic-claim-bar > div {
+        flex-direction: column;
+        text-align: center;
+        padding: 16px !important;
+    }
+    #webmagic-claim-bar button {
+        width: 100%;
+    }
+}
+'''
+        return css + "\n" + claim_css
+    
+    def _add_claim_bar_js(self, js: str, slug: str) -> str:
+        """Add claim bar click handler."""
+        api_url = settings.API_URL
+        
+        claim_js = f'''
+// WebMagic Claim Bar Handler
+(function() {{
+    const claimBtn = document.getElementById('webmagic-claim-btn');
+    if (claimBtn) {{
+        claimBtn.addEventListener('click', function() {{
+            // Open claim modal
+            const modal = document.createElement('div');
+            modal.id = 'webmagic-claim-modal';
+            modal.innerHTML = `
+                <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 20px;">
+                    <div style="background: white; border-radius: 16px; max-width: 480px; width: 100%; padding: 32px; position: relative; box-shadow: 0 25px 50px rgba(0,0,0,0.25);">
+                        <button onclick="this.closest('#webmagic-claim-modal').remove()" style="position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">×</button>
+                        <h2 style="margin: 0 0 8px; font-size: 24px; color: #1e3a5f;">Claim This Website</h2>
+                        <p style="color: #64748b; margin: 0 0 24px; font-size: 15px;">Get your professional website today!</p>
+                        
+                        <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                                <span style="color: #475569;">One-time setup</span>
+                                <span style="font-weight: 700; color: #1e3a5f;">$495</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 1px solid #e2e8f0;">
+                                <span style="color: #475569;">Monthly (hosting + changes)</span>
+                                <span style="font-weight: 700; color: #1e3a5f;">$99/mo</span>
+                            </div>
+                        </div>
+                        
+                        <p style="font-size: 13px; color: #64748b; margin: 0 0 20px;">
+                            ✓ Professional website ready to go<br>
+                            ✓ Unlimited text & image changes<br>
+                            ✓ Fast, secure hosting included<br>
+                            ✓ SEO optimization included<br>
+                            ✓ Cancel anytime
+                        </p>
+                        
+                        <form id="webmagic-claim-form" style="display: flex; flex-direction: column; gap: 12px;">
+                            <input type="email" id="claim-email" placeholder="Your email address" required style="padding: 14px 16px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 15px; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e2e8f0'">
+                            <input type="text" id="claim-name" placeholder="Your name (optional)" style="padding: 14px 16px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 15px; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e2e8f0'">
+                            <button type="submit" style="background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%); color: white; border: none; padding: 16px; border-radius: 8px; font-weight: 700; font-size: 16px; cursor: pointer; transition: transform 0.2s, opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                                Proceed to Checkout →
+                            </button>
+                        </form>
+                        
+                        <p style="text-align: center; font-size: 12px; color: #94a3b8; margin: 16px 0 0;">
+                            Secure payment powered by Recurrente
+                        </p>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Handle form submission
+            document.getElementById('webmagic-claim-form').addEventListener('submit', async function(e) {{
+                e.preventDefault();
+                const email = document.getElementById('claim-email').value;
+                const name = document.getElementById('claim-name').value;
+                const btn = this.querySelector('button[type="submit"]');
+                const originalText = btn.textContent;
+                btn.textContent = 'Processing...';
+                btn.disabled = true;
+                
+                try {{
+                    const response = await fetch('{api_url}/api/v1/sites/{slug}/purchase', {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                        body: JSON.stringify({{
+                            customer_email: email,
+                            customer_name: name || undefined,
+                            success_url: window.location.href + '?purchased=true',
+                            cancel_url: window.location.href
+                        }})
+                    }});
+                    
+                    if (response.ok) {{
+                        const data = await response.json();
+                        window.location.href = data.checkout_url;
+                    }} else {{
+                        const error = await response.json();
+                        alert(error.detail || 'Something went wrong. Please try again.');
+                        btn.textContent = originalText;
+                        btn.disabled = false;
+                    }}
+                }} catch (err) {{
+                    alert('Connection error. Please check your internet and try again.');
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }}
+            }});
+        }});
+    }}
+}})();
+'''
+        return js + "\n" + claim_js

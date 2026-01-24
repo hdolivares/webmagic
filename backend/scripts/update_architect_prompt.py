@@ -83,9 +83,9 @@ You MUST include ALL of these sections:
    - Business name
    - Essential links
 
-8. **CLAIM BAR** (Fixed bottom)
-   - "Is this your business? Claim for FREE!"
-   - Claim button
+8. **CLAIM BAR** 
+   - DO NOT add a claim bar - it's automatically injected by the system
+   - The system adds proper pricing: $495 + $99/month
 
 === DESIGN REQUIREMENTS ===
 
@@ -171,7 +171,7 @@ Return ONLY valid JSON:
 <section id="reviews">3-5 customer reviews</section>
 <section id="contact">Contact info + form</section>
 <footer>Copyright and links</footer>
-<div id="claim-bar">Claim this site</div>
+<!-- Claim bar is auto-injected by system - DO NOT add manually -->
 ```
 
 === REMEMBER ===

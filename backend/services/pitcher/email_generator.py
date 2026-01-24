@@ -81,7 +81,12 @@ class EmailGenerator:
         """Build system prompt based on variant."""
         base_prompt = """You are an expert copywriter specializing in cold email outreach.
 
-Your job is to write a personalized, compelling cold email to a business owner about their FREE website.
+Your job is to write a personalized, compelling cold email to a business owner about a professional website we built for them.
+
+PRICING (mention naturally if relevant):
+- $495 one-time to claim the site
+- $99/month for hosting, maintenance, and unlimited changes
+- They can preview the site for free before buying
 
 Key principles:
 - Keep it SHORT (under 150 words)
@@ -91,6 +96,7 @@ Key principles:
 - NO pushy sales language
 - Make it feel personal and authentic
 - Include a clear, low-pressure CTA
+- Don't say "FREE website" - the preview is free, not the site itself
 
 """
         
@@ -181,7 +187,7 @@ Keep it under 150 words total."""
         rating = business_data.get("rating", 0)
         
         subject = f"We built a website for {name}"
-        preview = "Free website preview - no obligation"
+        preview = "Your professional website is ready to preview"
         
         body = f"""Hi {name},
 
@@ -192,16 +198,16 @@ I noticed you're doing great work in {category}"""
         
         body += """.
 
-I created a professional website for your business - completely free.
+I created a professional website for your business - take a look!
 
 """
         
         if site_url:
             body += f"Preview it here: {site_url}\n\n"
         
-        body += """If you like it, you can claim it. If not, no worries at all.
+        body += """If you like it, you can claim it for just $495 (includes hosting & unlimited changes for $99/month).
 
-Either way, hope it helps!
+No pressure at all - just wanted to show you what's possible.
 
 Best regards"""
         

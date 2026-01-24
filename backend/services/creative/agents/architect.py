@@ -279,26 +279,23 @@ SPACING: {design_brief.get('spacing', 'comfortable')}
         return code.strip()
     
     def _add_claim_bar(self, html: str) -> str:
-        """Add 'Claim This Site' bar to HTML."""
+        """Add 'Claim This Site' bar to HTML with proper pricing."""
         claim_bar = """
-<!-- Claim This Site Bar -->
-<div id="claim-bar" class="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 z-50">
-    <div class="container mx-auto flex items-center justify-between">
-        <p class="text-sm font-medium">
-            Is this your business? Claim this site for <strong>FREE</strong>!
-        </p>
-        <button onclick="claimSite()" class="bg-white text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
-            Claim Now
+<!-- WebMagic Claim Bar -->
+<div id="webmagic-claim-bar" style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 9999;">
+    <div style="background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%); color: white; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; box-shadow: 0 -4px 20px rgba(0,0,0,0.15);">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <span style="font-size: 20px;">🏢</span>
+            <div>
+                <p style="margin: 0; font-weight: 600; font-size: 15px;">Is this your business?</p>
+                <p style="margin: 0; font-size: 13px; opacity: 0.9;">Claim this website for only <strong>$495</strong> · Then just $99/month for hosting & changes</p>
+            </div>
+        </div>
+        <button onclick="alert('Contact us to claim this website! $495 one-time + $99/month')" style="background: #fbbf24; color: #1e3a5f; border: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; text-transform: uppercase;">
+            Claim for $495
         </button>
     </div>
 </div>
-
-<script>
-function claimSite() {
-    alert('Thank you for your interest! Please contact us to claim this site.');
-    // TODO: Add actual claim functionality
-}
-</script>
 """
         
         # Insert before closing body tag
