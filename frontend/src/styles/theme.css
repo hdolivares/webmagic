@@ -420,4 +420,97 @@
   --crm-filter-active-bg: var(--color-primary-900);
   --crm-filter-active-text: var(--color-primary-300);
   --crm-filter-hover-bg: var(--color-secondary-700);
+  
+  /* ============================================
+     CUSTOMER DASHBOARD - Dark Mode
+     ============================================ */
+  --customer-dashboard-bg: var(--color-secondary-900);
+  --customer-dashboard-surface: var(--color-secondary-800);
+  --customer-dashboard-border: var(--color-secondary-700);
+  
+  --customer-site-card-bg: var(--color-secondary-800);
+  --customer-site-card-hover: var(--color-secondary-700);
+  --customer-site-card-border: var(--color-secondary-600);
+  
+  --customer-primary-badge-bg: var(--color-primary-900);
+  --customer-primary-badge-text: var(--color-primary-300);
+  
+  --customer-subscription-active-bg: #064e3b;
+  --customer-subscription-active-text: #a7f3d0;
+  --customer-subscription-past-due-bg: #78350f;
+  --customer-subscription-past-due-text: #fde68a;
+  --customer-subscription-cancelled-bg: #7f1d1d;
+  --customer-subscription-cancelled-text: #fecaca;
+}
+
+/* ============================================
+   CUSTOMER DASHBOARD VARIABLES - Light Mode
+   ============================================ */
+:root {
+  /* Customer Dashboard Colors */
+  --customer-dashboard-bg: #f9fafb;
+  --customer-dashboard-surface: #ffffff;
+  --customer-dashboard-border: #e5e7eb;
+  
+  /* Site Card */
+  --customer-site-card-bg: #ffffff;
+  --customer-site-card-hover: #f9fafb;
+  --customer-site-card-border: #e5e7eb;
+  --customer-site-card-shadow: rgba(0, 0, 0, 0.05);
+  --customer-site-card-hover-shadow: rgba(0, 0, 0, 0.1);
+  
+  /* Primary Badge */
+  --customer-primary-badge-bg: #ede9fe;
+  --customer-primary-badge-text: #7c3aed;
+  --customer-primary-badge-border: #c4b5fd;
+  
+  /* Site Status Colors */
+  --customer-status-preview-bg: #f3f4f6;
+  --customer-status-preview-text: #6b7280;
+  --customer-status-preview-border: #d1d5db;
+  
+  --customer-status-owned-bg: #dbeafe;
+  --customer-status-owned-text: #1e40af;
+  --customer-status-owned-border: #93c5fd;
+  
+  --customer-status-active-bg: #d1fae5;
+  --customer-status-active-text: #065f46;
+  --customer-status-active-border: #6ee7b7;
+  
+  --customer-status-suspended-bg: #fee2e2;
+  --customer-status-suspended-text: #991b1b;
+  --customer-status-suspended-border: #fca5a5;
+  
+  /* Subscription Status Colors */
+  --customer-subscription-active-bg: #d1fae5;
+  --customer-subscription-active-text: #065f46;
+  --customer-subscription-active-border: #6ee7b7;
+  
+  --customer-subscription-past-due-bg: #fef3c7;
+  --customer-subscription-past-due-text: #92400e;
+  --customer-subscription-past-due-border: #fde68a;
+  
+  --customer-subscription-cancelled-bg: #fee2e2;
+  --customer-subscription-cancelled-text: #991b1b;
+  --customer-subscription-cancelled-border: #fca5a5;
+  
+  /* Site Selector */
+  --customer-site-selector-bg: #ffffff;
+  --customer-site-selector-border: #e5e7eb;
+  --customer-site-selector-hover: #f9fafb;
+  --customer-site-selector-selected: #ede9fe;
+  --customer-site-selector-selected-border: #7c3aed;
+  
+  /* Action Buttons */
+  --customer-action-primary-bg: linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%);
+  --customer-action-primary-hover: linear-gradient(135deg, #6d28d9 0%, #2563eb 100%);
+  --customer-action-secondary-bg: #ffffff;
+  --customer-action-secondary-border: #e5e7eb;
+  --customer-action-secondary-hover: #f9fafb;
+  
+  /* Site Grid */
+  --customer-grid-gap: var(--spacing-lg);
+  --customer-grid-columns: 1;  /* Mobile first */
+  --customer-card-padding: var(--spacing-xl);
+  --customer-card-radius: var(--border-radius-lg);
 }

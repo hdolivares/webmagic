@@ -48,6 +48,18 @@ const CustomerLayout: React.FC = () => {
 
           <nav className={`customer-nav ${mobileMenuOpen ? 'mobile-open' : ''}`}>
             <NavLink 
+              to="/customer/sites" 
+              className={({ isActive }) => isActive ? 'active' : ''}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <line x1="9" y1="3" x2="9" y2="21"/>
+              </svg>
+              <span>My Sites</span>
+            </NavLink>
+
+            <NavLink 
               to="/customer/domains" 
               className={({ isActive }) => isActive ? 'active' : ''}
               onClick={() => setMobileMenuOpen(false)}
