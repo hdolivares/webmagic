@@ -1,0 +1,422 @@
+/**
+ * My Sites Page Styles
+ * 
+ * Uses semantic CSS variables for consistent theming
+ * Responsive grid layout with mobile-first approach
+ */
+
+.my-sites-page {
+  padding: var(--spacing-xl);
+  max-width: 1400px;
+  margin: 0 auto;
+  background: var(--customer-dashboard-bg);
+  min-height: 100vh;
+}
+
+/* ============================================
+   PAGE HEADER
+   ============================================ */
+.my-sites-page .page-header {
+  margin-bottom: var(--spacing-2xl);
+}
+
+.my-sites-page h1 {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.my-sites-page .page-description {
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* ============================================
+   SITES GRID
+   ============================================ */
+.sites-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--customer-grid-columns), 1fr);
+  gap: var(--customer-grid-gap);
+  margin-bottom: var(--spacing-2xl);
+}
+
+/* Responsive grid columns */
+@media (min-width: 768px) {
+  .sites-grid {
+    --customer-grid-columns: 2;
+  }
+}
+
+@media (min-width: 1200px) {
+  .sites-grid {
+    --customer-grid-columns: 3;
+  }
+}
+
+/* ============================================
+   SITE CARD
+   ============================================ */
+.site-card {
+  background: var(--customer-site-card-bg);
+  border: 1px solid var(--customer-site-card-border);
+  border-radius: var(--customer-card-radius);
+  padding: var(--customer-card-padding);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px var(--customer-site-card-shadow);
+}
+
+.site-card:hover {
+  background: var(--customer-site-card-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px var(--customer-site-card-hover-shadow);
+}
+
+/* ============================================
+   SITE CARD HEADER
+   ============================================ */
+.site-card-header {
+  margin-bottom: var(--spacing-lg);
+}
+
+.site-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.site-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-primary {
+  background: var(--customer-primary-badge-bg);
+  color: var(--customer-primary-badge-text);
+  border: 1px solid var(--customer-primary-badge-border);
+}
+
+.site-url {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-primary-600);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.site-url:hover {
+  color: var(--color-primary-700);
+  text-decoration: underline;
+}
+
+.site-url svg {
+  flex-shrink: 0;
+}
+
+/* ============================================
+   STATUS BADGES
+   ============================================ */
+.site-card-status {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.status-badge {
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: capitalize;
+  letter-spacing: 0.3px;
+}
+
+/* Site Status Badges */
+.status-badge.status-preview {
+  background: var(--customer-status-preview-bg);
+  color: var(--customer-status-preview-text);
+  border: 1px solid var(--customer-status-preview-border);
+}
+
+.status-badge.status-owned {
+  background: var(--customer-status-owned-bg);
+  color: var(--customer-status-owned-text);
+  border: 1px solid var(--customer-status-owned-border);
+}
+
+.status-badge.status-active {
+  background: var(--customer-status-active-bg);
+  color: var(--customer-status-active-text);
+  border: 1px solid var(--customer-status-active-border);
+}
+
+.status-badge.status-suspended {
+  background: var(--customer-status-suspended-bg);
+  color: var(--customer-status-suspended-text);
+  border: 1px solid var(--customer-status-suspended-border);
+}
+
+/* Subscription Status Badges */
+.status-badge.subscription-active {
+  background: var(--customer-subscription-active-bg);
+  color: var(--customer-subscription-active-text);
+  border: 1px solid var(--customer-subscription-active-border);
+}
+
+.status-badge.subscription-past-due {
+  background: var(--customer-subscription-past-due-bg);
+  color: var(--customer-subscription-past-due-text);
+  border: 1px solid var(--customer-subscription-past-due-border);
+}
+
+.status-badge.subscription-cancelled {
+  background: var(--customer-subscription-cancelled-bg);
+  color: var(--customer-subscription-cancelled-text);
+  border: 1px solid var(--customer-subscription-cancelled-border);
+}
+
+/* ============================================
+   BILLING INFO
+   ============================================ */
+.site-card-billing {
+  background: var(--color-background-secondary);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.billing-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm) 0;
+}
+
+.billing-row:not(:last-child) {
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.billing-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.billing-value {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ============================================
+   CARD ACTIONS
+   ============================================ */
+.site-card-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-lg);
+}
+
+.site-card-actions .btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-sm {
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+}
+
+.btn-primary {
+  background: var(--customer-action-primary-bg);
+  color: var(--color-text-inverse);
+}
+
+.btn-primary:hover {
+  background: var(--customer-action-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.btn-secondary {
+  background: var(--customer-action-secondary-bg);
+  color: var(--color-text-primary);
+  border: 1px solid var(--customer-action-secondary-border);
+}
+
+.btn-secondary:hover {
+  background: var(--customer-action-secondary-hover);
+}
+
+/* ============================================
+   MULTI-SITE BANNER
+   ============================================ */
+.multi-site-banner {
+  display: flex;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  background: var(--color-info-light);
+  border: 1px solid var(--color-info);
+  border-radius: var(--border-radius-lg);
+  margin-bottom: var(--spacing-xl);
+}
+
+.multi-site-banner svg {
+  flex-shrink: 0;
+  color: var(--color-info);
+}
+
+.banner-title {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-info-dark);
+  margin: 0 0 var(--spacing-xs) 0;
+}
+
+.banner-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-info-dark);
+  margin: 0;
+  opacity: 0.9;
+}
+
+/* ============================================
+   LOADING, ERROR, EMPTY STATES
+   ============================================ */
+.loading-state,
+.error-state,
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-3xl) var(--spacing-xl);
+  text-align: center;
+  min-height: 400px;
+}
+
+.loading-state p,
+.error-state p,
+.empty-state p {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-md);
+  margin: var(--spacing-md) 0;
+}
+
+.empty-state h2 {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: var(--spacing-md) 0;
+}
+
+.empty-state svg {
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--spacing-lg);
+}
+
+.error-state svg {
+  color: var(--color-error);
+  margin-bottom: var(--spacing-md);
+}
+
+.spinner-large {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--color-border);
+  border-top-color: var(--color-primary-600);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================
+   MOBILE RESPONSIVE
+   ============================================ */
+@media (max-width: 767px) {
+  .my-sites-page {
+    padding: var(--spacing-lg);
+  }
+
+  .site-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .site-card-actions {
+    flex-direction: column;
+  }
+
+  .site-card-actions .btn {
+    width: 100%;
+  }
+}
+
+/* ============================================
+   DARK MODE
+   ============================================ */
+.dark .my-sites-page {
+  background: var(--color-secondary-900);
+}
+
+.dark .site-card {
+  background: var(--color-secondary-800);
+  border-color: var(--color-secondary-700);
+}
+
+.dark .site-card:hover {
+  background: var(--color-secondary-700);
+}
+
+.dark .site-card-billing {
+  background: var(--color-secondary-900);
+}
+
+.dark .multi-site-banner {
+  background: color-mix(in srgb, var(--color-info) 15%, transparent);
+  border-color: var(--color-info);
+}
+
+.dark .banner-title,
+.dark .banner-text {
+  color: var(--color-info-light);
+}

@@ -629,6 +629,35 @@ class ApiClient {
     return response.data
   }
 
+  // ============================================
+  // CUSTOMER SITE METHODS (Multi-site support)
+  // ============================================
+
+  async getMySites(): Promise<{
+    sites: Array<{
+      site_id: string
+      slug: string
+      site_title: string
+      site_url: string
+      status: string
+      subscription_status: string
+      is_primary: boolean
+      acquired_at: string
+      next_billing_date?: string
+      custom_domain?: string
+    }>
+    total: number
+    has_multiple_sites: boolean
+  }> {
+    const response = await this.client.get('/customer/my-sites')
+    return response.data
+  }
+
+  async getMySite(): Promise<any> {
+    const response = await this.client.get('/customer/my-site')
+    return response.data
+  }
+
   // Intelligent Campaign Methods
   async createIntelligentStrategy(data: {
     city: string

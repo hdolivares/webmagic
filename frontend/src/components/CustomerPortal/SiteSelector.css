@@ -1,0 +1,159 @@
+/**
+ * Site Selector Component Styles
+ * 
+ * Semantic CSS variables for consistent theming
+ */
+
+.site-selector-container {
+  margin-bottom: var(--spacing-lg);
+}
+
+/* ============================================
+   LABEL
+   ============================================ */
+.site-selector-label {
+  display: block;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.required-indicator {
+  color: var(--color-error);
+}
+
+/* ============================================
+   SELECT WRAPPER
+   ============================================ */
+.site-selector-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.site-selector-icon {
+  position: absolute;
+  left: var(--spacing-md);
+  color: var(--color-text-tertiary);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ============================================
+   SELECT ELEMENT
+   ============================================ */
+.site-selector {
+  width: 100%;
+  padding: var(--spacing-md) var(--spacing-md) var(--spacing-md) calc(var(--spacing-md) + 28px);
+  font-size: var(--font-size-md);
+  font-family: var(--font-family-base);
+  color: var(--color-text-primary);
+  background: var(--customer-site-selector-bg);
+  border: 2px solid var(--customer-site-selector-border);
+  border-radius: var(--border-radius-md);
+  outline: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%236b7280' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--spacing-md) center;
+  padding-right: calc(var(--spacing-md) + 24px);
+}
+
+.site-selector:hover:not(:disabled) {
+  border-color: var(--color-primary-500);
+  background: var(--customer-site-selector-hover);
+}
+
+.site-selector:focus {
+  border-color: var(--color-primary-600);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-600) 10%, transparent);
+}
+
+.site-selector:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--color-background-tertiary);
+}
+
+.site-selector.has-error {
+  border-color: var(--color-error);
+}
+
+.site-selector.has-error:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-error) 10%, transparent);
+}
+
+/* ============================================
+   OPTION STYLING
+   ============================================ */
+.site-selector option {
+  padding: var(--spacing-sm);
+  background: var(--customer-site-selector-bg);
+  color: var(--color-text-primary);
+}
+
+.site-selector option:checked {
+  background: var(--customer-site-selector-selected);
+  color: var(--color-primary-700);
+}
+
+/* ============================================
+   HINT & ERROR TEXT
+   ============================================ */
+.site-selector-hint {
+  margin-top: var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  margin-bottom: 0;
+}
+
+.site-selector-error {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-error);
+  margin-bottom: 0;
+}
+
+.site-selector-error svg {
+  flex-shrink: 0;
+}
+
+/* ============================================
+   DARK MODE
+   ============================================ */
+.dark .site-selector {
+  background: var(--color-secondary-800);
+  border-color: var(--color-secondary-700);
+  color: var(--color-text-inverse);
+}
+
+.dark .site-selector:hover:not(:disabled) {
+  background: var(--color-secondary-700);
+}
+
+.dark .site-selector option {
+  background: var(--color-secondary-800);
+  color: var(--color-text-inverse);
+}
+
+.dark .site-selector option:checked {
+  background: var(--color-primary-900);
+  color: var(--color-primary-300);
+}
+
+/* ============================================
+   MOBILE RESPONSIVE
+   ============================================ */
+@media (max-width: 767px) {
+  .site-selector {
+    font-size: var(--font-size-md);
+    padding: var(--spacing-md);
+    padding-left: calc(var(--spacing-md) + 28px);
+  }
+}
