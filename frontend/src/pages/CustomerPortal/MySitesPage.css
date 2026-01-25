@@ -9,7 +9,7 @@
   padding: var(--spacing-xl);
   max-width: 1400px;
   margin: 0 auto;
-  background: var(--customer-dashboard-bg);
+  background: #ffffff;
   min-height: 100vh;
 }
 
@@ -23,13 +23,13 @@
 .my-sites-page h1 {
   font-size: var(--font-size-3xl);
   font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
+  color: #111827;
   margin: 0 0 var(--spacing-sm) 0;
 }
 
 .my-sites-page .page-description {
   font-size: var(--font-size-md);
-  color: var(--color-text-secondary);
+  color: #374151;
   margin: 0;
 }
 
@@ -60,19 +60,19 @@
    SITE CARD
    ============================================ */
 .site-card {
-  background: var(--customer-site-card-bg);
-  border: 1px solid var(--customer-site-card-border);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-radius: var(--customer-card-radius);
   padding: var(--customer-card-padding);
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 8px var(--customer-site-card-shadow);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .site-card:hover {
-  background: var(--customer-site-card-hover);
+  background: #fafafa;
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px var(--customer-site-card-hover-shadow);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
 /* ============================================
@@ -93,7 +93,7 @@
 .site-title {
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
+  color: #111827;
   margin: 0;
   flex: 1;
   min-width: 0;
@@ -222,13 +222,13 @@
 
 .billing-label {
   font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
+  color: #374151;
   font-weight: var(--font-weight-medium);
 }
 
 .billing-value {
   font-size: var(--font-size-sm);
-  color: var(--color-text-primary);
+  color: #111827;
   font-weight: var(--font-weight-semibold);
 }
 
@@ -273,13 +273,14 @@
 }
 
 .btn-secondary {
-  background: var(--customer-action-secondary-bg);
-  color: var(--color-text-primary);
-  border: 1px solid var(--customer-action-secondary-border);
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #d1d5db;
 }
 
 .btn-secondary:hover {
-  background: var(--customer-action-secondary-hover);
+  background: #f9fafb;
+  border-color: #9ca3af;
 }
 
 /* ============================================
@@ -332,7 +333,7 @@
 .loading-state p,
 .error-state p,
 .empty-state p {
-  color: var(--color-text-secondary);
+  color: #374151;
   font-size: var(--font-size-md);
   margin: var(--spacing-md) 0;
 }
@@ -340,7 +341,7 @@
 .empty-state h2 {
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
+  color: #111827;
   margin: var(--spacing-md) 0;
 }
 
