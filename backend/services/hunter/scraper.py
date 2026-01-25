@@ -27,6 +27,7 @@ class OutscraperClient:
         self.api_key = api_key or settings.OUTSCRAPER_API_KEY
         self.client = ApiClient(api_key=self.api_key)
         self.rate_limit_delay = 1.0  # seconds between requests
+        self._active_searches = set()  # Track in-progress searches to prevent duplicates
         
     async def search_businesses(
         self,
@@ -77,6 +78,20 @@ class OutscraperClient:
                 search_query = f"{query} in {location}"
                 logger.info(f"City-search: {search_query} (limit: {limit})")
             
+            # ANTI-DUPLICATE: Check if this exact search is already running
+            search_key = f"{query}|{city}|{state}|{zone_lat}|{zone_lon}|{limit}"
+            if search_key in self._active_searches:
+                logger.warning(f"⚠️  DUPLICATE CALL BLOCKED: {search_query}")
+                logger.warning("This search is already in progress - preventing duplicate Outscraper charge!")
+                raise ExternalAPIException(
+                    "Duplicate search detected - this exact query is already running. "
+                    "Please wait for the first search to complete."
+                )
+            
+            # Mark search as active
+            self._active_searches.add(search_key)
+            logger.info(f"🔒 Search locked: {search_key}")
+            
             # Run synchronous API call in thread pool
             loop = asyncio.get_event_loop()
             results = await loop.run_in_executor(
@@ -99,7 +114,7 @@ class OutscraperClient:
                 f"(has_more: {has_more})"
             )
             
-            return {
+            result = {
                 "businesses": normalized,
                 "total_found": len(normalized),
                 "has_more": has_more,
@@ -107,7 +122,18 @@ class OutscraperClient:
                 "zone_id": zone_id
             }
             
+            # Release lock
+            self._active_searches.discard(search_key)
+            logger.info(f"🔓 Search unlocked: {search_key}")
+            
+            return result
+            
         except Exception as e:
+            # Release lock on error
+            if 'search_key' in locals():
+                self._active_searches.discard(search_key)
+                logger.info(f"🔓 Search unlocked (error): {search_key}")
+            
             logger.error(f"Outscraper API error: {str(e)}")
             raise ExternalAPIException(f"Failed to scrape businesses: {str(e)}")
     
