@@ -17,7 +17,7 @@ email-validator==2.3.0  # Required by pydantic for email validation
 # Authentication & Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-bcrypt==4.1.2
+bcrypt==3.2.2  # Compatible with passlib 1.7.4 (v4.x removed __about__ attribute)
 
 # HTTP Client
 httpx==0.26.0
