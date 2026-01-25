@@ -77,7 +77,7 @@ const AccountSettingsPage: React.FC = () => {
     changePasswordMutation.mutate()
   }
 
-  const formatDate = (dateString: string | undefined) => {
+  const formatDate = (dateString: string | undefined | null) => {
     if (!dateString) return 'N/A'
     const date = new Date(dateString)
     return date.toLocaleDateString('en-US', {
@@ -86,6 +86,12 @@ const AccountSettingsPage: React.FC = () => {
       day: 'numeric',
     })
   }
+  
+  // Safely access user properties with type checking
+  const userEmail = (user as any)?.email || 'N/A'
+  const userCreatedAt = (user as any)?.created_at
+  const userLastLogin = (user as any)?.last_login
+  const userEmailVerified = (user as any)?.email_verified ?? false
 
   return (
     <div className="account-settings-page">
@@ -105,20 +111,20 @@ const AccountSettingsPage: React.FC = () => {
           <div className="info-card">
             <div className="info-row">
               <span className="info-label">Email Address</span>
-              <span className="info-value">{user?.email || 'N/A'}</span>
+              <span className="info-value">{userEmail}</span>
             </div>
             <div className="info-row">
               <span className="info-label">Account Created</span>
-              <span className="info-value">{formatDate(user?.created_at)}</span>
+              <span className="info-value">{formatDate(userCreatedAt)}</span>
             </div>
             <div className="info-row">
               <span className="info-label">Last Login</span>
-              <span className="info-value">{formatDate(user?.last_login) || 'Never'}</span>
+              <span className="info-value">{formatDate(userLastLogin) || 'Never'}</span>
             </div>
             <div className="info-row">
               <span className="info-label">Email Verified</span>
-              <span className={`info-badge ${user?.email_verified ? 'badge-success' : 'badge-warning'}`}>
-                {user?.email_verified ? '✓ Verified' : '⚠ Not Verified'}
+              <span className={`info-badge ${userEmailVerified ? 'badge-success' : 'badge-warning'}`}>
+                {userEmailVerified ? '✓ Verified' : '⚠ Not Verified'}
               </span>
             </div>
           </div>
