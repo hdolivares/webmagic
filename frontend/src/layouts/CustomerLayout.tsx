@@ -7,25 +7,26 @@
  */
 import React, { useState } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { useAuth } from '@/hooks/useAuth'
 import './CustomerLayout.css'
 
 const CustomerLayout: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  const { logout, user } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const handleLogout = () => {
-    // Clear customer auth token
-    localStorage.removeItem('customer_token')
-    navigate('/customer/login')
+    logout()
+    navigate('/login', { replace: true })
   }
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen)
   }
 
-  // Get customer info from localStorage or context
-  const customerEmail = localStorage.getItem('customer_email') || 'Customer'
+  // Get customer info from auth state
+  const customerEmail = (user as any)?.email || 'Customer'
 
   return (
     <div className="customer-layout">

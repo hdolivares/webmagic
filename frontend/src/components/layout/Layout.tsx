@@ -1,7 +1,7 @@
 /**
  * Main layout with sidebar navigation
  */
-import { Outlet, NavLink } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
 import {
@@ -18,8 +18,14 @@ import {
 } from 'lucide-react'
 
 export const Layout = () => {
+  const navigate = useNavigate()
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login', { replace: true })
+  }
 
   const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -73,7 +79,7 @@ export const Layout = () => {
             <p className="text-xs text-text-secondary truncate">{user?.email}</p>
           </div>
 
-          <button onClick={logout} className="nav-link w-full text-error hover:bg-error/10">
+          <button onClick={handleLogout} className="nav-link w-full text-error hover:bg-error/10">
             <LogOut className="w-5 h-5" />
             Logout
           </button>
