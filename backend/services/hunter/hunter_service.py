@@ -5,6 +5,7 @@ Now enhanced with Claude-powered intelligent zone placement strategies.
 from typing import Dict, Any, Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
+from datetime import datetime
 import logging
 
 from services.hunter.scraper import OutscraperClient
@@ -194,17 +195,26 @@ class HunterService:
                     continue
             
             # Update coverage tracking
-            await self.coverage_service.update_coverage_for_zone(
+            coverage, created = await self.coverage_service.get_or_create_coverage(
                 city=city,
                 state=state,
+                industry=category,
                 country=country,
-                category=category,
                 zone_id=zone_id,
                 zone_lat=zone_lat,
                 zone_lon=zone_lon,
-                zone_radius_km=zone_radius,
-                total_found=len(raw_businesses),
-                qualified=qualified_count
+                zone_radius_km=zone_radius
+            )
+            
+            # Update with scraping results
+            await self.coverage_service.update_coverage(
+                coverage_id=coverage.id,
+                updates={
+                    "status": "completed",
+                    "lead_count": qualified_count,
+                    "total_found": len(raw_businesses),
+                    "last_scraped_at": datetime.utcnow()
+                }
             )
             
             # Mark zone complete in strategy
