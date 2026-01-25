@@ -122,10 +122,8 @@ export const useAuth = create<AuthState>((set) => ({
     localStorage.removeItem('user')
     set({ user: null, userType: null, isAuthenticated: false, isLoading: false })
     
-    // Call API logout (fire and forget)
-    api.logout().catch(() => {
-      // Ignore logout API errors since we already cleared local state
-    })
+    // Call API logout to clear server-side token
+    api.logout()
   },
 
   fetchUser: async () => {
