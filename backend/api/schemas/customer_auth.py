@@ -245,12 +245,12 @@ class CustomerUserResponse(BaseModel):
     """Customer user profile response."""
     id: UUID
     email: str
-    full_name: Optional[str]
-    phone: Optional[str]
-    site_id: Optional[UUID]
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    site_id: Optional[UUID] = None  # Deprecated: kept for backward compatibility, use /my-sites endpoint
     email_verified: bool
     login_count: int
-    last_login: Optional[datetime]
+    last_login: Optional[datetime] = None
     created_at: datetime
     
     class Config:
