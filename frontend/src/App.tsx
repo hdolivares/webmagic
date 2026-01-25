@@ -11,8 +11,12 @@ import { useEffect } from 'react'
 import { Layout } from '@/components/layout/Layout'
 import CustomerLayout from '@/layouts/CustomerLayout'
 
-// Admin Pages
+// Auth Pages
 import { LoginPage } from '@/pages/Auth/LoginPage'
+import ForgotPasswordPage from '@/pages/Auth/ForgotPasswordPage'
+import ResetPasswordPage from '@/pages/Auth/ResetPasswordPage'
+
+// Admin Pages
 import { DashboardPage } from '@/pages/Dashboard/DashboardPage'
 import { BusinessesPage } from '@/pages/Businesses/BusinessesPage'
 import { SitesPage } from '@/pages/Sites/SitesPage'
@@ -27,6 +31,7 @@ import MySitesPage from '@/pages/CustomerPortal/MySitesPage'
 import DomainsPage from '@/pages/CustomerPortal/DomainsPage'
 import TicketsPage from '@/pages/CustomerPortal/TicketsPage'
 import TicketDetailPage from '@/pages/CustomerPortal/TicketDetailPage'
+import AccountSettingsPage from '@/pages/CustomerPortal/AccountSettingsPage'
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -70,6 +75,8 @@ function App() {
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/* Admin Protected routes */}
           <Route
@@ -105,6 +112,7 @@ function App() {
             <Route path="domains" element={<DomainsPage />} />
             <Route path="tickets" element={<TicketsPage />} />
             <Route path="tickets/:ticketId" element={<TicketDetailPage />} />
+            <Route path="settings" element={<AccountSettingsPage />} />
           </Route>
 
           {/* 404 */}
