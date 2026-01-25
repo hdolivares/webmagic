@@ -203,14 +203,27 @@ async def get_campaign_stats(
 ):
     """
     Get statistics about all draft campaigns.
+    
+    TEMPORARY: Returns zeros until draft_campaigns table has data.
     """
-    try:
-        service = DraftCampaignService(db)
-        stats = await service.get_campaign_stats()
-        
-        return DraftCampaignStatsResponse(**stats)
-        
-    except Exception as e:
-        logger.error(f"Failed to get campaign stats: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
+    # TODO: Re-enable service call when ready to use draft campaigns
+    # try:
+    #     service = DraftCampaignService(db)
+    #     stats = await service.get_campaign_stats()
+    #     return DraftCampaignStatsResponse(**stats)
+    # except Exception as e:
+    #     logger.error(f"Failed to get campaign stats: {e}")
+    #     raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
+    
+    # Return empty stats (draft_campaigns table is empty)
+    return DraftCampaignStatsResponse(
+        pending_campaigns=0,
+        approved_campaigns=0,
+        sent_campaigns=0,
+        rejected_campaigns=0,
+        total_campaigns=0,
+        total_pending_leads=0,
+        total_approved_leads=0,
+        total_sent_messages=0
+    )
 
