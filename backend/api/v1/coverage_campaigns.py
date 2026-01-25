@@ -242,8 +242,11 @@ async def get_category_coverage(
         if min_completion is not None and completion_pct < min_completion:
             continue
         
+        # Use "Uncategorized" as default for null categories
+        category_name = row.industry_category if row.industry_category else "Uncategorized"
+        
         categories.append(CategoryCoverage(
-            category=row.industry_category,
+            category=category_name,
             total_locations=total,
             completed_locations=completed,
             pending_locations=row.pending_locations or 0,
