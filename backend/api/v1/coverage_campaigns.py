@@ -100,9 +100,9 @@ async def get_campaign_stats(
     # Total grids
     total = sum(status_counts.values())
     
-    # Count unique locations and categories
+    # Count unique locations and categories (use concat of city+state as location key)
     locations_result = await db.execute(
-        select(func.count(func.distinct(CoverageGrid.location)))
+        select(func.count(func.distinct(func.concat(CoverageGrid.city, ':', CoverageGrid.state))))
     )
     total_locations = locations_result.scalar() or 0
     
@@ -154,7 +154,7 @@ async def get_location_coverage(
     """
     # Build query
     query = select(
-        CoverageGrid.location,
+        CoverageGrid.city.label("location"),
         CoverageGrid.state,
         func.count(CoverageGrid.id).label("total_categories"),
         func.sum(
@@ -163,10 +163,10 @@ async def get_location_coverage(
         func.sum(
             func.case((CoverageGrid.status == "pending", 1), else_=0)
         ).label("pending_categories"),
-        func.sum(CoverageGrid.businesses_found).label("total_businesses"),
-        func.max(CoverageGrid.last_scraped).label("last_scraped")
+        func.sum(CoverageGrid.lead_count).label("total_businesses"),
+        func.max(CoverageGrid.last_scraped_at).label("last_scraped")
     ).group_by(
-        CoverageGrid.location,
+        CoverageGrid.city,
         CoverageGrid.state
     )
     
@@ -223,8 +223,8 @@ async def get_category_coverage(
         func.sum(
             func.case((CoverageGrid.status == "pending", 1), else_=0)
         ).label("pending_locations"),
-        func.sum(CoverageGrid.businesses_found).label("total_businesses"),
-        func.avg(CoverageGrid.businesses_found).label("avg_businesses")
+        func.sum(CoverageGrid.lead_count).label("total_businesses"),
+        func.avg(CoverageGrid.lead_count).label("avg_businesses")
     ).group_by(
         CoverageGrid.industry_category
     )
@@ -298,14 +298,14 @@ async def get_grid_details(
     return [
         GridDetail(
             id=str(grid.id),
-            location=grid.location,
+            location=grid.city,
             state=grid.state,
-            category=grid.category,
+            category=grid.industry,
             status=grid.status,
             priority=grid.priority,
-            businesses_found=grid.businesses_found or 0,
+            businesses_found=grid.lead_count or 0,
             estimated_businesses=grid.estimated_businesses or 0,
-            last_scraped=grid.last_scraped,
+            last_scraped=grid.last_scraped_at,
             next_scheduled=grid.next_scheduled,
             error_message=grid.error_message
         )
