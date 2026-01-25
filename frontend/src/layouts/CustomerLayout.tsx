@@ -87,6 +87,18 @@ const CustomerLayout: React.FC = () => {
               <span>My Tickets</span>
             </NavLink>
 
+            <NavLink 
+              to="/customer/settings" 
+              className={({ isActive }) => isActive ? 'active' : ''}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v6m0 6v6m5.196-15.196l-4.242 4.242m0 6l-4.242 4.242M23 12h-6m-6 0H1m16.196 5.196l-4.242-4.242m0-6L8.804 2.804"/>
+              </svg>
+              <span>Account Settings</span>
+            </NavLink>
+
             <div className="customer-user-info">
               <div className="customer-email">{customerEmail}</div>
               <button className="btn-logout" onClick={handleLogout}>

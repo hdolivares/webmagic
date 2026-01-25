@@ -145,6 +145,48 @@ class ApiClient {
   }
 
   // ============================================
+  // CUSTOMER PASSWORD MANAGEMENT METHODS
+  // ============================================
+
+  /**
+   * Request password reset email for customer
+   * @param email - Customer email address
+   * @returns Success message
+   */
+  async customerForgotPassword(email: string): Promise<{ message: string; success: boolean }> {
+    const response = await this.client.post('/customer/forgot-password', { email })
+    return response.data
+  }
+
+  /**
+   * Reset customer password using token from email
+   * @param token - Password reset token
+   * @param newPassword - New password
+   * @returns Success message
+   */
+  async customerResetPassword(token: string, newPassword: string): Promise<{ message: string; success: boolean }> {
+    const response = await this.client.post('/customer/reset-password', {
+      token,
+      new_password: newPassword,
+    })
+    return response.data
+  }
+
+  /**
+   * Change password for authenticated customer
+   * @param currentPassword - Current password for verification
+   * @param newPassword - New password
+   * @returns Success message
+   */
+  async customerChangePassword(currentPassword: string, newPassword: string): Promise<{ message: string; success: boolean }> {
+    const response = await this.client.post('/customer/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    })
+    return response.data
+  }
+
+  // ============================================
   // BUSINESS METHODS
   // ============================================
 

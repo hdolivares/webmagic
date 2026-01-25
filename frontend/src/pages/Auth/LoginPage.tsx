@@ -1,20 +1,35 @@
 /**
  * Login page
  */
-import { useState, FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, FormEvent, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui'
 
 export const LoginPage = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { unifiedLogin, isLoading, error, clearError } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  // Check for password reset success message
+  useEffect(() => {
+    if (searchParams.get('reset') === 'success') {
+      setSuccessMessage('Password reset successful! You can now log in with your new password.')
+      // Clear the query param
+      setTimeout(() => {
+        const newUrl = window.location.pathname
+        window.history.replaceState({}, '', newUrl)
+      }, 100)
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     clearError()
+    setSuccessMessage(null)
 
     try {
       const userType = await unifiedLogin({ email, password })
@@ -41,6 +56,14 @@ export const LoginPage = () => {
 
         {/* Login form */}
         <form onSubmit={handleSubmit} className="space-y-md">
+          {successMessage && (
+            <div className="bg-success/10 border border-success/30 text-success px-md py-sm rounded-md">
+              <p className="text-sm">
+                {successMessage}
+              </p>
+            </div>
+          )}
+
           {error && (
             <div className="alert-error">
               <p className="text-sm">
@@ -77,6 +100,15 @@ export const LoginPage = () => {
               placeholder="••••••••"
               required
             />
+            <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
+              <a
+                href="/forgot-password"
+                className="text-sm text-primary hover:text-primary-hover"
+                style={{ textDecoration: 'none', transition: 'color 0.2s ease' }}
+              >
+                Forgot your password?
+              </a>
+            </div>
           </div>
 
           <Button type="submit" className="w-full" isLoading={isLoading}>
