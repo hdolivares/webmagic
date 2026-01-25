@@ -71,7 +71,6 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
   const [state, setState] = useState('CA')
   const [city, setCity] = useState('Los Angeles')
   const [category, setCategory] = useState('plumbers')
-  const [population, setPopulation] = useState<number | string>(3800000)
   const [draftMode, setDraftMode] = useState(true) // Default to draft mode for safety
   
   // Data state
@@ -120,7 +119,6 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
         city,
         state,
         category,
-        population: population ? Number(population) : undefined,
         force_regenerate: false
       })
       
@@ -262,18 +260,14 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
                 ))}
               </select>
             </div>
-            
-            <div className="form-field">
-              <label>Population (Optional)</label>
-              <input
-                type="number"
-                className="form-input"
-                value={population}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPopulation(e.target.value ? parseInt(e.target.value) : '')}
-                placeholder="3800000"
-              />
-              <small className="form-help">Helps Claude optimize zone placement</small>
-            </div>
+          </div>
+          
+          <div className="info-box">
+            <span className="info-icon">ℹ️</span>
+            <p>
+              Claude will automatically fetch city population and geographic data to optimize zone placement.
+              Just select your target city and business category!
+            </p>
           </div>
 
           {/* Draft Mode Toggle */}

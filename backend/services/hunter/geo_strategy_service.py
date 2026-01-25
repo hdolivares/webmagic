@@ -68,11 +68,18 @@ class GeoStrategyService:
                 )
                 return existing
         
-        # Geocode city if coordinates not provided
-        if center_lat is None or center_lon is None:
-            coords = await geocoding_service.get_coordinates(city, state, country)
-            if coords:
-                center_lat, center_lon = coords
+        # Geocode city if coordinates or population not provided
+        if center_lat is None or center_lon is None or population is None:
+            logger.info(f"Geocoding {city}, {state} to get coordinates and population")
+            city_data = await geocoding_service.geocode_city(city, state, country)
+            if city_data:
+                if center_lat is None:
+                    center_lat = city_data.latitude
+                if center_lon is None:
+                    center_lon = city_data.longitude
+                if population is None:
+                    population = city_data.population
+                    logger.info(f"Auto-detected population for {city}, {state}: {population:,}")
             else:
                 raise ValueError(f"Could not geocode {city}, {state}")
         
