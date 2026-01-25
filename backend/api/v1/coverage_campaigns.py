@@ -243,7 +243,7 @@ async def get_category_coverage(
             continue
         
         categories.append(CategoryCoverage(
-            category=row.category,
+            category=row.industry_category,
             total_locations=total,
             completed_locations=completed,
             pending_locations=row.pending_locations or 0,
