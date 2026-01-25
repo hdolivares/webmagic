@@ -8,9 +8,10 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui'
 import { api } from '@/services/api'
 import { IntelligentCampaignPanel } from '@/components/coverage/IntelligentCampaignPanel'
-import { DraftCampaignsPanel } from '@/components/coverage/DraftCampaignsPanel'
+// TEMP: Disabled until draft campaigns endpoint is fixed
+// import { DraftCampaignsPanel } from '@/components/coverage/DraftCampaignsPanel'
 import '@/components/coverage/IntelligentCampaignPanel.css'
-import '@/components/coverage/DraftCampaignsPanel.css'
+// import '@/components/coverage/DraftCampaignsPanel.css'
 
 interface CampaignStats {
   total_grids: number
@@ -177,7 +178,8 @@ export function CoveragePage() {
       <IntelligentCampaignPanel onCampaignUpdate={loadCampaignData} />
 
       {/* Draft Campaigns Panel - Review and Approve */}
-      <DraftCampaignsPanel onCampaignUpdate={loadCampaignData} />
+      {/* TEMP: Disabled until draft campaigns endpoint is fixed */}
+      {/* <DraftCampaignsPanel onCampaignUpdate={loadCampaignData} /> */}
 
       {/* Progress Bar */}
       <Card>
