@@ -394,7 +394,7 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
                     disabled={loading}
                     className="scrape-btn primary"
                   >
-                    {loading ? '⏳ Scraping...' : '🎯 Scrape Next Zone'}
+                    {loading ? '⏳ Scraping...' : '🎯 Start Scraping This Zone'}
                   </button>
                   
                   <button
