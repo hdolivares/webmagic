@@ -145,9 +145,9 @@ class HunterService:
                 state=state,
                 country=country,
                 limit=limit_per_zone,
-                latitude=zone_lat,
-                longitude=zone_lon,
-                radius_km=zone_radius
+                zone_lat=zone_lat,
+                zone_lon=zone_lon,
+                zone_id=zone_id
             )
             
             raw_businesses = results.get("data", [])

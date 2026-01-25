@@ -5,7 +5,7 @@ Endpoints for planning, tracking, and managing systematic business discovery cam
 """
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, case
 from typing import Optional, List
 from datetime import datetime
 
@@ -158,10 +158,10 @@ async def get_location_coverage(
         CoverageGrid.state,
         func.count(CoverageGrid.id).label("total_categories"),
         func.sum(
-            func.case((CoverageGrid.status == "completed", 1), else_=0)
+            case((CoverageGrid.status == "completed", 1), else_=0)
         ).label("completed_categories"),
         func.sum(
-            func.case((CoverageGrid.status == "pending", 1), else_=0)
+            case((CoverageGrid.status == "pending", 1), else_=0)
         ).label("pending_categories"),
         func.sum(CoverageGrid.lead_count).label("total_businesses"),
         func.max(CoverageGrid.last_scraped_at).label("last_scraped")
@@ -218,10 +218,10 @@ async def get_category_coverage(
         CoverageGrid.industry_category,
         func.count(CoverageGrid.id).label("total_locations"),
         func.sum(
-            func.case((CoverageGrid.status == "completed", 1), else_=0)
+            case((CoverageGrid.status == "completed", 1), else_=0)
         ).label("completed_locations"),
         func.sum(
-            func.case((CoverageGrid.status == "pending", 1), else_=0)
+            case((CoverageGrid.status == "pending", 1), else_=0)
         ).label("pending_locations"),
         func.sum(CoverageGrid.lead_count).label("total_businesses"),
         func.avg(CoverageGrid.lead_count).label("avg_businesses")
