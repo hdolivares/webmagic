@@ -115,8 +115,8 @@ function App() {
             <Route path="settings" element={<AccountSettingsPage />} />
           </Route>
 
-          {/* 404 */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          {/* 404 - redirect to login for unauthenticated, or dashboard for authenticated */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>
