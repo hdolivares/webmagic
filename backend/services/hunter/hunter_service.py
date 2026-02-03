@@ -140,6 +140,12 @@ class HunterService:
         
         # Scrape the zone
         try:
+            logger.info(
+                f"Scraper params: zone_lat={zone_lat} (type: {type(zone_lat).__name__}), "
+                f"zone_lon={zone_lon} (type: {type(zone_lon).__name__}), "
+                f"zone_radius={zone_radius} (type: {type(zone_radius).__name__})"
+            )
+            
             results = await self.scraper.search_businesses(
                 query=category,
                 city=city,
@@ -195,15 +201,16 @@ class HunterService:
                     continue
             
             # Update coverage tracking
+            # Convert floats to strings for database schema compatibility
             coverage, created = await self.coverage_service.get_or_create_coverage(
                 city=city,
                 state=state,
                 industry=category,
                 country=country,
                 zone_id=zone_id,
-                zone_lat=zone_lat,
-                zone_lon=zone_lon,
-                zone_radius_km=zone_radius
+                zone_lat=str(zone_lat) if zone_lat is not None else None,
+                zone_lon=str(zone_lon) if zone_lon is not None else None,
+                zone_radius_km=str(zone_radius) if zone_radius is not None else None
             )
             
             # Update with scraping results

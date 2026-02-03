@@ -44,6 +44,17 @@ class CoverageService:
             Created CoverageGrid instance
         """
         try:
+            # Log kwargs for debugging type issues
+            logger.debug(f"Creating coverage with kwargs: {kwargs}")
+            
+            # Type validation for common issues
+            if "zone_lat" in kwargs and kwargs["zone_lat"] is not None and not isinstance(kwargs["zone_lat"], str):
+                logger.warning(f"zone_lat should be string, got {type(kwargs['zone_lat']).__name__}: {kwargs['zone_lat']}")
+            if "zone_lon" in kwargs and kwargs["zone_lon"] is not None and not isinstance(kwargs["zone_lon"], str):
+                logger.warning(f"zone_lon should be string, got {type(kwargs['zone_lon']).__name__}: {kwargs['zone_lon']}")
+            if "zone_radius_km" in kwargs and kwargs["zone_radius_km"] is not None and not isinstance(kwargs["zone_radius_km"], str):
+                logger.warning(f"zone_radius_km should be string, got {type(kwargs['zone_radius_km']).__name__}: {kwargs['zone_radius_km']}")
+            
             coverage = CoverageGrid(
                 state=state,
                 city=city,
@@ -63,6 +74,7 @@ class CoverageService:
         except Exception as e:
             await self.db.rollback()
             logger.error(f"Error creating coverage: {str(e)}")
+            logger.error(f"Coverage params - state={state}, city={city}, industry={industry}, kwargs={kwargs}")
             raise DatabaseException(f"Failed to create coverage: {str(e)}")
     
     async def get_coverage(self, coverage_id: UUID) -> Optional[CoverageGrid]:
