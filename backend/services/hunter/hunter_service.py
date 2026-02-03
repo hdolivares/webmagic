@@ -157,8 +157,9 @@ class HunterService:
                 zone_id=zone_id
             )
             
-            raw_businesses = results.get("data", [])
-            logger.info(f"Zone {zone_id} returned {len(raw_businesses)} businesses")
+            raw_businesses = results.get("businesses", [])
+            logger.info(f"Zone {zone_id} returned {len(raw_businesses)} businesses from scraper")
+            logger.debug(f"Scraper result keys: {list(results.keys())}")
             
             # Process and qualify leads
             qualified_count = 0
@@ -435,7 +436,7 @@ class HunterService:
             offset=offset
         )
         
-        raw_businesses = results.get("data", [])
+        raw_businesses = results.get("businesses", [])
         
         # Process businesses
         qualified_count = 0
