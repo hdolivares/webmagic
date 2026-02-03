@@ -219,7 +219,7 @@ class HunterService:
                 updates={
                     "status": "completed",
                     "lead_count": qualified_count,
-                    "total_found": len(raw_businesses),
+                    "last_scrape_size": len(raw_businesses),
                     "last_scraped_at": datetime.utcnow()
                 }
             )
