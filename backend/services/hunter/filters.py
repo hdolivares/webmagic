@@ -91,7 +91,7 @@ class LeadQualifier:
         
         # 3. Check rating (20 points)
         rating = business.get("rating")
-        if rating:
+        if rating is not None and rating > 0:
             if rating >= 4.5:
                 score += 20
                 reasons.append(f"Excellent rating {rating} (20)")
