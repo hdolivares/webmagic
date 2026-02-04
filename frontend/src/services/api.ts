@@ -847,6 +847,71 @@ class ApiClient {
     const response = await this.client.get('/intelligent-campaigns/coverage/breakdown', { params })
     return response.data
   }
+
+  // ============================================
+  // PHASE 4: BUSINESS FILTERING METHODS
+  // ============================================
+
+  /**
+   * Apply advanced filters to businesses
+   */
+  async filterBusinesses(request: {
+    filters: any
+    sort_by?: string
+    sort_desc?: boolean
+    page?: number
+    page_size?: number
+  }): Promise<any> {
+    const response = await this.client.post('/businesses/filter', request)
+    return response.data
+  }
+
+  /**
+   * Get predefined quick filter templates
+   */
+  async getQuickFilters(): Promise<any> {
+    const response = await this.client.get('/businesses/filters/quick')
+    return response.data
+  }
+
+  /**
+   * Get filter statistics (counts by website status, etc.)
+   */
+  async getFilterStats(filters?: any): Promise<any> {
+    const params = filters ? { filters: JSON.stringify(filters) } : {}
+    const response = await this.client.get('/businesses/filters/stats', { params })
+    return response.data
+  }
+
+  /**
+   * Save a filter preset
+   */
+  async saveFilterPreset(name: string, filters: any, isPublic: boolean = false): Promise<any> {
+    const response = await this.client.post('/businesses/filters/presets', {
+      name,
+      filters,
+      is_public: isPublic
+    })
+    return response.data
+  }
+
+  /**
+   * Get all filter presets for current user
+   */
+  async getFilterPresets(includePublic: boolean = true): Promise<any> {
+    const response = await this.client.get('/businesses/filters/presets', {
+      params: { include_public: includePublic }
+    })
+    return response.data
+  }
+
+  /**
+   * Delete a filter preset
+   */
+  async deleteFilterPreset(presetId: string): Promise<any> {
+    const response = await this.client.delete(`/businesses/filters/presets/${presetId}`)
+    return response.data
+  }
 }
 
 // Export singleton instance

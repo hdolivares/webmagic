@@ -1,0 +1,398 @@
+/**
+ * Filter System - Semantic CSS Variables
+ * 
+ * Extends coverage-theme.css with filter-specific variables
+ * for consistent styling across filtering components.
+ * 
+ * Best Practices:
+ * - Use semantic names (--filter-input-border) not values (--color-gray-300)
+ * - Group related variables together
+ * - Maintain consistency with coverage-theme.css
+ */
+
+:root {
+  /* ==========================================================================
+     FILTER INPUT COLORS
+     ========================================================================== */
+  
+  --filter-input-bg: #ffffff;
+  --filter-input-bg-disabled: #f3f4f6;
+  --filter-input-border: #d1d5db;
+  --filter-input-border-focus: #3b82f6;
+  --filter-input-border-error: #ef4444;
+  --filter-input-text: #111827;
+  --filter-input-text-placeholder: #9ca3af;
+  
+  /* ==========================================================================
+     FILTER CHIP/TAG COLORS
+     ========================================================================== */
+  
+  --filter-chip-bg: #eff6ff;
+  --filter-chip-border: #bfdbfe;
+  --filter-chip-text: #1e40af;
+  --filter-chip-close-hover: #ef4444;
+  
+  --filter-chip-active-bg: #dbeafe;
+  --filter-chip-active-border: #93c5fd;
+  --filter-chip-active-text: #1e3a8a;
+  
+  /* ==========================================================================
+     FILTER PANEL COLORS
+     ========================================================================== */
+  
+  --filter-panel-bg: #f9fafb;
+  --filter-panel-border: #e5e7eb;
+  --filter-panel-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  
+  --filter-panel-header-bg: #ffffff;
+  --filter-panel-header-border: #e5e7eb;
+  
+  --filter-section-bg: #ffffff;
+  --filter-section-border: #e5e7eb;
+  
+  /* ==========================================================================
+     FILTER BUTTON COLORS
+     ========================================================================== */
+  
+  --filter-button-primary-bg: #3b82f6;
+  --filter-button-primary-hover: #2563eb;
+  --filter-button-primary-text: #ffffff;
+  
+  --filter-button-secondary-bg: #f3f4f6;
+  --filter-button-secondary-hover: #e5e7eb;
+  --filter-button-secondary-text: #374151;
+  
+  --filter-button-danger-bg: #ef4444;
+  --filter-button-danger-hover: #dc2626;
+  --filter-button-danger-text: #ffffff;
+  
+  --filter-button-ghost-hover: #f3f4f6;
+  --filter-button-ghost-text: #6b7280;
+  
+  /* ==========================================================================
+     DROPDOWN/SELECT COLORS
+     ========================================================================== */
+  
+  --filter-dropdown-bg: #ffffff;
+  --filter-dropdown-border: #d1d5db;
+  --filter-dropdown-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  
+  --filter-dropdown-item-hover: #f3f4f6;
+  --filter-dropdown-item-selected: #eff6ff;
+  --filter-dropdown-item-text: #111827;
+  
+  /* ==========================================================================
+     PRESET CARD COLORS
+     ========================================================================== */
+  
+  --filter-preset-bg: #ffffff;
+  --filter-preset-border: #e5e7eb;
+  --filter-preset-hover-border: #3b82f6;
+  --filter-preset-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  --filter-preset-hover-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  
+  --filter-preset-public-badge-bg: #fef3c7;
+  --filter-preset-public-badge-text: #92400e;
+  
+  /* ==========================================================================
+     LAYOUT & SPACING
+     ========================================================================== */
+  
+  --filter-panel-padding: 1.5rem;
+  --filter-section-padding: 1rem;
+  --filter-section-gap: 1rem;
+  --filter-input-padding: 0.625rem 0.875rem;
+  
+  --filter-chip-padding: 0.375rem 0.75rem;
+  --filter-chip-gap: 0.5rem;
+  
+  /* ==========================================================================
+     TYPOGRAPHY
+     ========================================================================== */
+  
+  --filter-title-size: 1.125rem;
+  --filter-label-size: 0.875rem;
+  --filter-input-size: 0.9375rem;
+  --filter-chip-size: 0.8125rem;
+  --filter-help-size: 0.75rem;
+  
+  /* ==========================================================================
+     BORDERS & RADIUS
+     ========================================================================== */
+  
+  --filter-panel-radius: 0.75rem;
+  --filter-section-radius: 0.5rem;
+  --filter-input-radius: 0.375rem;
+  --filter-chip-radius: 9999px;
+  --filter-button-radius: 0.375rem;
+  
+  --filter-border-width: 1px;
+  
+  /* ==========================================================================
+     TRANSITIONS
+     ========================================================================== */
+  
+  --filter-transition-fast: 150ms ease-in-out;
+  --filter-transition-normal: 200ms ease-in-out;
+  --filter-transition-slow: 300ms ease-in-out;
+  
+  /* ==========================================================================
+     Z-INDEX LAYERS
+     ========================================================================== */
+  
+  --filter-panel-z: 10;
+  --filter-dropdown-z: 20;
+  --filter-modal-z: 50;
+}
+
+/* ==========================================================================
+   UTILITY CLASSES - Reusable filter components
+   ========================================================================== */
+
+.filter-panel {
+  background: var(--filter-panel-bg);
+  border: var(--filter-border-width) solid var(--filter-panel-border);
+  border-radius: var(--filter-panel-radius);
+  padding: var(--filter-panel-padding);
+  box-shadow: var(--filter-panel-shadow);
+}
+
+.filter-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: var(--filter-section-padding);
+  margin-bottom: var(--filter-section-gap);
+  border-bottom: var(--filter-border-width) solid var(--filter-panel-header-border);
+}
+
+.filter-title {
+  font-size: var(--filter-title-size);
+  font-weight: 600;
+  color: var(--filter-input-text);
+  margin: 0;
+}
+
+.filter-section {
+  background: var(--filter-section-bg);
+  border: var(--filter-border-width) solid var(--filter-section-border);
+  border-radius: var(--filter-section-radius);
+  padding: var(--filter-section-padding);
+  margin-bottom: var(--filter-section-gap);
+}
+
+.filter-section-title {
+  font-size: var(--filter-label-size);
+  font-weight: 600;
+  color: var(--filter-input-text);
+  margin: 0 0 0.75rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.filter-input {
+  width: 100%;
+  padding: var(--filter-input-padding);
+  font-size: var(--filter-input-size);
+  color: var(--filter-input-text);
+  background: var(--filter-input-bg);
+  border: var(--filter-border-width) solid var(--filter-input-border);
+  border-radius: var(--filter-input-radius);
+  transition: all var(--filter-transition-normal);
+}
+
+.filter-input:focus {
+  outline: none;
+  border-color: var(--filter-input-border-focus);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.filter-input:disabled {
+  background: var(--filter-input-bg-disabled);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.filter-input::placeholder {
+  color: var(--filter-input-text-placeholder);
+}
+
+.filter-label {
+  display: block;
+  font-size: var(--filter-label-size);
+  font-weight: 500;
+  color: var(--filter-input-text);
+  margin-bottom: 0.375rem;
+}
+
+.filter-help {
+  font-size: var(--filter-help-size);
+  color: var(--filter-input-text-placeholder);
+  margin-top: 0.25rem;
+}
+
+.filter-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--filter-chip-gap);
+  margin-top: 0.5rem;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: var(--filter-chip-padding);
+  font-size: var(--filter-chip-size);
+  font-weight: 500;
+  color: var(--filter-chip-text);
+  background: var(--filter-chip-bg);
+  border: var(--filter-border-width) solid var(--filter-chip-border);
+  border-radius: var(--filter-chip-radius);
+  transition: all var(--filter-transition-fast);
+  cursor: default;
+}
+
+.filter-chip.active {
+  background: var(--filter-chip-active-bg);
+  border-color: var(--filter-chip-active-border);
+  color: var(--filter-chip-active-text);
+}
+
+.filter-chip-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all var(--filter-transition-fast);
+}
+
+.filter-chip-close:hover {
+  background: var(--filter-chip-close-hover);
+  color: white;
+}
+
+.filter-button {
+  padding: 0.625rem 1rem;
+  font-size: var(--filter-input-size);
+  font-weight: 500;
+  border: none;
+  border-radius: var(--filter-button-radius);
+  cursor: pointer;
+  transition: all var(--filter-transition-normal);
+}
+
+.filter-button-primary {
+  background: var(--filter-button-primary-bg);
+  color: var(--filter-button-primary-text);
+}
+
+.filter-button-primary:hover:not(:disabled) {
+  background: var(--filter-button-primary-hover);
+  transform: translateY(-1px);
+}
+
+.filter-button-secondary {
+  background: var(--filter-button-secondary-bg);
+  color: var(--filter-button-secondary-text);
+}
+
+.filter-button-secondary:hover:not(:disabled) {
+  background: var(--filter-button-secondary-hover);
+}
+
+.filter-button-danger {
+  background: var(--filter-button-danger-bg);
+  color: var(--filter-button-danger-text);
+}
+
+.filter-button-danger:hover:not(:disabled) {
+  background: var(--filter-button-danger-hover);
+}
+
+.filter-button-ghost {
+  background: transparent;
+  color: var(--filter-button-ghost-text);
+}
+
+.filter-button-ghost:hover:not(:disabled) {
+  background: var(--filter-button-ghost-hover);
+}
+
+.filter-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.filter-button-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.filter-preset-card {
+  background: var(--filter-preset-bg);
+  border: var(--filter-border-width) solid var(--filter-preset-border);
+  border-radius: var(--filter-section-radius);
+  padding: 1rem;
+  cursor: pointer;
+  transition: all var(--filter-transition-normal);
+  box-shadow: var(--filter-preset-shadow);
+}
+
+.filter-preset-card:hover {
+  border-color: var(--filter-preset-hover-border);
+  box-shadow: var(--filter-preset-hover-shadow);
+  transform: translateY(-2px);
+}
+
+.filter-preset-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+}
+
+.filter-preset-name {
+  font-size: var(--filter-input-size);
+  font-weight: 600;
+  color: var(--filter-input-text);
+  margin: 0;
+}
+
+.filter-preset-badge {
+  padding: 0.125rem 0.5rem;
+  font-size: var(--filter-help-size);
+  font-weight: 500;
+  background: var(--filter-preset-public-badge-bg);
+  color: var(--filter-preset-public-badge-text);
+  border-radius: var(--filter-chip-radius);
+}
+
+.filter-preset-description {
+  font-size: var(--filter-label-size);
+  color: var(--filter-input-text-placeholder);
+  margin: 0;
+}
+
+/* ==========================================================================
+   RESPONSIVE BREAKPOINTS
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  :root {
+    --filter-panel-padding: 1rem;
+    --filter-section-padding: 0.75rem;
+  }
+  
+  .filter-button-group {
+    flex-direction: column;
+  }
+  
+  .filter-button {
+    width: 100%;
+  }
+}
+
