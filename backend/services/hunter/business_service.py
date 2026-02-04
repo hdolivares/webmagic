@@ -108,14 +108,14 @@ class BusinessService:
         
         Args:
             data: Business data dictionary
-            source: Data source identifier
-            discovery_city: City where business was discovered
-            discovery_state: State where business was discovered
-            discovery_zone_id: Zone ID where business was discovered
-            discovery_zone_lat: Zone latitude
-            discovery_zone_lon: Zone longitude
+            source: Data source identifier (not stored in Business model)
+            discovery_city: City where business was discovered (not stored)
+            discovery_state: State where business was discovered (not stored)
+            discovery_zone_id: Zone ID where business was discovered (not stored)
+            discovery_zone_lat: Zone latitude (not stored)
+            discovery_zone_lon: Zone longitude (not stored)
             lead_score: Qualification score
-            qualification_reasons: List of qualification reason strings
+            qualification_reasons: List of qualification reason strings (not stored)
             
         Returns:
             Business instance or None if creation failed
@@ -129,21 +129,27 @@ class BusinessService:
             if gmb_id:
                 existing = await self.get_business_by_gmb_id(str(gmb_id))
             
-            # Build business data with discovery metadata
-            business_data = {
-                **data,
-                "source": source,
-                "discovery_city": discovery_city,
-                "discovery_state": discovery_state,
-                "discovery_zone_id": discovery_zone_id,
-                "discovery_zone_lat": discovery_zone_lat,
-                "discovery_zone_lon": discovery_zone_lon,
-                "lead_score": lead_score,
-                "qualification_reasons": qualification_reasons
+            # Only pass fields that exist in the Business model
+            valid_fields = {
+                "gmb_id", "gmb_place_id", "name", "slug",
+                "email", "phone", "website_url",
+                "address", "city", "state", "zip_code", "country", "latitude", "longitude",
+                "category", "subcategory", "rating", "review_count",
+                "reviews_summary", "review_highlight", "brand_archetype",
+                "photos_urls", "logo_url",
+                "website_status", "contact_status", "qualification_score",
+                "creative_dna", "coverage_grid_id", "scraped_at"
             }
             
-            # Clean None values
-            business_data = {k: v for k, v in business_data.items() if v is not None}
+            # Filter business data to only valid fields
+            business_data = {
+                k: v for k, v in data.items() 
+                if k in valid_fields and v is not None
+            }
+            
+            # Add qualification score if provided
+            if lead_score is not None:
+                business_data["qualification_score"] = int(lead_score)
             
             if existing:
                 # Update existing business with new data
@@ -161,6 +167,8 @@ class BusinessService:
                 
         except Exception as e:
             logger.error(f"Error in create_or_update_business: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
     
     async def list_businesses(
