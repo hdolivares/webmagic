@@ -1,0 +1,325 @@
+/**
+ * BusinessFilterPanel Component Styles
+ * 
+ * Uses semantic CSS variables from filter-theme.css for consistent theming
+ */
+
+@import '../../styles/filter-theme.css';
+
+/* Component Container */
+.business-filter-panel {
+  position: relative;
+  max-width: 400px;
+}
+
+/* Header */
+.filter-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--filter-button-primary-bg);
+  color: white;
+  border-radius: 50%;
+}
+
+.filter-header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Quick Filters */
+.quick-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.quick-filter-button {
+  padding: 0.625rem 0.75rem;
+  font-size: var(--filter-label-size);
+  font-weight: 500;
+  color: var(--filter-button-secondary-text);
+  background: var(--filter-button-secondary-bg);
+  border: var(--filter-border-width) solid var(--filter-input-border);
+  border-radius: var(--filter-button-radius);
+  cursor: pointer;
+  transition: all var(--filter-transition-fast);
+  text-align: left;
+}
+
+.quick-filter-button:hover {
+  background: var(--filter-button-secondary-hover);
+  border-color: var(--filter-button-primary-bg);
+  transform: translateY(-1px);
+}
+
+/* Website Status Checkboxes */
+.website-status-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.website-status-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  background: var(--filter-input-bg);
+  border: var(--filter-border-width) solid var(--filter-input-border);
+  border-radius: var(--filter-input-radius);
+  cursor: pointer;
+  transition: all var(--filter-transition-fast);
+}
+
+.website-status-checkbox:hover {
+  background: var(--filter-dropdown-item-hover);
+}
+
+.website-status-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--filter-button-primary-bg);
+}
+
+.website-status-checkbox .checkbox-label {
+  flex: 1;
+  font-size: var(--filter-input-size);
+  color: var(--filter-input-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Status color indicators */
+.website-status-checkbox.status-green {
+  border-left: 4px solid #22c55e;
+}
+
+.website-status-checkbox.status-amber {
+  border-left: 4px solid #f59e0b;
+}
+
+.website-status-checkbox.status-red {
+  border-left: 4px solid #ef4444;
+}
+
+.website-status-checkbox.status-gray {
+  border-left: 4px solid #9ca3af;
+}
+
+/* Form Groups */
+.filter-form-group {
+  margin-bottom: 0.75rem;
+}
+
+.filter-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+/* Active Filters Section */
+.active-filters-section {
+  background: var(--filter-chip-bg);
+  border-color: var(--filter-chip-border);
+}
+
+/* Action Buttons */
+.filter-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: var(--filter-section-gap);
+}
+
+.filter-actions .filter-button {
+  width: 100%;
+}
+
+/* Presets Panel */
+.presets-panel {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  margin-left: 1rem;
+  width: 350px;
+  max-height: 600px;
+  overflow-y: auto;
+  background: var(--filter-panel-bg);
+  border: var(--filter-border-width) solid var(--filter-panel-border);
+  border-radius: var(--filter-panel-radius);
+  box-shadow: var(--filter-dropdown-shadow);
+  z-index: var(--filter-dropdown-z);
+  animation: slideInRight var(--filter-transition-normal);
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.presets-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--filter-section-padding);
+  border-bottom: var(--filter-border-width) solid var(--filter-panel-header-border);
+  background: var(--filter-panel-header-bg);
+  border-radius: var(--filter-panel-radius) var(--filter-panel-radius) 0 0;
+}
+
+.presets-loading,
+.presets-empty {
+  padding: var(--filter-section-padding);
+  text-align: center;
+  color: var(--filter-input-text-placeholder);
+  font-size: var(--filter-label-size);
+}
+
+.presets-grid {
+  padding: var(--filter-section-padding);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.filter-preset-card {
+  position: relative;
+}
+
+.preset-delete-button {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 1rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--filter-transition-fast);
+}
+
+.filter-preset-card:hover .preset-delete-button {
+  opacity: 1;
+}
+
+.preset-delete-button:hover {
+  transform: scale(1.2);
+}
+
+/* Save Preset Dialog */
+.save-preset-dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 400px;
+  background: var(--filter-panel-bg);
+  border: var(--filter-border-width) solid var(--filter-panel-border);
+  border-radius: var(--filter-panel-radius);
+  box-shadow: var(--filter-dropdown-shadow);
+  z-index: var(--filter-modal-z);
+  animation: fadeIn var(--filter-transition-normal);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--filter-section-padding);
+  border-bottom: var(--filter-border-width) solid var(--filter-panel-header-border);
+  background: var(--filter-panel-header-bg);
+  border-radius: var(--filter-panel-radius) var(--filter-panel-radius) 0 0;
+}
+
+.dialog-content {
+  padding: var(--filter-section-padding);
+}
+
+.preset-public-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  font-size: var(--filter-label-size);
+  color: var(--filter-input-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.preset-public-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--filter-button-primary-bg);
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: var(--filter-section-padding);
+  border-top: var(--filter-border-width) solid var(--filter-panel-header-border);
+}
+
+.dialog-actions .filter-button {
+  flex: 1;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .presets-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: 100%;
+    margin: 0;
+    border-radius: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .business-filter-panel {
+    max-width: none;
+  }
+  
+  .quick-filters-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .filter-form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .save-preset-dialog {
+    width: 95%;
+  }
+}
+
