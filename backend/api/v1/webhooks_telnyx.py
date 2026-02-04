@@ -1,16 +1,16 @@
 """
-Twilio Webhook Endpoints.
+Telnyx Webhook Endpoints.
 
-Handles incoming webhooks from Twilio for:
-- SMS delivery status updates
-- Incoming SMS replies (opt-outs, feedback)
+Handles incoming webhooks from Telnyx for:
+- SMS delivery status updates (message.sent, message.finalized)
+- Incoming SMS replies (message.received) - opt-outs, feedback
 
-Updated: January 22, 2026
+Updated: February 2026
+- Migrated from Twilio to Telnyx
+- JSON payload format (not form-encoded)
 - Integrated CRM lifecycle service for automated status tracking
-- SMS delivery events now update business contact_status
 
-Author: WebMagic Team  
-Date: January 21, 2026
+Author: WebMagic Team
 """
 from fastapi import APIRouter, Request, Depends, HTTPException, status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +27,18 @@ from services.crm import BusinessLifecycleService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/twilio", tags=["Twilio Webhooks"])
+router = APIRouter(prefix="/telnyx", tags=["Telnyx Webhooks"])
+
+# Telnyx status mapping to internal status
+TELNYX_STATUS_MAP = {
+    "queued": "pending",
+    "sending": "sent",
+    "sent": "sent",
+    "delivered": "delivered",
+    "sending_failed": "failed",
+    "delivery_failed": "failed",
+    "delivery_unconfirmed": "sent",  # Carrier didn't confirm but likely delivered
+}
 
 
 # ============================================================================
@@ -40,65 +51,67 @@ async def handle_sms_status_callback(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Handle Twilio SMS status callback.
+    Handle Telnyx SMS status callback.
     
-    Twilio sends status updates as the SMS is processed:
-    - queued: Message queued at Twilio
-    - sent: Sent to carrier
-    - delivered: Delivered to recipient
-    - undelivered: Failed to deliver
-    - failed: Permanent failure
+    Telnyx sends status updates as JSON webhooks:
+    - message.sent: Message accepted by carrier
+    - message.finalized: Final delivery status (delivered/failed)
     
-    Endpoint: POST /api/v1/webhooks/twilio/status
+    Endpoint: POST /api/v1/webhooks/telnyx/status
     
     Returns:
         200: Status updated successfully
-        400: Missing required fields
+        400: Invalid payload
         404: Campaign not found
     """
     try:
-        # Parse form data from Twilio
-        form_data = await request.form()
+        # Parse JSON payload from Telnyx
+        json_data = await request.json()
         
-        message_sid = form_data.get("MessageSid")
-        message_status = form_data.get("MessageStatus")
-        error_code = form_data.get("ErrorCode")
-        error_message = form_data.get("ErrorMessage")
+        # Extract event data
+        data = json_data.get("data", {})
+        event_type = data.get("event_type", "")
+        payload = data.get("payload", {})
         
-        if not message_sid:
-            logger.warning("Twilio callback missing MessageSid")
+        # Get message details
+        message_id = payload.get("id")
+        
+        if not message_id:
+            logger.warning("Telnyx callback missing message ID")
             raise HTTPException(
                 status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail="Missing MessageSid"
+                detail="Missing message ID in payload"
             )
         
-        logger.info(f"Twilio status callback: {message_sid} -> {message_status}")
+        # Get status from 'to' array
+        to_info = payload.get("to", [{}])
+        if isinstance(to_info, list) and len(to_info) > 0:
+            message_status = to_info[0].get("status", "unknown")
+        else:
+            message_status = "unknown"
         
-        # Find campaign by Twilio message SID
+        logger.info(
+            f"Telnyx status callback: {message_id} -> {message_status} "
+            f"(event: {event_type})"
+        )
+        
+        # Find campaign by Telnyx message ID
+        # Note: We store the message ID in sms_sid column (reusing existing column)
         result = await db.execute(
-            select(Campaign).where(Campaign.sms_sid == message_sid)
+            select(Campaign).where(Campaign.sms_sid == message_id)
         )
         campaign = result.scalar_one_or_none()
         
         if not campaign:
-            logger.warning(f"Campaign not found for Twilio SID: {message_sid}")
-            # Return 200 anyway to prevent Twilio retries
+            logger.warning(f"Campaign not found for Telnyx ID: {message_id}")
+            # Return 200 anyway to prevent Telnyx retries
             return {
                 "status": "ok",
                 "message": "Campaign not found (may have been deleted)"
             }
         
-        # Map Twilio status to campaign status
-        status_map = {
-            "queued": "pending",
-            "sending": "sent",
-            "sent": "sent",
-            "delivered": "delivered",
-            "undelivered": "failed",
-            "failed": "failed"
-        }
-        
-        new_status = status_map.get(message_status, campaign.status)
+        # Map Telnyx status to internal status
+        new_status = TELNYX_STATUS_MAP.get(message_status, campaign.status)
         
         # Build update values
         update_values = {
@@ -106,15 +119,27 @@ async def handle_sms_status_callback(
             "updated_at": datetime.utcnow()
         }
         
-        # Add delivered timestamp
+        # Add delivered timestamp for final delivery
         if message_status == "delivered" and not campaign.delivered_at:
             update_values["delivered_at"] = datetime.utcnow()
         
-        # Add error information
-        if error_code:
-            update_values["error_message"] = (
-                f"Twilio Error {error_code}: {error_message or 'Unknown error'}"
-            )
+        # Extract error information if present
+        errors = payload.get("errors", [])
+        if errors:
+            error_info = errors[0]
+            error_code = error_info.get("code", "unknown")
+            error_detail = error_info.get("detail", "Unknown error")
+            update_values["error_message"] = f"Telnyx Error {error_code}: {error_detail}"
+        
+        # Extract cost if provided (Telnyx sends cost in finalized webhook)
+        cost_info = payload.get("cost", {})
+        if cost_info:
+            cost_amount = cost_info.get("amount")
+            if cost_amount:
+                try:
+                    update_values["sms_cost"] = float(cost_amount)
+                except (ValueError, TypeError):
+                    pass
         
         # Update campaign
         await db.execute(
@@ -130,7 +155,7 @@ async def handle_sms_status_callback(
         )
         
         # CRM Integration: Update business contact status
-        if campaign.business_id and message_status in ["delivered", "failed", "undelivered"]:
+        if campaign.business_id and message_status in ["delivered", "sending_failed", "delivery_failed"]:
             lifecycle_service = BusinessLifecycleService(db)
             
             try:
@@ -144,7 +169,7 @@ async def handle_sms_status_callback(
                         f"Updated business {campaign.business_id}: "
                         f"contact_status=sms_sent (SMS delivered)"
                     )
-                elif message_status in ["failed", "undelivered"]:
+                elif message_status in ["sending_failed", "delivery_failed"]:
                     # SMS bounced/failed
                     await lifecycle_service.mark_bounced(campaign.business_id)
                     logger.info(
@@ -174,8 +199,8 @@ async def handle_sms_status_callback(
         raise
     
     except Exception as e:
-        logger.error(f"Twilio status callback error: {e}", exc_info=True)
-        # Return 200 to prevent Twilio retries on our errors
+        logger.error(f"Telnyx status callback error: {e}", exc_info=True)
+        # Return 200 to prevent Telnyx retries on our errors
         return {
             "status": "error",
             "message": "Internal server error"
@@ -194,34 +219,54 @@ async def handle_incoming_sms(
     """
     Handle incoming SMS replies from recipients.
     
+    Telnyx sends inbound messages as JSON with event_type: message.received
+    
     Processes:
     - STOP keywords (opt-out)
     - Regular replies (feedback, questions)
     
-    Endpoint: POST /api/v1/webhooks/twilio/reply
+    Endpoint: POST /api/v1/webhooks/telnyx/reply
     
-    Twilio Form Data:
-    - MessageSid: Unique message ID
-    - From: Sender phone number (E.164 format)
-    - To: Your Twilio number
-    - Body: Message text
+    Telnyx JSON Payload:
+    - data.payload.from.phone_number: Sender phone (E.164)
+    - data.payload.to[0].phone_number: Your Telnyx number
+    - data.payload.text: Message text
     
     Returns:
-        TwiML response (empty - no auto-reply)
+        200: Reply processed (no auto-response sent)
     """
     try:
-        # Parse form data from Twilio
-        form_data = await request.form()
+        # Parse JSON payload from Telnyx
+        json_data = await request.json()
         
-        from_phone = form_data.get("From")  # Sender's phone
-        message_body = form_data.get("Body")  # Message text
-        message_sid = form_data.get("MessageSid")
+        # Extract event data
+        data = json_data.get("data", {})
+        event_type = data.get("event_type", "")
+        payload = data.get("payload", {})
+        
+        # Validate event type
+        if event_type != "message.received":
+            logger.info(f"Ignoring Telnyx event type: {event_type}")
+            return {"status": "ok", "message": "Event type not handled"}
+        
+        # Extract message details
+        from_info = payload.get("from", {})
+        from_phone = from_info.get("phone_number")
+        
+        to_info = payload.get("to", [{}])
+        if isinstance(to_info, list) and len(to_info) > 0:
+            to_phone = to_info[0].get("phone_number")
+        else:
+            to_phone = None
+        
+        message_body = payload.get("text", "")
+        message_id = payload.get("id")
         
         if not from_phone or not message_body:
-            logger.warning("Twilio reply missing From or Body")
+            logger.warning("Telnyx reply missing from_phone or text")
             raise HTTPException(
                 status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail="Missing From or Body"
+                detail="Missing from phone or message text"
             )
         
         logger.info(f"Incoming SMS from {from_phone}: {message_body[:50]}...")
@@ -244,8 +289,7 @@ async def handle_incoming_sms(
                 campaign_id=None
             )
             
-            # Return empty TwiML (no auto-reply)
-            return _generate_twiml_response()
+            return {"status": "ok", "message": "Opt-out processed (no campaign found)"}
         
         # Process reply with most recent campaign
         latest_campaign = campaigns[0]
@@ -289,41 +333,64 @@ async def handle_incoming_sms(
                 )
                 # Don't fail the webhook
         
-        # Return empty TwiML (no auto-reply)
-        # In production, you might want to send a confirmation
-        return _generate_twiml_response()
+        # Return success (Telnyx doesn't expect TwiML, just HTTP 200)
+        return {
+            "status": "ok",
+            "action": result['action'],
+            "campaign_id": str(latest_campaign.id)
+        }
     
     except HTTPException:
         raise
     
     except Exception as e:
-        logger.error(f"Twilio reply handling error: {e}", exc_info=True)
-        # Return empty TwiML to prevent errors on Twilio's side
-        return _generate_twiml_response()
+        logger.error(f"Telnyx reply handling error: {e}", exc_info=True)
+        # Return 200 to prevent Telnyx retries
+        return {
+            "status": "error",
+            "message": "Internal server error"
+        }
 
 
-def _generate_twiml_response(message: str = None) -> Dict[str, str]:
+# ============================================================================
+# COMBINED WEBHOOK ENDPOINT (Optional - for single webhook URL)
+# ============================================================================
+
+@router.post("/webhook")
+async def handle_telnyx_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
     """
-    Generate TwiML response for Twilio.
+    Combined webhook endpoint that routes based on event_type.
     
-    Args:
-        message: Optional message to send back to user
+    This allows configuring a single webhook URL in Telnyx portal
+    that handles all event types:
+    - message.sent / message.finalized → status updates
+    - message.received → incoming replies
     
-    Returns:
-        Dict with TwiML XML
+    Endpoint: POST /api/v1/webhooks/telnyx/webhook
     """
-    if message:
-        # Send a reply
-        twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Message>{message}</Message>
-</Response>"""
-    else:
-        # No reply (silent)
-        twiml = """<?xml version="1.0" encoding="UTF-8"?>
-<Response></Response>"""
+    try:
+        json_data = await request.json()
+        data = json_data.get("data", {})
+        event_type = data.get("event_type", "")
+        
+        logger.info(f"Telnyx webhook received: {event_type}")
+        
+        # Route to appropriate handler based on event type
+        if event_type in ["message.sent", "message.finalized"]:
+            # Recreate request with same body for handler
+            return await handle_sms_status_callback(request, db)
+        
+        elif event_type == "message.received":
+            return await handle_incoming_sms(request, db)
+        
+        else:
+            logger.info(f"Unhandled Telnyx event type: {event_type}")
+            return {"status": "ok", "message": f"Event type {event_type} not handled"}
     
-    # Return as XML content type
-    from fastapi.responses import Response
-    return Response(content=twiml, media_type="application/xml")
+    except Exception as e:
+        logger.error(f"Telnyx webhook error: {e}", exc_info=True)
+        return {"status": "error", "message": "Internal server error"}
 

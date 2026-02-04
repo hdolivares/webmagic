@@ -48,12 +48,12 @@ class Settings(BaseSettings):
     EMAIL_FROM_NAME: str = "WebMagic"
     FRONTEND_URL: str = "https://app.lavish.solutions"  # Frontend URL for email links
     
-    # SMS / Twilio
-    SMS_PROVIDER: str = "twilio"  # Currently only twilio
-    TWILIO_ACCOUNT_SID: Optional[str] = None
-    TWILIO_AUTH_TOKEN: Optional[str] = None
-    TWILIO_PHONE_NUMBER: Optional[str] = None  # Your Twilio number (e.g., +12345678900)
-    SMS_COST_PER_SEGMENT: float = 0.0079  # Twilio US SMS cost
+    # SMS / Telnyx
+    SMS_PROVIDER: str = "telnyx"
+    TELNYX_API_KEY: Optional[str] = None  # API key (KEY... format)
+    TELNYX_PHONE_NUMBER: Optional[str] = None  # Your Telnyx number (e.g., +12345678900)
+    TELNYX_MESSAGING_PROFILE_ID: Optional[str] = None  # Optional messaging profile
+    SMS_COST_PER_SEGMENT: float = 0.004  # Telnyx US SMS cost (~50% cheaper than Twilio)
     MAX_SMS_DAILY_BUDGET: float = 50.00  # Maximum daily SMS spend in USD
     SMS_DAILY_BUDGET: Optional[float] = None  # Alias for MAX_SMS_DAILY_BUDGET
     SMS_MAX_COST_PER_MESSAGE: float = 0.05  # Maximum cost per single message
@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     SMS_ENFORCE_BUSINESS_HOURS: bool = True  # Only send SMS during business hours (9 AM - 9 PM)
     SMS_DEFAULT_TIMEZONE: str = "America/Chicago"  # Timezone for business hours enforcement
     DEFAULT_CAMPAIGN_CHANNEL: str = "auto"  # auto, email, sms, both
-    API_URL: str = "https://api.lavish.solutions"  # For Twilio webhooks
+    API_URL: str = "https://api.lavish.solutions"  # For Telnyx webhooks
     
     # SMTP (development/fallback)
     SMTP_HOST: str = "localhost"
