@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 """
-Telnyx SMS quick test (single file)
+Telnyx SMS Test Script
+
+Quick test for sending SMS via Telnyx API (used by WebMagic for SMS campaigns).
 
 Prereqs:
   pip install requests python-dotenv
 
-Env vars (recommended):
-  TELNYX_API_KEY=KEY...
-  TELNYX_FROM=+15551234567
-  TELNYX_TO=+15559876543
+Env vars (recommended - set in backend/.env):
+  TELNYX_API_KEY=KEY...              # From https://portal.telnyx.com/ → API Keys
+  TELNYX_PHONE_NUMBER=+15551234567   # Your purchased Telnyx number
+  TELNYX_TO=+15559876543             # Test recipient (your phone)
 
 Optional:
-  TELNYX_MESSAGING_PROFILE_ID=...   (not required if your number is already assigned to a messaging profile)
-  TELNYX_WEBHOOK_URL=https://...    (delivery receipts, etc)
-  TELNYX_WEBHOOK_FAILOVER_URL=https://...
+  TELNYX_MESSAGING_PROFILE_ID=...    # From Messaging → Profiles (recommended)
+  TELNYX_WEBHOOK_URL=https://...     # Status webhook URL
+
+Usage:
+  python scripts/tests/sms.py --to +15551234567 --text "Hello from WebMagic!"
 """
 
 import os
@@ -63,7 +67,7 @@ def main() -> None:
     args = parser.parse_args()
 
     api_key = must_get("TELNYX_API_KEY", args.api_key)
-    from_number = must_get("TELNYX_FROM", args.from_number)
+    from_number = must_get("TELNYX_PHONE_NUMBER", args.from_number)  # Consistent with backend config
     to_number = must_get("TELNYX_TO", args.to_number)
 
     # Optional extras
