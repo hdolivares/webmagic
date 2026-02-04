@@ -42,8 +42,8 @@ export function ZoneStatisticsCard({ zoneId, autoLoad = false, onGenerateWebsite
     try {
       setLoading(true)
       setError(null)
-      const response = await api.get(`/intelligent-campaigns/zones/${zoneId}/statistics`)
-      setStats(response.data)
+      const data = await api.getZoneStatistics(zoneId)
+      setStats(data)
     } catch (err: any) {
       console.error('Failed to load zone statistics:', err)
       setError(err.response?.data?.detail || 'Failed to load statistics')

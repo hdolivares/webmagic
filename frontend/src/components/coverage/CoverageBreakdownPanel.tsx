@@ -60,8 +60,8 @@ export function CoverageBreakdownPanel({
     try {
       setLoading(true)
       setError(null)
-      const response = await api.get(`/intelligent-campaigns/strategies/${strategyId}/overview`)
-      setOverview(response.data)
+      const data = await api.getStrategyOverview(strategyId)
+      setOverview(data)
     } catch (err: any) {
       console.error('Failed to load strategy overview:', err)
       setError(err.response?.data?.detail || 'Failed to load overview')
