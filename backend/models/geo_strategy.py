@@ -81,6 +81,14 @@ class GeoStrategy(BaseModel):
     businesses_found = Column(Integer, nullable=False, default=0)
     last_scrape_at = Column(DateTime, nullable=True)
     
+    # Strategy-Wide Aggregated Metrics (New in Migration 009)
+    total_businesses_scraped = Column(Integer, default=0, nullable=False)
+    total_with_websites = Column(Integer, default=0, nullable=False)
+    total_without_websites = Column(Integer, default=0, nullable=False)
+    total_websites_generated = Column(Integer, default=0, nullable=False)
+    avg_businesses_per_zone = Column(Float, nullable=True)
+    completion_rate = Column(Float, nullable=True)  # Percentage 0-100
+    
     # Adaptive learning
     performance_data = Column(JSONB, nullable=True)
     """
@@ -141,7 +149,13 @@ class GeoStrategy(BaseModel):
                 "zones_completed": self.zones_completed,
                 "estimated_businesses": self.estimated_total_businesses,
                 "businesses_found": self.businesses_found,
-                "coverage_area_km2": self.coverage_area_km2
+                "coverage_area_km2": self.coverage_area_km2,
+                "total_businesses_scraped": self.total_businesses_scraped,
+                "total_with_websites": self.total_with_websites,
+                "total_without_websites": self.total_without_websites,
+                "total_websites_generated": self.total_websites_generated,
+                "avg_businesses_per_zone": self.avg_businesses_per_zone,
+                "completion_rate": self.completion_rate
             },
             "performance": self.performance_data,
             "status": self.is_active,

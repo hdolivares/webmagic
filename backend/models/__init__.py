@@ -28,6 +28,8 @@ from models.analytics_snapshot import AnalyticsSnapshot
 from models.geo_strategy import GeoStrategy
 from models.draft_campaign import DraftCampaign
 from models.system_settings import SystemSetting
+from models.website_validation import WebsiteValidation
+from models.business_filter_preset import BusinessFilterPreset
 
 __all__ = [
     "BaseModel",
@@ -62,4 +64,7 @@ __all__ = [
     "DraftCampaign",
     # System models
     "SystemSetting",
+    # Website validation & filtering models
+    "WebsiteValidation",
+    "BusinessFilterPreset",
 ]
