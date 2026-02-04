@@ -1,0 +1,216 @@
+/**
+ * ZoneStatisticsCard Component Styles
+ * 
+ * Uses semantic CSS variables from coverage-theme.css for consistent theming
+ */
+
+@import '../../styles/coverage-theme.css';
+
+/* Component Container */
+.zone-statistics-card {
+  position: relative;
+}
+
+/* Loading State */
+.zone-stats-loading,
+.zone-stats-error,
+.zone-stats-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  gap: 1rem;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--coverage-progress-bg);
+  border-top-color: var(--coverage-button-primary-bg);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-message {
+  color: var(--coverage-status-failed);
+  font-size: var(--coverage-body-size);
+  margin: 0;
+}
+
+/* Header */
+.zone-last-scraped {
+  font-size: var(--coverage-small-size);
+  color: var(--coverage-text-tertiary);
+  margin: 0.25rem 0 0 0;
+}
+
+/* Website Breakdown Section */
+.zone-website-breakdown {
+  margin-top: var(--coverage-section-gap);
+  padding-top: var(--coverage-card-gap);
+  border-top: var(--coverage-border-width) solid var(--coverage-border-color);
+}
+
+.breakdown-title {
+  font-size: var(--coverage-subheading-size);
+  font-weight: 600;
+  color: var(--coverage-text-primary);
+  margin: 0 0 var(--coverage-card-gap) 0;
+}
+
+.website-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--coverage-metric-gap);
+}
+
+.website-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--coverage-bg-secondary);
+  border-radius: var(--coverage-badge-border-radius);
+  transition: transform var(--coverage-transition-speed-fast) var(--coverage-transition-easing);
+}
+
+.website-metric-row:hover {
+  transform: translateX(4px);
+}
+
+.metric-info {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.website-metric-row .metric-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--coverage-text-primary);
+}
+
+.website-metric-row .metric-label {
+  font-size: var(--coverage-body-size);
+  color: var(--coverage-text-secondary);
+}
+
+.metric-percentage {
+  font-size: var(--coverage-body-size);
+  font-weight: 600;
+  color: var(--coverage-text-tertiary);
+  padding: 0.25rem 0.5rem;
+  background: var(--coverage-bg-tertiary);
+  border-radius: var(--coverage-badge-border-radius);
+}
+
+/* Progress Section */
+.coverage-progress-description {
+  font-size: var(--coverage-small-size);
+  color: var(--coverage-text-tertiary);
+  margin: 0.5rem 0 0 0;
+  text-align: center;
+}
+
+.progress-percentage {
+  font-weight: 600;
+  color: var(--coverage-text-primary);
+}
+
+/* Actions */
+.zone-actions {
+  margin-top: var(--coverage-card-gap);
+  padding-top: var(--coverage-card-gap);
+  border-top: var(--coverage-border-width) solid var(--coverage-border-color);
+}
+
+.zone-actions .coverage-button {
+  width: 100%;
+  font-size: 1rem;
+}
+
+/* Last Scrape Details */
+.zone-scrape-details {
+  margin-top: var(--coverage-card-gap);
+  padding: var(--coverage-card-gap);
+  background: var(--coverage-bg-secondary);
+  border-radius: var(--coverage-badge-border-radius);
+}
+
+.details-summary {
+  font-size: var(--coverage-body-size);
+  font-weight: 600;
+  color: var(--coverage-text-primary);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: color var(--coverage-transition-speed-fast) var(--coverage-transition-easing);
+}
+
+.details-summary:hover {
+  color: var(--coverage-link-color);
+}
+
+.details-summary::-webkit-details-marker {
+  display: none;
+}
+
+.details-summary::before {
+  content: '▶';
+  font-size: 0.75rem;
+  transition: transform var(--coverage-transition-speed-normal) var(--coverage-transition-easing);
+}
+
+.zone-scrape-details[open] .details-summary::before {
+  transform: rotate(90deg);
+}
+
+.details-content {
+  margin-top: var(--coverage-card-gap);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--coverage-small-size);
+}
+
+.detail-label {
+  color: var(--coverage-text-secondary);
+}
+
+.detail-value {
+  font-weight: 600;
+  color: var(--coverage-text-primary);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .website-metric-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .metric-info {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .metric-percentage {
+    align-self: flex-end;
+  }
+}
+

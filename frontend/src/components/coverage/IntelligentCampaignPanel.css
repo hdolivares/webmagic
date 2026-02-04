@@ -466,6 +466,57 @@
   text-align: center;
 }
 
+/* Phase 3: Website Metrics Grid */
+.website-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.result-card.website-valid {
+  border-left: 4px solid #22c55e;
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+}
+
+.result-card.website-none {
+  border-left: 4px solid #f59e0b;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+}
+
+.result-card.website-invalid {
+  border-left: 4px solid #ef4444;
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+}
+
+.result-card.website-generating {
+  border-left: 4px solid #8b5cf6;
+  background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+}
+
+/* Phase 3: Zone Statistics Container */
+.zone-stats-container {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 2px solid var(--color-border, #e5e7eb);
+}
+
+.zone-stats-container h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #111827);
+  margin: 0 0 1rem 0;
+}
+
+/* Phase 3: Strategy Breakdown Container */
+.strategy-breakdown-container {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 3px solid var(--color-primary-200, #bfdbfe);
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .form-row {
@@ -486,6 +537,10 @@
 
   .results-grid {
     grid-template-columns: 1fr;
+  }
+
+  .website-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 

@@ -1,0 +1,355 @@
+/**
+ * Coverage System - Semantic CSS Variables
+ * 
+ * A comprehensive theme system using semantic naming for easy maintenance
+ * and consistent styling across coverage components.
+ * 
+ * Best Practices:
+ * - Use semantic names (--coverage-status-completed) not values (--color-green)
+ * - Group related variables together
+ * - Provide fallbacks for older browsers
+ * - Document usage for each variable group
+ */
+
+:root {
+  /* ==========================================================================
+     STATUS COLORS - For zone and coverage status indicators
+     ========================================================================== */
+  
+  --coverage-status-pending: #94a3b8;      /* Slate-400 - Not started */
+  --coverage-status-in-progress: #3b82f6;  /* Blue-500 - Currently scraping */
+  --coverage-status-completed: #22c55e;    /* Green-500 - Successfully completed */
+  --coverage-status-failed: #ef4444;       /* Red-500 - Error state */
+  
+  /* ==========================================================================
+     WEBSITE STATUS COLORS - For website validation states
+     ========================================================================== */
+  
+  --website-status-none: #f59e0b;          /* Amber-500 - No website */
+  --website-status-valid: #22c55e;         /* Green-500 - Valid website */
+  --website-status-invalid: #ef4444;       /* Red-500 - Invalid/broken */
+  --website-status-generating: #3b82f6;    /* Blue-500 - Generation in progress */
+  --website-status-generated: #8b5cf6;     /* Purple-500 - Website generated */
+  --website-status-pending: #d1d5db;       /* Gray-300 - Awaiting validation */
+  
+  /* ==========================================================================
+     LAYOUT & SPACING - Consistent spacing across components
+     ========================================================================== */
+  
+  --coverage-card-padding: 1.5rem;         /* 24px - Card internal padding */
+  --coverage-card-gap: 1rem;               /* 16px - Gap between card sections */
+  --coverage-section-gap: 2rem;            /* 32px - Gap between major sections */
+  --coverage-metric-gap: 0.75rem;          /* 12px - Gap between metrics */
+  
+  /* ==========================================================================
+     TYPOGRAPHY - Font sizes for hierarchy
+     ========================================================================== */
+  
+  --coverage-heading-size: 1.5rem;         /* 24px - Main headings */
+  --coverage-subheading-size: 1.125rem;    /* 18px - Subheadings */
+  --coverage-metric-value-size: 2rem;      /* 32px - Large metric numbers */
+  --coverage-metric-label-size: 0.875rem;  /* 14px - Metric labels */
+  --coverage-body-size: 0.9375rem;         /* 15px - Body text */
+  --coverage-small-size: 0.8125rem;        /* 13px - Small text */
+  
+  /* ==========================================================================
+     BORDERS & RADIUS - Consistent border styling
+     ========================================================================== */
+  
+  --coverage-card-border-radius: 0.75rem;  /* 12px - Card corners */
+  --coverage-badge-border-radius: 0.375rem;/* 6px - Badge corners */
+  --coverage-button-border-radius: 0.5rem; /* 8px - Button corners */
+  --coverage-progress-border-radius: 9999px; /* Full rounded - Progress bars */
+  
+  --coverage-border-width: 1px;
+  --coverage-border-color: #e5e7eb;        /* Gray-200 */
+  --coverage-border-color-hover: #d1d5db;  /* Gray-300 */
+  
+  /* ==========================================================================
+     SHADOWS - Elevation levels
+     ========================================================================== */
+  
+  --coverage-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --coverage-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --coverage-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --coverage-shadow-hover: 0 6px 10px -1px rgb(0 0 0 / 0.12);
+  
+  /* ==========================================================================
+     TRANSITIONS - Smooth animations
+     ========================================================================== */
+  
+  --coverage-transition-speed-fast: 150ms;
+  --coverage-transition-speed-normal: 200ms;
+  --coverage-transition-speed-slow: 300ms;
+  --coverage-transition-easing: cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* ==========================================================================
+     NEUTRAL COLORS - For backgrounds, text, etc.
+     ========================================================================== */
+  
+  --coverage-bg-primary: #ffffff;          /* White - Main background */
+  --coverage-bg-secondary: #f8fafc;        /* Slate-50 - Secondary background */
+  --coverage-bg-tertiary: #f1f5f9;         /* Slate-100 - Tertiary background */
+  
+  --coverage-text-primary: #0f172a;        /* Slate-900 - Main text */
+  --coverage-text-secondary: #475569;      /* Slate-600 - Secondary text */
+  --coverage-text-tertiary: #64748b;       /* Slate-500 - Tertiary text */
+  --coverage-text-disabled: #cbd5e1;       /* Slate-300 - Disabled text */
+  
+  /* ==========================================================================
+     SEMANTIC BACKGROUNDS - For different component states
+     ========================================================================== */
+  
+  --coverage-bg-success: #f0fdf4;          /* Green-50 - Success state */
+  --coverage-bg-warning: #fef3c7;          /* Amber-100 - Warning state */
+  --coverage-bg-error: #fef2f2;            /* Red-50 - Error state */
+  --coverage-bg-info: #eff6ff;             /* Blue-50 - Info state */
+  
+  /* ==========================================================================
+     PROGRESS & LOADING - For progress bars and loaders
+     ========================================================================== */
+  
+  --coverage-progress-bg: #e2e8f0;         /* Slate-200 - Progress track */
+  --coverage-progress-fill: linear-gradient(90deg, #3b82f6, #8b5cf6); /* Blue to Purple */
+  --coverage-progress-height: 0.5rem;      /* 8px - Progress bar height */
+  
+  /* ==========================================================================
+     INTERACTIVE ELEMENTS - Buttons, links, hover states
+     ========================================================================== */
+  
+  --coverage-button-primary-bg: #8b5cf6;   /* Purple-500 */
+  --coverage-button-primary-hover: #7c3aed;/* Purple-600 */
+  --coverage-button-primary-text: #ffffff;
+  
+  --coverage-button-secondary-bg: #f1f5f9; /* Slate-100 */
+  --coverage-button-secondary-hover: #e2e8f0; /* Slate-200 */
+  --coverage-button-secondary-text: #475569; /* Slate-600 */
+  
+  --coverage-link-color: #3b82f6;          /* Blue-500 */
+  --coverage-link-hover: #2563eb;          /* Blue-600 */
+  
+  /* ==========================================================================
+     Z-INDEX LAYERS - Stacking order
+     ========================================================================== */
+  
+  --coverage-z-base: 1;
+  --coverage-z-dropdown: 10;
+  --coverage-z-sticky: 20;
+  --coverage-z-modal: 50;
+  --coverage-z-tooltip: 100;
+}
+
+/* ==========================================================================
+   DARK MODE SUPPORT (Optional - Future Enhancement)
+   ========================================================================== */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Override colors for dark mode */
+    --coverage-bg-primary: #0f172a;
+    --coverage-bg-secondary: #1e293b;
+    --coverage-bg-tertiary: #334155;
+    
+    --coverage-text-primary: #f8fafc;
+    --coverage-text-secondary: #cbd5e1;
+    --coverage-text-tertiary: #94a3b8;
+    
+    --coverage-border-color: #334155;
+    --coverage-border-color-hover: #475569;
+  }
+}
+
+/* ==========================================================================
+   UTILITY CLASSES - Common patterns for quick styling
+   ========================================================================== */
+
+.coverage-card {
+  background: var(--coverage-bg-primary);
+  border-radius: var(--coverage-card-border-radius);
+  padding: var(--coverage-card-padding);
+  box-shadow: var(--coverage-shadow-md);
+  border: var(--coverage-border-width) solid var(--coverage-border-color);
+  transition: box-shadow var(--coverage-transition-speed-normal) var(--coverage-transition-easing);
+}
+
+.coverage-card:hover {
+  box-shadow: var(--coverage-shadow-hover);
+}
+
+.coverage-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--coverage-card-gap);
+  padding-bottom: var(--coverage-card-gap);
+  border-bottom: var(--coverage-border-width) solid var(--coverage-border-color);
+}
+
+.coverage-card-title {
+  font-size: var(--coverage-heading-size);
+  font-weight: 600;
+  color: var(--coverage-text-primary);
+  margin: 0;
+}
+
+.coverage-status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--coverage-badge-border-radius);
+  font-size: var(--coverage-small-size);
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.coverage-status-badge.pending {
+  background: var(--coverage-status-pending);
+  color: white;
+}
+
+.coverage-status-badge.in-progress {
+  background: var(--coverage-status-in-progress);
+  color: white;
+}
+
+.coverage-status-badge.completed {
+  background: var(--coverage-status-completed);
+  color: white;
+}
+
+.coverage-status-badge.failed {
+  background: var(--coverage-status-failed);
+  color: white;
+}
+
+.coverage-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--coverage-metric-gap);
+  margin-top: var(--coverage-card-gap);
+}
+
+.coverage-metric-card {
+  background: var(--coverage-bg-secondary);
+  border-radius: var(--coverage-badge-border-radius);
+  padding: 1rem;
+  text-align: center;
+  transition: transform var(--coverage-transition-speed-fast) var(--coverage-transition-easing);
+}
+
+.coverage-metric-card:hover {
+  transform: translateY(-2px);
+}
+
+.coverage-metric-value {
+  font-size: var(--coverage-metric-value-size);
+  font-weight: 700;
+  color: var(--coverage-text-primary);
+  line-height: 1;
+  margin: 0;
+}
+
+.coverage-metric-label {
+  font-size: var(--coverage-metric-label-size);
+  color: var(--coverage-text-tertiary);
+  margin-top: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.coverage-progress {
+  margin-top: var(--coverage-card-gap);
+}
+
+.coverage-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--coverage-small-size);
+  color: var(--coverage-text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.coverage-progress-bar {
+  height: var(--coverage-progress-height);
+  background: var(--coverage-progress-bg);
+  border-radius: var(--coverage-progress-border-radius);
+  overflow: hidden;
+}
+
+.coverage-progress-fill {
+  height: 100%;
+  background: var(--coverage-progress-fill);
+  transition: width var(--coverage-transition-speed-slow) var(--coverage-transition-easing);
+}
+
+.coverage-button {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: var(--coverage-button-border-radius);
+  font-size: var(--coverage-body-size);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--coverage-transition-speed-normal) var(--coverage-transition-easing);
+}
+
+.coverage-button-primary {
+  background: var(--coverage-button-primary-bg);
+  color: var(--coverage-button-primary-text);
+}
+
+.coverage-button-primary:hover:not(:disabled) {
+  background: var(--coverage-button-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--coverage-shadow-md);
+}
+
+.coverage-button-secondary {
+  background: var(--coverage-button-secondary-bg);
+  color: var(--coverage-button-secondary-text);
+}
+
+.coverage-button-secondary:hover:not(:disabled) {
+  background: var(--coverage-button-secondary-hover);
+}
+
+.coverage-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Website status specific colors */
+.metric-website-none {
+  border-left: 4px solid var(--website-status-none);
+}
+
+.metric-website-valid {
+  border-left: 4px solid var(--website-status-valid);
+}
+
+.metric-website-invalid {
+  border-left: 4px solid var(--website-status-invalid);
+}
+
+.metric-website-generating {
+  border-left: 4px solid var(--website-status-generating);
+}
+
+.metric-website-generated {
+  border-left: 4px solid var(--website-status-generated);
+}
+
+/* ==========================================================================
+   RESPONSIVE BREAKPOINTS
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  :root {
+    --coverage-card-padding: 1rem;
+    --coverage-section-gap: 1.5rem;
+    --coverage-heading-size: 1.25rem;
+    --coverage-metric-value-size: 1.5rem;
+  }
+  
+  .coverage-metrics-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+}
+

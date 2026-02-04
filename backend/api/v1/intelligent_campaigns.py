@@ -18,6 +18,7 @@ from models.user import AdminUser
 from api.v1.auth import get_current_user
 from services.hunter.hunter_service import HunterService
 from services.hunter.geo_strategy_service import GeoStrategyService
+from services.hunter.coverage_reporting_service import CoverageReportingService
 from services.draft_campaign_service import DraftCampaignService
 
 router = APIRouter(prefix="/intelligent-campaigns", tags=["intelligent-campaigns"])
@@ -443,5 +444,108 @@ async def get_strategy_stats(
         
     except Exception as e:
         logger.error(f"Failed to get stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Phase 3: Coverage Reporting Endpoints
+
+@router.get("/zones/{zone_id}/statistics")
+async def get_zone_statistics(
+    zone_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Get detailed statistics for a specific zone.
+    
+    Returns comprehensive metrics including:
+    - Total businesses, qualified leads
+    - Website metrics (with/without/invalid/generated)
+    - Generation progress
+    - Qualification and coverage rates
+    - Last scrape details (persistent)
+    """
+    try:
+        reporting_service = CoverageReportingService(db)
+        stats = await reporting_service.get_zone_statistics(zone_id)
+        
+        if 'error' in stats:
+            raise HTTPException(status_code=404, detail=stats['error'])
+        
+        return stats
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get zone statistics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/strategies/{strategy_id}/overview")
+async def get_strategy_overview(
+    strategy_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Get comprehensive overview of a geo-strategy.
+    
+    Returns strategy-wide aggregated metrics including:
+    - Zone progress (total, completed, pending)
+    - Business totals and website metrics
+    - Performance rates (qualification, coverage)
+    - Per-zone breakdown with details
+    """
+    try:
+        from uuid import UUID
+        strategy_uuid = UUID(strategy_id)
+        
+        reporting_service = CoverageReportingService(db)
+        overview = await reporting_service.get_strategy_overview(strategy_uuid)
+        
+        if 'error' in overview:
+            raise HTTPException(status_code=404, detail=overview['error'])
+        
+        return overview
+        
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid strategy ID format")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get strategy overview: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/coverage/breakdown")
+async def get_coverage_breakdown(
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    category: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Get coverage breakdown with optional filters.
+    
+    Query parameters:
+    - city: Filter by city (optional)
+    - state: Filter by state (optional)
+    - category: Filter by category/industry (optional)
+    
+    Returns aggregated coverage statistics across filtered zones.
+    """
+    try:
+        reporting_service = CoverageReportingService(db)
+        breakdown = await reporting_service.get_coverage_breakdown(
+            city=city,
+            state=state,
+            category=category
+        )
+        
+        return breakdown
+        
+    except Exception as e:
+        logger.error(f"Failed to get coverage breakdown: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
