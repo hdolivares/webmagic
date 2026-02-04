@@ -26,7 +26,7 @@ from api.v1 import (
     domains,  # Phase 5: Custom domains
     tickets  # Phase 6: Support tickets
 )
-from api.v1 import webhooks_twilio as twilio  # Phase 7: SMS webhooks
+from api.v1 import webhooks_telnyx as telnyx  # Phase 7: SMS webhooks (Telnyx)
 
 api_router = APIRouter()
 
@@ -40,7 +40,7 @@ api_router.include_router(preview.router)  # Preview system (Phase 4)
 api_router.include_router(domains.router)  # Custom domains (Phase 5)
 api_router.include_router(tickets.router)  # Support tickets (Phase 6)
 api_router.include_router(webhooks.router)  # Webhooks (Phase 2)
-api_router.include_router(twilio.router)  # SMS webhooks (Phase 7)
+api_router.include_router(telnyx.router)  # SMS webhooks - Telnyx (Phase 7)
 api_router.include_router(businesses.router)
 api_router.include_router(business_categories.router)  # Business categories
 api_router.include_router(coverage.router)

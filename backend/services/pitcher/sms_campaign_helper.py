@@ -74,9 +74,9 @@ class SMSCampaignHelper:
                 
                 raise ValidationException(error_msg)
             
-            # Build status callback URL for delivery tracking
+            # Build status callback URL for delivery tracking (Telnyx)
             callback_url = (
-                f"{settings.API_URL}/api/v1/webhooks/twilio/status"
+                f"{settings.API_URL}/api/v1/webhooks/telnyx/status"
                 if settings.API_URL
                 else None
             )
