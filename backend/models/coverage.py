@@ -1,7 +1,8 @@
 """
 Coverage Grid model for tracking scraping territories.
 """
-from sqlalchemy import Column, String, Integer, DateTime, Boolean, Text
+from sqlalchemy import Column, String, Integer, DateTime, Boolean, Text, Numeric
+from sqlalchemy.dialects.postgresql import JSONB
 from models.base import BaseModel
 
 
@@ -42,6 +43,27 @@ class CoverageGrid(BaseModel):
     qualified_count = Column(Integer, default=0, nullable=False)
     site_count = Column(Integer, default=0, nullable=False)
     conversion_count = Column(Integer, default=0, nullable=False)
+    
+    # Detailed Website Metrics (New in Migration 008)
+    businesses_with_websites = Column(Integer, default=0, nullable=False)
+    businesses_without_websites = Column(Integer, default=0, nullable=False)
+    invalid_websites = Column(Integer, default=0, nullable=False)
+    websites_generated = Column(Integer, default=0, nullable=False)
+    generation_in_progress = Column(Integer, default=0, nullable=False)
+    generation_failed = Column(Integer, default=0, nullable=False)
+    
+    # Validation Metrics (New in Migration 008)
+    validation_completed_count = Column(Integer, default=0, nullable=False)
+    validation_pending_count = Column(Integer, default=0, nullable=False)
+    
+    # Zone Performance Metrics (New in Migration 008)
+    avg_qualification_score = Column(Numeric(5, 2), nullable=True)
+    avg_rating = Column(Numeric(2, 1), nullable=True)
+    
+    # Last Scrape Details - persistent storage (New in Migration 008)
+    last_scrape_details = Column(JSONB, nullable=True)
+    # Stores: raw_businesses, qualified_leads, new_businesses, existing_businesses,
+    #         with_websites, without_websites, invalid_websites, timestamp
     
     # Pagination & Continuation Support
     scrape_count = Column(Integer, default=0, nullable=False)

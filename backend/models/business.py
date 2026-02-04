@@ -51,12 +51,30 @@ class Business(BaseModel):
     
     # Processing Status
     website_status = Column(String(30), default="none", nullable=True, index=True)
-    # Values: none, generating, generated, deployed, sold, archived
+    # Values: none, queued, generating, generated, deployed, sold, archived
     
     contact_status = Column(String(30), default="pending", nullable=True, index=True)
     # Values: pending, emailed, opened, clicked, replied, purchased, unsubscribed, bounced
     
     qualification_score = Column(Integer, default=0, nullable=True)
+    
+    # Website Validation (New in Migration 007)
+    website_validation_status = Column(String(30), default="pending", nullable=True, index=True)
+    # Values: pending, valid, invalid, missing, timeout
+    
+    website_validation_result = Column(JSONB, nullable=True)
+    # Stores full ValidationResult: status, url_type, accessibility, issues, etc.
+    
+    website_validated_at = Column(DateTime, nullable=True)
+    
+    discovered_urls = Column(JSONB, default=list, nullable=True)
+    # URLs found in Google web results that weren't in the site field
+    
+    # Website Generation Queue Tracking (New in Migration 007)
+    generation_queued_at = Column(DateTime, nullable=True)
+    generation_started_at = Column(DateTime, nullable=True)
+    generation_completed_at = Column(DateTime, nullable=True)
+    generation_attempts = Column(Integer, default=0, nullable=True)
     
     # Creative DNA (stored after AI generation)
     creative_dna = Column(JSONB, nullable=True)
