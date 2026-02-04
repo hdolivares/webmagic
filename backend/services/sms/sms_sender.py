@@ -1,22 +1,27 @@
 """
-SMS Sender Service - Multi-Provider SMS Sending.
+SMS Sender Service - Telnyx SMS Provider.
 
-Supports Twilio (primary) with extensible architecture for additional providers.
-Mirrors the email_sender.py architecture for consistency.
+Uses Telnyx API for SMS sending with raw requests (no SDK dependency).
+Provides retry logic and comprehensive error handling.
 
 Author: WebMagic Team
 Date: January 21, 2026
+Updated: February 2026 - Migrated from Twilio to Telnyx
 """
 from typing import Optional, Dict, Any
 from abc import ABC, abstractmethod
 import logging
-from datetime import datetime
+import asyncio
+import httpx
 
 from core.config import get_settings
 from core.exceptions import ExternalAPIException
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Telnyx API configuration
+TELNYX_API_URL = "https://api.telnyx.com/v2/messages"
 
 
 class SMSProvider(ABC):
@@ -45,38 +50,28 @@ class SMSProvider(ABC):
         pass
 
 
-class TwilioSMSProvider(SMSProvider):
-    """Twilio SMS provider implementation."""
+class TelnyxSMSProvider(SMSProvider):
+    """Telnyx SMS provider implementation using raw requests."""
     
     def __init__(self):
-        """Initialize Twilio client."""
-        self.account_sid = settings.TWILIO_ACCOUNT_SID
-        self.auth_token = settings.TWILIO_AUTH_TOKEN
-        self.from_phone = settings.TWILIO_PHONE_NUMBER
+        """Initialize Telnyx client with API key."""
+        self.api_key = settings.TELNYX_API_KEY
+        self.from_phone = settings.TELNYX_PHONE_NUMBER
+        self.messaging_profile_id = settings.TELNYX_MESSAGING_PROFILE_ID
         
-        if not self.account_sid or not self.auth_token:
+        if not self.api_key:
             raise ValueError(
-                "Twilio credentials not configured. "
-                "Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in .env"
+                "Telnyx API key not configured. "
+                "Set TELNYX_API_KEY in .env"
             )
         
         if not self.from_phone:
             raise ValueError(
-                "Twilio phone number not configured. "
-                "Set TWILIO_PHONE_NUMBER in .env"
+                "Telnyx phone number not configured. "
+                "Set TELNYX_PHONE_NUMBER in .env"
             )
         
-        # Lazy import Twilio (only when needed)
-        try:
-            from twilio.rest import Client
-            self.client = Client(self.account_sid, self.auth_token)
-            logger.info("Twilio SMS client initialized successfully")
-        except ImportError:
-            raise ImportError(
-                "Twilio SDK not installed. Run: pip install twilio"
-            )
-        except Exception as e:
-            raise ValueError(f"Failed to initialize Twilio client: {str(e)}")
+        logger.info("Telnyx SMS client initialized successfully")
     
     async def send_sms(
         self,
@@ -86,7 +81,7 @@ class TwilioSMSProvider(SMSProvider):
         status_callback: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Send SMS via Twilio.
+        Send SMS via Telnyx API.
         
         Args:
             to_phone: Recipient phone in E.164 format (e.g., +12345678900)
@@ -95,7 +90,7 @@ class TwilioSMSProvider(SMSProvider):
             status_callback: Optional webhook URL for delivery tracking
         
         Returns:
-            Dict with Twilio message details
+            Dict with Telnyx message details
         
         Raises:
             ExternalAPIException: If SMS sending fails
@@ -107,60 +102,103 @@ class TwilioSMSProvider(SMSProvider):
                     f"Phone must be in E.164 format (e.g., +12345678900): {to_phone}"
                 )
             
-            # Prepare message parameters
-            message_params = {
-                "body": body,
-                "from_": from_phone or self.from_phone,
-                "to": to_phone
+            # Prepare request payload
+            payload = {
+                "from": from_phone or self.from_phone,
+                "to": to_phone,
+                "text": body,
             }
             
-            # Add status callback if provided
+            # Add messaging profile if configured
+            if self.messaging_profile_id:
+                payload["messaging_profile_id"] = self.messaging_profile_id
+            
+            # Add webhook URL if provided
             if status_callback:
-                message_params["status_callback"] = status_callback
+                payload["webhook_url"] = status_callback
             
-            # Send message
-            logger.info(f"Sending SMS to {to_phone} (length: {len(body)} chars)")
-            message = self.client.messages.create(**message_params)
-            
-            # Calculate cost (Twilio provides this after sending)
-            cost = float(message.price) if message.price else None
-            
-            # Prepare response
-            response = {
-                "provider": "twilio",
-                "message_id": message.sid,
-                "status": message.status,
-                "to": message.to,
-                "from": message.from_,
-                "body": body,
-                "segments": message.num_segments,
-                "cost": cost,
-                "cost_unit": message.price_unit,
-                "sent_at": message.date_created.isoformat() if message.date_created else None,
-                "error_code": message.error_code,
-                "error_message": message.error_message
+            # Prepare headers
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
             }
             
-            logger.info(
-                f"SMS sent successfully: {message.sid} "
-                f"(segments: {message.num_segments}, cost: {cost})"
-            )
+            logger.info(f"Sending SMS to {to_phone} (length: {len(body)} chars)")
             
-            return response
+            # Send request using httpx (async)
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    TELNYX_API_URL,
+                    headers=headers,
+                    json=payload
+                )
+                
+                data = response.json()
+                
+                # Check for errors
+                if response.status_code not in (200, 201, 202):
+                    error_detail = data.get("errors", [{}])[0]
+                    error_code = error_detail.get("code", "unknown")
+                    error_msg = error_detail.get("detail", str(data))
+                    
+                    logger.error(
+                        f"Telnyx API error {response.status_code}: {error_msg}"
+                    )
+                    raise ExternalAPIException(
+                        f"Telnyx error {error_code}: {error_msg}"
+                    )
+                
+                # Parse successful response
+                message_data = data.get("data", {})
+                message_id = message_data.get("id")
+                
+                # Telnyx returns parts count instead of segments
+                parts = message_data.get("parts", 1)
+                
+                # Get initial status from 'to' array
+                to_info = message_data.get("to", [{}])
+                if isinstance(to_info, list) and len(to_info) > 0:
+                    initial_status = to_info[0].get("status", "queued")
+                else:
+                    initial_status = "queued"
+                
+                # Prepare response (cost comes via webhook, not initial response)
+                result = {
+                    "provider": "telnyx",
+                    "message_id": message_id,
+                    "status": initial_status,
+                    "to": to_phone,
+                    "from": from_phone or self.from_phone,
+                    "body": body,
+                    "segments": parts,
+                    "cost": None,  # Telnyx sends cost in webhook
+                    "cost_unit": "USD",
+                    "sent_at": message_data.get("created_at"),
+                    "error_code": None,
+                    "error_message": None
+                }
+                
+                logger.info(
+                    f"SMS sent successfully: {message_id} "
+                    f"(parts: {parts}, status: {initial_status})"
+                )
+                
+                return result
+        
+        except httpx.TimeoutException:
+            error_msg = f"Telnyx API timeout sending SMS to {to_phone}"
+            logger.error(error_msg)
+            raise ExternalAPIException(error_msg)
+        
+        except httpx.RequestError as e:
+            error_msg = f"Telnyx request error: {str(e)}"
+            logger.error(error_msg)
+            raise ExternalAPIException(error_msg)
+        
+        except ExternalAPIException:
+            raise
         
         except Exception as e:
-            # Import Twilio exceptions
-            try:
-                from twilio.base.exceptions import TwilioRestException
-                
-                if isinstance(e, TwilioRestException):
-                    error_msg = f"Twilio error {e.code}: {e.msg}"
-                    logger.error(f"Failed to send SMS to {to_phone}: {error_msg}")
-                    raise ExternalAPIException(error_msg)
-            except ImportError:
-                pass
-            
-            # Generic error
             error_msg = f"SMS send failed: {str(e)}"
             logger.error(f"Failed to send SMS to {to_phone}: {error_msg}")
             raise ExternalAPIException(error_msg)
@@ -171,7 +209,7 @@ class SMSSender:
     SMS sender that auto-selects configured provider.
     
     Currently supports:
-    - Twilio (primary)
+    - Telnyx (primary)
     
     Future providers:
     - MessageBird
@@ -199,12 +237,12 @@ class SMSSender:
         Raises:
             ValueError: If provider is not configured or invalid
         """
-        if self.provider_name.lower() == "twilio":
+        if self.provider_name.lower() == "telnyx":
             try:
-                return TwilioSMSProvider()
+                return TelnyxSMSProvider()
             except Exception as e:
-                logger.error(f"Failed to initialize Twilio: {e}")
-                raise ValueError(f"Twilio initialization failed: {e}")
+                logger.error(f"Failed to initialize Telnyx: {e}")
+                raise ValueError(f"Telnyx initialization failed: {e}")
         
         # Future providers can be added here
         # elif self.provider_name.lower() == "messagebird":
@@ -212,7 +250,7 @@ class SMSSender:
         
         raise ValueError(
             f"Invalid SMS provider: {self.provider_name}. "
-            "Supported providers: twilio"
+            "Supported providers: telnyx"
         )
     
     async def send(
@@ -283,7 +321,6 @@ class SMSSender:
                 
                 if attempt < max_retries - 1:
                     # Wait before retry (exponential backoff)
-                    import asyncio
                     wait_time = 2 ** attempt  # 1s, 2s, 4s
                     await asyncio.sleep(wait_time)
         
@@ -291,4 +328,3 @@ class SMSSender:
         raise ExternalAPIException(
             f"SMS failed after {max_retries} attempts: {last_error}"
         )
-
