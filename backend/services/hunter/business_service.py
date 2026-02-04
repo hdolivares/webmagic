@@ -89,6 +89,80 @@ class BusinessService:
         )
         return result.scalar_one_or_none()
     
+    async def create_or_update_business(
+        self,
+        data: Dict[str, Any],
+        source: str = "outscraper_gmaps",
+        discovery_city: Optional[str] = None,
+        discovery_state: Optional[str] = None,
+        discovery_zone_id: Optional[str] = None,
+        discovery_zone_lat: Optional[float] = None,
+        discovery_zone_lon: Optional[float] = None,
+        lead_score: Optional[float] = None,
+        qualification_reasons: Optional[List[str]] = None
+    ) -> Optional[Business]:
+        """
+        Create or update a business record (idempotent).
+        
+        Looks up by gmb_id first, creates if not found, updates if found.
+        
+        Args:
+            data: Business data dictionary
+            source: Data source identifier
+            discovery_city: City where business was discovered
+            discovery_state: State where business was discovered
+            discovery_zone_id: Zone ID where business was discovered
+            discovery_zone_lat: Zone latitude
+            discovery_zone_lon: Zone longitude
+            lead_score: Qualification score
+            qualification_reasons: List of qualification reason strings
+            
+        Returns:
+            Business instance or None if creation failed
+        """
+        try:
+            # Extract gmb_id for lookup
+            gmb_id = data.get("gmb_id") or data.get("cid")
+            
+            # Try to find existing business
+            existing = None
+            if gmb_id:
+                existing = await self.get_business_by_gmb_id(str(gmb_id))
+            
+            # Build business data with discovery metadata
+            business_data = {
+                **data,
+                "source": source,
+                "discovery_city": discovery_city,
+                "discovery_state": discovery_state,
+                "discovery_zone_id": discovery_zone_id,
+                "discovery_zone_lat": discovery_zone_lat,
+                "discovery_zone_lon": discovery_zone_lon,
+                "lead_score": lead_score,
+                "qualification_reasons": qualification_reasons
+            }
+            
+            # Clean None values
+            business_data = {k: v for k, v in business_data.items() if v is not None}
+            
+            if existing:
+                # Update existing business with new data
+                logger.info(f"Updating existing business: {existing.name} ({existing.id})")
+                updated = await self.update_business(existing.id, business_data)
+                if updated:
+                    updated._is_new = False
+                return updated
+            else:
+                # Create new business
+                business = await self.create_business(business_data)
+                if business:
+                    business._is_new = True
+                return business
+                
+        except Exception as e:
+            logger.error(f"Error in create_or_update_business: {str(e)}")
+            return None
+    
     async def list_businesses(
         self,
         skip: int = 0,
