@@ -168,9 +168,10 @@ class OutscraperClient:
             
             if results and len(results) > 0:
                 logger.info(f"First element type: {type(results[0])}, length: {len(results[0]) if isinstance(results[0], (list, dict)) else 'N/A'}")
+                logger.info(f"Total results from Outscraper: {len(results)}")
                 
-                # Outscraper returns a list of lists
-                return results[0]  # Get first result set
+                # Outscraper returns a flat list of dicts (not a list of lists)
+                return results  # Return the whole list
             
             logger.warning("Outscraper returned empty results")
             return []
