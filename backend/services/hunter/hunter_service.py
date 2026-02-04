@@ -176,7 +176,10 @@ class HunterService:
                         biz_data["website_status"] = website_status
                     
                     # Qualify the lead
-                    is_qualified, score, reasons = self.qualifier.qualify(biz_data)
+                    qualification_result = self.qualifier.qualify(biz_data)
+                    is_qualified = qualification_result["qualified"]
+                    score = qualification_result["score"]
+                    reasons = qualification_result["reasons"]
                     
                     # Store if qualified
                     if is_qualified:
@@ -449,7 +452,10 @@ class HunterService:
                     biz_data["website_status"] = website_status
                 
                 # Qualify
-                is_qualified, score, reasons = self.qualifier.qualify(biz_data)
+                qualification_result = self.qualifier.qualify(biz_data)
+                is_qualified = qualification_result["qualified"]
+                score = qualification_result["score"]
+                reasons = qualification_result["reasons"]
                 
                 if is_qualified:
                     await self.business_service.create_or_update_business(
