@@ -107,7 +107,7 @@ class LeadQualifier:
             reasons.append("No rating (0)")
         
         # 4. Check review count (15 points)
-        review_count = business.get("review_count", 0)
+        review_count = business.get("review_count") or 0
         if review_count >= 100:
             score += 15
             reasons.append(f"{review_count} reviews (15)")
