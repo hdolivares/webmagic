@@ -205,7 +205,7 @@ class LeadQualifier:
             return has_valid
         
         # Fall back to URL pattern checking (pre-validation)
-        website = business.get("website_url", "")
+        website = business.get("website_url") or ""  # Handle None values
         if not website:
             return False
         
@@ -239,7 +239,7 @@ class LeadQualifier:
     
     def _is_chain(self, business: Dict[str, Any]) -> bool:
         """Check if business is a chain/franchise."""
-        name = business.get("name", "").lower()
+        name = (business.get("name") or "").lower()  # Handle None values
         
         for keyword in self.CHAIN_KEYWORDS:
             if keyword in name:
@@ -260,18 +260,22 @@ class LeadQualifier:
         """
         # Check reviews
         reviews_data = business.get("reviews_data", [])
-        for review in reviews_data:
-            text = review.get("text", "")
-            matches = self.EMAIL_PATTERN.findall(text)
-            if matches:
-                return matches[0]
+        if reviews_data:
+            for review in reviews_data:
+                text = review.get("text") or ""  # Handle None values
+                if text:
+                    matches = self.EMAIL_PATTERN.findall(text)
+                    if matches:
+                        return matches[0]
         
         # Check raw_data if available
         raw_data = business.get("raw_data", {})
-        description = raw_data.get("description", "")
-        matches = self.EMAIL_PATTERN.findall(description)
-        if matches:
-            return matches[0]
+        if raw_data:
+            description = raw_data.get("description") or ""  # Handle None values
+            if description:
+                matches = self.EMAIL_PATTERN.findall(description)
+                if matches:
+                    return matches[0]
         
         return None
     
