@@ -155,6 +155,11 @@ class OutscraperClient:
             drop_duplicates=True
         )
         
+        # DEBUG: Log what Outscraper returns
+        logger.info(f"Outscraper returned type: {type(results)}, length: {len(results) if results else 0}")
+        if results and len(results) > 0:
+            logger.info(f"First element type: {type(results[0])}, length: {len(results[0]) if isinstance(results[0], (list, dict)) else 'N/A'}")
+        
         # Outscraper returns a list of lists
         if results and len(results) > 0:
             return results[0]  # Get first result set
@@ -183,10 +188,20 @@ class OutscraperClient:
         - google_id → gmb_id
         - photos_data_id → photos_urls
         """
+        # DEBUG: Log what we're actually getting
+        logger.info(f"Normalizing {len(results)} results. Type: {type(results)}")
+        if results and len(results) > 0:
+            logger.info(f"First result type: {type(results[0])}, Sample: {str(results[0])[:200]}")
+        
         normalized = []
         
         for business in results:
             try:
+                # Type check - skip if not a dict
+                if not isinstance(business, dict):
+                    logger.warning(f"Skipping non-dict business: {type(business)} = {str(business)[:100]}")
+                    continue
+                
                 # Extract review data for AI analysis
                 reviews_data = business.get("reviews_data", [])
                 review_texts = [
