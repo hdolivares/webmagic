@@ -22,6 +22,7 @@ from api.schemas.business import (
     BusinessStats
 )
 from services.hunter.business_service import BusinessService
+from services.hunter.business_filter_service import BusinessFilterService, QUICK_FILTERS
 from services.crm import BusinessEnrichmentService
 from models.user import AdminUser
 
@@ -522,3 +523,241 @@ async def bulk_export(
             media_type="application/json",
             headers={"Content-Disposition": "attachment; filename=businesses.json"}
         )
+
+
+# ============================================
+# PHASE 4: ADVANCED FILTERING ENDPOINTS
+# ============================================
+
+class FilterRequest(BaseModel):
+    """Request model for advanced filtering."""
+    filters: dict
+    sort_by: str = "scraped_at"
+    sort_desc: bool = True
+    page: int = 1
+    page_size: int = 50
+
+
+class SaveFilterPresetRequest(BaseModel):
+    """Request model for saving filter preset."""
+    name: str
+    filters: dict
+    is_public: bool = False
+
+
+@router.post("/filter")
+async def filter_businesses_advanced(
+    request: FilterRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Advanced business filtering with complex AND/OR logic.
+    
+    Supports:
+    - Complex filter combinations
+    - Custom operators (eq, ne, gt, lt, in, contains, etc.)
+    - Nested AND/OR logic
+    - Multiple field filtering
+    
+    Example request body:
+    ```json
+    {
+        "filters": {
+            "AND": [
+                {"state": "CA"},
+                {"OR": [
+                    {"website_url": {"operator": "is_null", "value": null}},
+                    {"website_validation_status": {"operator": "in", "value": ["invalid", "missing"]}}
+                ]},
+                {"rating": {"operator": "gte", "value": 4.0}}
+            ]
+        },
+        "sort_by": "rating",
+        "sort_desc": true,
+        "page": 1,
+        "page_size": 50
+    }
+    ```
+    """
+    try:
+        filter_service = BusinessFilterService(db)
+        
+        # Calculate skip for pagination
+        skip = (request.page - 1) * request.page_size
+        
+        result = await filter_service.filter_businesses(
+            filters=request.filters,
+            sort_by=request.sort_by,
+            sort_desc=request.sort_desc,
+            skip=skip,
+            limit=request.page_size
+        )
+        
+        return result
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to filter businesses: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/filters/quick")
+async def get_quick_filters(
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Get predefined quick filter templates.
+    
+    Returns commonly used filter configurations that can be applied instantly.
+    """
+    return {
+        "quick_filters": QUICK_FILTERS
+    }
+
+
+@router.get("/filters/stats")
+async def get_filter_stats(
+    filters: Optional[str] = Query(None, description="JSON string of filters to apply"),
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Get statistics for businesses matching filters.
+    
+    Useful for showing "You have X businesses without websites" messages.
+    """
+    try:
+        import json as json_lib
+        
+        filter_service = BusinessFilterService(db)
+        
+        # Parse filters if provided
+        parsed_filters = None
+        if filters:
+            try:
+                parsed_filters = json_lib.loads(filters)
+            except json_lib.JSONDecodeError:
+                raise HTTPException(status_code=400, detail="Invalid JSON in filters parameter")
+        
+        # Get counts by website status
+        counts = await filter_service.count_by_website_status(parsed_filters)
+        
+        return {
+            "by_website_status": counts,
+            "filters_applied": parsed_filters
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get filter stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/filters/presets")
+async def save_filter_preset(
+    request: SaveFilterPresetRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Save a filter preset for reuse.
+    
+    Allows users to save complex filter combinations with a friendly name.
+    """
+    try:
+        filter_service = BusinessFilterService(db)
+        
+        preset = await filter_service.save_filter_preset(
+            user_id=current_user.id,
+            name=request.name,
+            filters=request.filters,
+            is_public=request.is_public
+        )
+        
+        return {
+            "id": str(preset.id),
+            "name": preset.name,
+            "filters": preset.filters,
+            "is_public": preset.is_public,
+            "created_at": preset.created_at.isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to save filter preset: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/filters/presets")
+async def list_filter_presets(
+    include_public: bool = Query(True, description="Include public presets from other users"),
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    List all filter presets for the current user.
+    
+    Includes user's own presets and optionally public presets from other users.
+    """
+    try:
+        filter_service = BusinessFilterService(db)
+        
+        presets = await filter_service.get_user_presets(
+            user_id=current_user.id,
+            include_public=include_public
+        )
+        
+        return {
+            "presets": [
+                {
+                    "id": str(p.id),
+                    "name": p.name,
+                    "filters": p.filters,
+                    "is_public": p.is_public,
+                    "is_own": p.user_id == current_user.id,
+                    "created_at": p.created_at.isoformat()
+                }
+                for p in presets
+            ],
+            "total": len(presets)
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to list filter presets: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/filters/presets/{preset_id}")
+async def delete_filter_preset(
+    preset_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Delete a filter preset.
+    
+    Users can only delete their own presets.
+    """
+    try:
+        filter_service = BusinessFilterService(db)
+        
+        deleted = await filter_service.delete_preset(
+            preset_id=preset_id,
+            user_id=current_user.id
+        )
+        
+        if not deleted:
+            raise HTTPException(
+                status_code=404,
+                detail="Preset not found or you don't have permission to delete it"
+            )
+        
+        return {"message": "Preset deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete filter preset: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
