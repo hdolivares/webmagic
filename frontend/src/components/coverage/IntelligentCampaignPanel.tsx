@@ -3,6 +3,8 @@ import { Card } from '@/components/ui'
 import { api } from '@/services/api'
 import { US_STATES } from '@/data/states'
 import { getCitiesForState } from '@/data/cities'
+import { CoverageBreakdownPanel } from './CoverageBreakdownPanel'
+import { ZoneStatisticsCard } from './ZoneStatisticsCard'
 import './IntelligentCampaignPanel.css'
 
 interface Zone {
@@ -50,6 +52,11 @@ interface ScrapeResult {
     raw_businesses: number
     qualified_leads: number
     new_businesses: number
+    // Phase 3: New website metrics
+    with_websites?: number
+    without_websites?: number
+    invalid_websites?: number
+    queued_for_generation?: number
   }
   progress: {
     total_zones: number
@@ -439,6 +446,40 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
               </div>
             </div>
 
+            {/* Phase 3: New Website Metrics */}
+            {(scrapeResult.results.with_websites !== undefined || 
+              scrapeResult.results.without_websites !== undefined) && (
+              <div className="website-metrics-grid">
+                {scrapeResult.results.with_websites !== undefined && (
+                  <div className="result-card website-valid">
+                    <div className="result-value">{scrapeResult.results.with_websites}</div>
+                    <div className="result-label">With Valid Websites</div>
+                  </div>
+                )}
+                
+                {scrapeResult.results.without_websites !== undefined && (
+                  <div className="result-card website-none">
+                    <div className="result-value">{scrapeResult.results.without_websites}</div>
+                    <div className="result-label">Without Websites</div>
+                  </div>
+                )}
+                
+                {scrapeResult.results.invalid_websites !== undefined && scrapeResult.results.invalid_websites > 0 && (
+                  <div className="result-card website-invalid">
+                    <div className="result-value">{scrapeResult.results.invalid_websites}</div>
+                    <div className="result-label">Invalid Websites</div>
+                  </div>
+                )}
+                
+                {scrapeResult.results.queued_for_generation !== undefined && scrapeResult.results.queued_for_generation > 0 && (
+                  <div className="result-card website-generating">
+                    <div className="result-value">{scrapeResult.results.queued_for_generation}</div>
+                    <div className="result-label">Queued for Generation</div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="progress-bar-container">
               <div className="progress-label">
                 Campaign Progress: {scrapeResult.progress.completion_pct}%
@@ -454,6 +495,26 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
                 ({scrapeResult.progress.total_businesses_found} businesses found)
               </div>
             </div>
+
+            {/* Phase 3: Zone Statistics Card (Persistent Details) */}
+            <div className="zone-stats-container">
+              <h4>Detailed Zone Statistics</h4>
+              <ZoneStatisticsCard 
+                zoneId={scrapeResult.zone_scraped.zone_id}
+                autoLoad={true}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Phase 3: Comprehensive Strategy Breakdown (Always visible when strategy exists) */}
+        {strategy && strategy.zones_completed > 0 && (
+          <div className="strategy-breakdown-container">
+            <CoverageBreakdownPanel 
+              strategyId={strategy.strategy_id}
+              autoLoad={true}
+              showZoneDetails={true}
+            />
           </div>
         )}
       </Card>

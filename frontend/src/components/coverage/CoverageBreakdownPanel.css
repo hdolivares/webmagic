@@ -1,0 +1,325 @@
+/**
+ * CoverageBreakdownPanel Component Styles
+ * 
+ * Uses semantic CSS variables from coverage-theme.css for consistent theming
+ */
+
+@import '../../styles/coverage-theme.css';
+
+/* Panel Container */
+.coverage-breakdown-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--coverage-section-gap);
+}
+
+/* Loading/Error States */
+.breakdown-loading,
+.breakdown-error,
+.breakdown-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  gap: 1rem;
+}
+
+/* Header Section */
+.breakdown-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.breakdown-header .coverage-card-title,
+.breakdown-header .strategy-subtitle {
+  color: white;
+}
+
+.header-content {
+  flex: 1;
+}
+
+.strategy-subtitle {
+  font-size: var(--coverage-small-size);
+  opacity: 0.9;
+  margin: 0.25rem 0 0 0;
+  font-family: monospace;
+}
+
+.breakdown-header .coverage-status-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  backdrop-filter: blur(10px);
+}
+
+/* Metrics Section */
+.breakdown-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--coverage-section-gap);
+}
+
+.section-title {
+  font-size: var(--coverage-heading-size);
+  font-weight: 700;
+  color: var(--coverage-text-primary);
+  margin: 0 0 var(--coverage-card-gap) 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.zone-count {
+  font-size: var(--coverage-body-size);
+  font-weight: 400;
+  color: var(--coverage-text-tertiary);
+}
+
+.metric-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--coverage-card-gap);
+}
+
+.metric-section-title {
+  font-size: var(--coverage-subheading-size);
+  font-weight: 600;
+  color: var(--coverage-text-secondary);
+  margin: 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--coverage-border-color);
+}
+
+/* Website Status Grid */
+.website-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--coverage-card-gap);
+}
+
+.website-status-card {
+  background: var(--coverage-bg-secondary);
+  border-radius: var(--coverage-card-border-radius);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: all var(--coverage-transition-speed-normal) var(--coverage-transition-easing);
+}
+
+.website-status-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--coverage-shadow-lg);
+}
+
+.status-card-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.status-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  background: var(--coverage-bg-tertiary);
+}
+
+.metric-website-valid .status-icon {
+  background: var(--website-status-valid);
+  color: white;
+}
+
+.metric-website-none .status-icon {
+  background: var(--website-status-none);
+  color: white;
+}
+
+.metric-website-generated .status-icon {
+  background: var(--website-status-generated);
+  color: white;
+}
+
+.metric-website-generating .status-icon {
+  background: var(--website-status-generating);
+  color: white;
+}
+
+.status-info {
+  flex: 1;
+}
+
+.status-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--coverage-text-primary);
+  line-height: 1;
+  margin: 0;
+}
+
+.status-label {
+  font-size: var(--coverage-small-size);
+  color: var(--coverage-text-tertiary);
+  margin: 0.25rem 0 0 0;
+}
+
+.status-percentage {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--coverage-text-primary);
+  background: var(--coverage-bg-tertiary);
+  padding: 0.5rem 1rem;
+  border-radius: var(--coverage-badge-border-radius);
+  text-align: center;
+}
+
+/* Generation Action */
+.generation-action {
+  margin-top: var(--coverage-card-gap);
+}
+
+.generation-action .coverage-button {
+  width: 100%;
+  font-size: 1.0625rem;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+}
+
+.generation-action .coverage-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  transform: translateY(-2px);
+}
+
+/* Zone Details Section */
+.zone-details-section {
+  background: var(--coverage-bg-secondary);
+}
+
+.zone-details-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--coverage-metric-gap);
+}
+
+.zone-detail-item {
+  background: var(--coverage-bg-primary);
+  border-radius: var(--coverage-card-border-radius);
+  border: var(--coverage-border-width) solid var(--coverage-border-color);
+  overflow: hidden;
+}
+
+.zone-detail-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background var(--coverage-transition-speed-fast) var(--coverage-transition-easing);
+}
+
+.zone-detail-header:hover {
+  background: var(--coverage-bg-secondary);
+}
+
+.zone-header-left,
+.zone-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.zone-id {
+  font-size: var(--coverage-body-size);
+  font-weight: 600;
+  color: var(--coverage-text-primary);
+  font-family: monospace;
+}
+
+.zone-quick-stats {
+  font-size: var(--coverage-small-size);
+  color: var(--coverage-text-tertiary);
+}
+
+.expand-icon {
+  font-size: 0.75rem;
+  color: var(--coverage-text-tertiary);
+  transition: transform var(--coverage-transition-speed-normal) var(--coverage-transition-easing);
+}
+
+.zone-detail-content {
+  padding: 0 1.25rem 1.25rem 1.25rem;
+  animation: slideDown var(--coverage-transition-speed-normal) var(--coverage-transition-easing);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .website-status-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .coverage-breakdown-panel {
+    gap: 1.5rem;
+  }
+
+  .website-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .zone-detail-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .zone-header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .zone-quick-stats {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .status-card-content {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .status-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+  }
+
+  .status-value {
+    font-size: 1.5rem;
+  }
+
+  .status-percentage {
+    font-size: 1rem;
+  }
+}
+
