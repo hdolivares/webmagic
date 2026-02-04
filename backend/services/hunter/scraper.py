@@ -147,23 +147,37 @@ class OutscraperClient:
         Synchronous search call to Outscraper.
         This runs in a thread pool to avoid blocking.
         """
-        results = self.client.google_maps_search(
-            query=[query],
-            limit=limit,
-            language=language,
-            region=None,
-            drop_duplicates=True
-        )
-        
-        # DEBUG: Log what Outscraper returns
-        logger.info(f"Outscraper returned type: {type(results)}, length: {len(results) if results else 0}")
-        if results and len(results) > 0:
-            logger.info(f"First element type: {type(results[0])}, length: {len(results[0]) if isinstance(results[0], (list, dict)) else 'N/A'}")
-        
-        # Outscraper returns a list of lists
-        if results and len(results) > 0:
-            return results[0]  # Get first result set
-        return []
+        try:
+            results = self.client.google_maps_search(
+                query=[query],
+                limit=limit,
+                language=language,
+                region=None,
+                drop_duplicates=True
+            )
+            
+            # DEBUG: Log what Outscraper returns
+            logger.info(f"Outscraper returned type: {type(results)}, length: {len(results) if results else 0}")
+            
+            # Check if Outscraper returned an error code (usually 0 when out of credits)
+            if isinstance(results, int):
+                if results == 0:
+                    raise ValueError("Outscraper returned 0 - likely out of API credits or invalid API key")
+                else:
+                    raise ValueError(f"Outscraper returned error code: {results}")
+            
+            if results and len(results) > 0:
+                logger.info(f"First element type: {type(results[0])}, length: {len(results[0]) if isinstance(results[0], (list, dict)) else 'N/A'}")
+                
+                # Outscraper returns a list of lists
+                return results[0]  # Get first result set
+            
+            logger.warning("Outscraper returned empty results")
+            return []
+            
+        except Exception as e:
+            logger.error(f"Error in Outscraper API call: {type(e).__name__}: {str(e)}")
+            raise
     
     def _normalize_results(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
