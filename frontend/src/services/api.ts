@@ -815,6 +815,38 @@ class ApiClient {
     const response = await this.client.get('/draft-campaigns/stats')
     return response.data
   }
+
+  // ============================================
+  // PHASE 3: COVERAGE REPORTING METHODS
+  // ============================================
+
+  /**
+   * Get detailed statistics for a specific zone
+   */
+  async getZoneStatistics(zoneId: string): Promise<any> {
+    const response = await this.client.get(`/intelligent-campaigns/zones/${zoneId}/statistics`)
+    return response.data
+  }
+
+  /**
+   * Get comprehensive overview of a geo-strategy with all zones
+   */
+  async getStrategyOverview(strategyId: string): Promise<any> {
+    const response = await this.client.get(`/intelligent-campaigns/strategies/${strategyId}/overview`)
+    return response.data
+  }
+
+  /**
+   * Get coverage breakdown with optional filters
+   */
+  async getCoverageBreakdown(params?: {
+    city?: string
+    state?: string
+    category?: string
+  }): Promise<any> {
+    const response = await this.client.get('/intelligent-campaigns/coverage/breakdown', { params })
+    return response.data
+  }
 }
 
 // Export singleton instance
