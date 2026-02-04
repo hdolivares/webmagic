@@ -17,11 +17,10 @@ import { Card, CardHeader, CardBody, CardTitle, Button } from '@/components/ui'
 import { 
   StatusBadge, 
   ContactIndicator, 
-  DataCompleteness, 
-  FilterBar,
-  BusinessFilters 
+  DataCompleteness
 } from '@/components/CRM'
-import { Download, Mail, MessageSquare, Trash2 } from 'lucide-react'
+import { BusinessFilterPanel } from '@/components/business'
+import { Download, Mail } from 'lucide-react'
 import './BusinessesPage.css'
 
 // Enhanced business type with all CRM fields
@@ -60,16 +59,25 @@ interface EnrichedBusiness {
 
 export const BusinessesPage = () => {
   // Filters state
-  const [filters, setFilters] = useState<BusinessFilters>({})
+  const [filters, setFilters] = useState<any>({})
+  const [page, setPage] = useState(1)
+  const [pageSize] = useState(50)
   
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectAll, setSelectAll] = useState(false)
 
-  // Fetch businesses with filters
+  // Fetch businesses with advanced filters
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['businesses', filters],
-    queryFn: () => api.getBusinesses({ ...filters, limit: 100 }),
+    queryKey: ['businesses', filters, page, pageSize],
+    queryFn: async () => {
+      // If no filters are applied, use the basic getBusinesses endpoint
+      if (Object.keys(filters).length === 0) {
+        return api.getBusinesses({ limit: pageSize })
+      }
+      // Otherwise, use the advanced filter endpoint
+      return api.filterBusinesses(filters, page, pageSize)
+    },
   })
 
   const businesses = (data?.businesses as EnrichedBusiness[]) || []
@@ -193,11 +201,16 @@ export const BusinessesPage = () => {
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <FilterBar
-        filters={filters}
-        onFiltersChange={setFilters}
-        resultCount={total}
+      {/* Advanced Filter Panel */}
+      <BusinessFilterPanel
+        onFilterApply={(newFilters) => {
+          setFilters(newFilters)
+          setPage(1) // Reset to first page when filters change
+        }}
+        onFilterClear={() => {
+          setFilters({})
+          setPage(1)
+        }}
       />
 
       {/* Bulk Actions Bar */}
@@ -365,6 +378,36 @@ export const BusinessesPage = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+          
+          {/* Pagination Controls */}
+          {!isLoading && businesses.length > 0 && (
+            <div className="pagination-controls">
+              <div className="pagination-info">
+                Showing {((page - 1) * pageSize) + 1} - {Math.min(page * pageSize, total)} of {total} businesses
+              </div>
+              <div className="pagination-buttons">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  Previous
+                </Button>
+                <span className="pagination-page">
+                  Page {page} of {Math.ceil(total / pageSize)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={page >= Math.ceil(total / pageSize)}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </CardBody>
