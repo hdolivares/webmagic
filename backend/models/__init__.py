@@ -12,6 +12,7 @@ from models.customer import Customer, Subscription, Payment
 from models.site_models import (
     Site,
     CustomerUser,
+    CustomerSiteOwnership,
     SiteVersion,
     EditRequest,
     DomainVerificationRecord
@@ -22,6 +23,11 @@ from models.support_ticket import (
     TicketTemplate
 )
 from models.sms_opt_out import SMSOptOut
+from models.activity_log import ActivityLog
+from models.analytics_snapshot import AnalyticsSnapshot
+from models.geo_strategy import GeoStrategy
+from models.draft_campaign import DraftCampaign
+from models.system_settings import SystemSetting
 
 __all__ = [
     "BaseModel",
@@ -38,6 +44,7 @@ __all__ = [
     # Phase 2 models
     "Site",
     "CustomerUser",
+    "CustomerSiteOwnership",
     "SiteVersion",
     "EditRequest",
     "DomainVerificationRecord",
@@ -47,4 +54,12 @@ __all__ = [
     "TicketTemplate",
     # SMS models
     "SMSOptOut",
+    # Analytics & Audit models
+    "ActivityLog",
+    "AnalyticsSnapshot",
+    # Geo-scraping models
+    "GeoStrategy",
+    "DraftCampaign",
+    # System models
+    "SystemSetting",
 ]
