@@ -76,7 +76,11 @@ export const BusinessesPage = () => {
         return api.getBusinesses({ limit: pageSize })
       }
       // Otherwise, use the advanced filter endpoint
-      return api.filterBusinesses(filters, page, pageSize)
+      return api.filterBusinesses({
+        filters,
+        page,
+        page_size: pageSize
+      })
     },
   })
 
