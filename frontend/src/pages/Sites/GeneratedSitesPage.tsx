@@ -246,7 +246,7 @@ export const GeneratedSitesPage = () => {
                             variant="primary"
                             size="sm"
                             className="flex items-center gap-1"
-                            onClick={() => window.open(`https://${site.subdomain}.webmagic.com`, '_blank')}
+                            onClick={() => window.open(`https://sites.lavish.solutions/${site.subdomain}`, '_blank')}
                           >
                             <ExternalLink className="w-4 h-4" />
                             Preview
