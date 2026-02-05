@@ -13,6 +13,7 @@ from api.v1 import (
     intelligent_campaigns,  # Claude-powered intelligent strategies
     draft_campaigns,  # Draft mode campaign review workflow
     sites,
+    generated_preview,  # PUBLIC: Serves generated site HTML content
     settings,
     campaigns,
     payments,
@@ -51,6 +52,7 @@ api_router.include_router(geo_grid.router)  # Geo-grid scraping
 api_router.include_router(intelligent_campaigns.router)  # Claude-powered intelligent strategies
 api_router.include_router(draft_campaigns.router)  # Draft campaign review workflow
 api_router.include_router(sites.router)
+api_router.include_router(generated_preview.router, prefix="")  # PUBLIC: Serves generated site HTML
 api_router.include_router(settings.router)
 api_router.include_router(system.router)
 api_router.include_router(campaigns.router)
