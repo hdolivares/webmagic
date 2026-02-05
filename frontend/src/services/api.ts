@@ -248,8 +248,25 @@ class ApiClient {
     limit?: number
     status?: string
   }): Promise<{ sites: any[]; total: number }> {
-    // Call the admin endpoint for deployed sites
+    // Call the admin endpoint for deployed CUSTOMER sites (sites table)
     const response = await this.client.get('/admin/sites', { params })
+    return response.data
+  }
+
+  async getGeneratedSites(params?: {
+    page?: number
+    page_size?: number
+    limit?: number
+    status?: string
+  }): Promise<{ sites: any[]; total: number; page?: number; pages?: number }> {
+    // Call the sites API for AI-GENERATED sites inventory (generated_sites table)
+    const response = await this.client.get('/sites/', { 
+      params: {
+        page: params?.page || 1,
+        page_size: params?.limit || params?.page_size || 100,
+        status: params?.status
+      }
+    })
     return response.data
   }
 

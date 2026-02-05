@@ -1,12 +1,13 @@
 /**
- * Deployed Sites page - Shows purchased/deployed customer sites
+ * Deployed Sites page - Shows customer-purchased sites from sites table
+ * These are sites that customers have bought and are actively managing
  */
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
 import { Card, CardHeader, CardBody, CardTitle, Badge, Button } from '@/components/ui'
-import { Globe, ExternalLink, Wand2, Search } from 'lucide-react'
+import { Globe, ExternalLink, Search, DollarSign, Users } from 'lucide-react'
 
 export const SitesPage = () => {
   const navigate = useNavigate()
@@ -30,9 +31,10 @@ export const SitesPage = () => {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, any> = {
       active: 'success',
-      pending: 'info',
-      inactive: 'error',
-      published: 'primary',
+      owned: 'success',
+      preview: 'info',
+      suspended: 'warning',
+      cancelled: 'error',
     }
     return <Badge variant={variants[status] || 'secondary'}>{status}</Badge>
   }
@@ -50,20 +52,17 @@ export const SitesPage = () => {
 
   return (
     <div className="p-xl">
+      {/* Header */}
       <div className="flex items-center justify-between mb-xl">
         <div>
-          <h1 className="text-4xl font-bold text-text-primary mb-2">Deployed Sites</h1>
-          <p className="text-text-secondary">View all customer websites ({data?.total || 0})</p>
+          <h1 className="text-4xl font-bold text-text-primary mb-2 flex items-center gap-3">
+            <Globe className="w-8 h-8 text-success-500" />
+            Deployed Customer Sites
+          </h1>
+          <p className="text-text-secondary">
+            Customer-purchased and managed websites ({data?.total || 0} total)
+          </p>
         </div>
-        
-        <Button
-          onClick={() => navigate('/sites/image-generator')}
-          variant="primary"
-          className="flex items-center gap-2"
-        >
-          <Wand2 className="w-4 h-4" />
-          Test Image Generator
-        </Button>
       </div>
       
       {/* Search Bar */}

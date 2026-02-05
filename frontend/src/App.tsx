@@ -20,6 +20,7 @@ import ResetPasswordPage from '@/pages/Auth/ResetPasswordPage'
 import { DashboardPage } from '@/pages/Dashboard/DashboardPage'
 import { BusinessesPage } from '@/pages/Businesses/BusinessesPage'
 import { SitesPage } from '@/pages/Sites/SitesPage'
+import { GeneratedSitesPage } from '@/pages/Sites/GeneratedSitesPage'
 import { CampaignsPage } from '@/pages/Campaigns/CampaignsPage'
 import { CustomersPage } from '@/pages/Customers/CustomersPage'
 import { CoveragePage } from '@/pages/Coverage/CoveragePage'
@@ -92,6 +93,7 @@ function App() {
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="businesses" element={<BusinessesPage />} />
             <Route path="sites" element={<SitesPage />} />
+            <Route path="sites/generated" element={<GeneratedSitesPage />} />
             <Route path="sites/image-generator" element={<ImageGenerationPage />} />
             <Route path="campaigns" element={<CampaignsPage />} />
             <Route path="messages" element={<MessagesPage />} />
