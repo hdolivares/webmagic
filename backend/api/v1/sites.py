@@ -157,8 +157,40 @@ async def list_sites(
     
     pages = (total + page_size - 1) // page_size
     
+    # Convert sites to response format, serializing business relationship
+    site_responses = []
+    for s in sites:
+        site_dict = {
+            "id": s.id,
+            "business_id": s.business_id,
+            "subdomain": s.subdomain,
+            "custom_domain": s.custom_domain,
+            "status": s.status,
+            "version": s.version,
+            "deployed_at": s.deployed_at,
+            "sold_at": s.sold_at,
+            "lighthouse_score": s.lighthouse_score,
+            "load_time_ms": s.load_time_ms,
+            "screenshot_desktop_url": s.screenshot_desktop_url,
+            "screenshot_mobile_url": s.screenshot_mobile_url,
+            "created_at": s.created_at,
+            "updated_at": s.updated_at,
+            "full_url": s.full_url,
+            "is_live": s.is_live,
+            "business": {
+                "id": str(s.business.id),
+                "name": s.business.name,
+                "category": s.business.category,
+                "city": s.business.city,
+                "state": s.business.state,
+                "rating": float(s.business.rating) if s.business.rating else None,
+                "review_count": s.business.review_count,
+            } if s.business else None
+        }
+        site_responses.append(SiteResponse.model_validate(site_dict))
+    
     return SiteListResponse(
-        sites=[SiteResponse.model_validate(s) for s in sites],
+        sites=site_responses,
         total=total,
         page=page,
         page_size=page_size,
