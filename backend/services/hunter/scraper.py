@@ -207,6 +207,11 @@ class OutscraperClient:
         logger.info(f"Normalizing {len(results)} results. Type: {type(results)}")
         if results and len(results) > 0:
             logger.info(f"First result type: {type(results[0])}, Sample: {str(results[0])[:200]}")
+            # DEBUG: Check if 'site' field exists in first result
+            first_result = results[0]
+            if isinstance(first_result, dict):
+                logger.info(f"First result keys: {list(first_result.keys())}")
+                logger.info(f"First result 'site' field: {first_result.get('site', 'KEY NOT FOUND')}")
         
         normalized = []
         
@@ -232,6 +237,11 @@ class OutscraperClient:
                 # Extract photo URLs
                 photos = business.get("photos_data_id", [])
                 photo_urls = [photo for photo in photos[:10] if photo]  # Top 10 photos
+                
+                # DEBUG: Log website field for each business
+                site_value = business.get("site")
+                if site_value:
+                    logger.info(f"Business '{business.get('name')}' has site: {site_value}")
                 
                 normalized_business = {
                     # Identity
