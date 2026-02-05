@@ -11,6 +11,7 @@ import logging
 
 from models.geo_strategy import GeoStrategy
 from services.hunter.geo_strategy_agent import GeoStrategyAgent
+from services.hunter.metro_city_strategy import generate_city_based_strategy
 from services.geocoding_service import geocoding_service
 
 logger = logging.getLogger(__name__)
@@ -87,18 +88,20 @@ class GeoStrategyService:
         if force_regenerate:
             await self._supersede_old_strategies(city, state, category, country)
         
-        # Generate new strategy using Claude
-        logger.info(f"Generating new strategy for {category} in {city}, {state}")
+        # Generate new strategy using city-based approach (not Claude)
+        # Outscraper ignores coordinates, so we use predefined city lists
+        logger.info(f"Generating city-based strategy for {category} in {city}, {state}")
         
-        strategy_data = await self.agent.generate_strategy(
-            city=city,
+        strategy_data = generate_city_based_strategy(
+            metro_area=city,
             state=state,
-            country=country,
             category=category,
             center_lat=center_lat,
-            center_lon=center_lon,
-            population=population
+            center_lon=center_lon
         )
+        
+        # Add model info
+        strategy_data["model_used"] = "city-based-v1"
         
         # Create database record
         strategy = GeoStrategy(
