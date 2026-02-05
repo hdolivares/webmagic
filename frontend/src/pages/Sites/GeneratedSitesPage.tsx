@@ -204,7 +204,10 @@ export const GeneratedSitesPage = () => {
             const isExpanded = expandedSites.has(site.id)
             const business = site.business
             const rawData = business?.raw_data
-            const googleMapsUrl = rawData?.link || rawData?.google_maps_url
+            // Construct Google Maps URL from place_id if available
+            const googleMapsUrl = business?.gmb_place_id 
+              ? `https://www.google.com/maps/place/?q=place_id:${business.gmb_place_id}`
+              : (rawData?.link || rawData?.google_maps_url)
             
             return (
               <Card key={site.id} className="hover:shadow-lg transition-shadow flex flex-col">
@@ -327,15 +330,15 @@ export const GeneratedSitesPage = () => {
                         </div>
                       )}
                       {googleMapsUrl && (
-                        <div className="pt-2">
+                        <div className="pt-2 mt-2 border-t border-border">
                           <a
                             href={googleMapsUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-primary-500 hover:underline font-semibold"
+                            className="inline-flex items-center gap-2 px-3 py-2 mt-2 text-xs font-semibold text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
                           >
-                            <LinkIcon className="w-3 h-3" />
-                            View on Google Maps
+                            <ExternalLink className="w-4 h-4" />
+                            View Google Business Profile
                           </a>
                         </div>
                       )}
