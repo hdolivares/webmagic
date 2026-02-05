@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, and_, or_, func
 
 from models.business import Business
-from tasks.generation import generate_site_for_business
+from tasks.generation_sync import generate_site_for_business  # Use SYNC version for Celery
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +81,18 @@ class WebsiteGenerationQueueService:
             return {
                 'status': 'error',
                 'message': 'Business not found'
+            }
+        
+        # **CRITICAL GUARD: Check if business actually needs a website**
+        if business.website_validation_status == 'valid':
+            logger.warning(
+                f"Attempted to queue business {business_id} with VALID website: {business.website_url}. "
+                "Skipping generation."
+            )
+            return {
+                'status': 'has_valid_website',
+                'website_url': business.website_url,
+                'message': 'Business already has a valid website - generation not needed'
             }
         
         # Check if already queued or in progress
