@@ -13,10 +13,11 @@ from services.hunter.filters import LeadQualifier
 from services.hunter.business_service import BusinessService
 from services.hunter.coverage_service import CoverageService
 from services.hunter.geo_strategy_service import GeoStrategyService
-# WebsiteValidator removed - using only WebsiteValidationService for comprehensive validation
-from services.hunter.website_validation_service import WebsiteValidationService
+# Simple HTTP-based validation for initial filtering
+from services.hunter.website_validator import WebsiteValidator
 from services.hunter.website_generation_queue_service import WebsiteGenerationQueueService
 from core.exceptions import ExternalAPIException
+from core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -526,24 +527,30 @@ class HunterService:
         )
         
         raw_businesses = results.get("businesses", [])
+        settings = get_settings()
         
-        # Process businesses with website validator context
+        # Process businesses with simple website validator for initial filtering
         qualified_count = 0
+        businesses_to_validate = []  # Track businesses that need deep validation
+        
         async with WebsiteValidator() as website_validator:
             for biz_data in raw_businesses:
                 try:
-                    # Validate website
-                    # FIX: Scraper normalizes to 'website_url', not 'website'
+                    # Simple validation: filter out social media, Google redirects, etc.
+                    # This is FAST and prevents bad URLs from entering the system
                     website_url = biz_data.get("website_url")
                     if website_url:
-                        validation_result = await website_validator.validate_url(website_url)
-                        # Convert WebsiteValidationResult object to string status
-                        if validation_result.is_valid:
-                            biz_data["website_validation_status"] = "valid"
-                        else:
+                        simple_validation = await website_validator.validate_url(website_url)
+                        
+                        # If simple validation fails (social media, redirect, etc.), mark as invalid
+                        if not simple_validation.is_valid and not simple_validation.is_real_website:
                             biz_data["website_validation_status"] = "invalid"
+                            logger.debug(f"Rejected URL during scraping: {website_url} - {simple_validation.error_message}")
+                        else:
+                            # Passed simple checks, mark for deep validation later
+                            biz_data["website_validation_status"] = "pending"
                     else:
-                        biz_data["website_validation_status"] = "missing"
+                        biz_data["website_validation_status"] = "no_website"
                     
                     # Qualify
                     qualification_result = self.qualifier.qualify(biz_data)
@@ -552,7 +559,7 @@ class HunterService:
                     reasons = qualification_result["reasons"]
                     
                     if is_qualified:
-                        await self.business_service.create_or_update_business(
+                        business = await self.business_service.create_or_update_business(
                             data=biz_data,
                             source="outscraper_gmaps",
                             discovery_city=city,
@@ -561,10 +568,34 @@ class HunterService:
                             qualification_reasons=reasons
                         )
                         qualified_count += 1
+                        
+                        # If business has a website that passed simple checks, queue for deep validation
+                        if (business and 
+                            business.website_url and 
+                            business.website_validation_status == "pending"):
+                            businesses_to_validate.append(str(business.id))
                             
                 except Exception as e:
                     logger.error(f"Error processing business: {e}")
                     continue
+        
+        # Queue deep Playwright validation for businesses with websites
+        if settings.ENABLE_AUTO_VALIDATION and businesses_to_validate:
+            logger.info(f"Queuing {len(businesses_to_validate)} businesses for deep validation")
+            try:
+                # Import here to avoid circular dependency
+                from tasks.validation_tasks import batch_validate_websites
+                
+                # Queue in batches to avoid overwhelming the validation queue
+                batch_size = settings.VALIDATION_BATCH_SIZE
+                for i in range(0, len(businesses_to_validate), batch_size):
+                    batch = businesses_to_validate[i:i + batch_size]
+                    batch_validate_websites.delay(batch)
+                    logger.debug(f"Queued validation batch {i//batch_size + 1}: {len(batch)} businesses")
+                    
+            except Exception as e:
+                logger.error(f"Failed to queue validation tasks: {e}", exc_info=True)
+                # Don't fail scraping if validation queueing fails
         
         # Update coverage
         await self.coverage_service.update_or_create_coverage(
@@ -583,6 +614,7 @@ class HunterService:
             "industry": industry,
             "results": {
                 "total_found": len(raw_businesses),
-                "qualified_leads": qualified_count
+                "qualified_leads": qualified_count,
+                "queued_for_validation": len(businesses_to_validate) if settings.ENABLE_AUTO_VALIDATION else 0
             }
         }
