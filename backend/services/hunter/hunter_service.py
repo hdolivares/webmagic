@@ -556,24 +556,24 @@ class HunterService:
                             biz_data["website_validation_status"] = "invalid"
                     else:
                         biz_data["website_validation_status"] = "missing"
-                
-                # Qualify
-                qualification_result = self.qualifier.qualify(biz_data)
-                is_qualified = qualification_result["qualified"]
-                score = qualification_result["score"]
-                reasons = qualification_result["reasons"]
-                
-                if is_qualified:
-                    await self.business_service.create_or_update_business(
-                        data=biz_data,
-                        source="outscraper_gmaps",
-                        discovery_city=city,
-                        discovery_state=state,
-                        lead_score=score,
-                        qualification_reasons=reasons
-                    )
-                    qualified_count += 1
-                        
+                    
+                    # Qualify
+                    qualification_result = self.qualifier.qualify(biz_data)
+                    is_qualified = qualification_result["qualified"]
+                    score = qualification_result["score"]
+                    reasons = qualification_result["reasons"]
+                    
+                    if is_qualified:
+                        await self.business_service.create_or_update_business(
+                            data=biz_data,
+                            source="outscraper_gmaps",
+                            discovery_city=city,
+                            discovery_state=state,
+                            lead_score=score,
+                            qualification_reasons=reasons
+                        )
+                        qualified_count += 1
+                            
                 except Exception as e:
                     logger.error(f"Error processing business: {e}")
                     continue
