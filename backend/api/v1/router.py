@@ -25,7 +25,8 @@ from api.v1 import (
     edit_requests,  # Phase 4: AI-powered edits
     preview,  # Phase 4: Preview system
     domains,  # Phase 5: Custom domains
-    tickets  # Phase 6: Support tickets
+    tickets,  # Phase 6: Support tickets
+    validation  # Playwright website validation
 )
 from api.v1 import webhooks_telnyx as telnyx  # Phase 7: SMS webhooks (Telnyx)
 from api.v1 import messages  # Phase 7: SMS Messages inbox
@@ -57,3 +58,4 @@ api_router.include_router(settings.router)
 api_router.include_router(system.router)
 api_router.include_router(campaigns.router)
 api_router.include_router(payments.router)
+api_router.include_router(validation.router)  # Website validation
