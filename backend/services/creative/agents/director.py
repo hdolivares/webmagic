@@ -11,6 +11,7 @@ import logging
 from services.creative.agents.base import BaseAgent
 from services.creative.prompts.builder import PromptBuilder
 from services.creative.industry_style_service import IndustryStyleService
+from services.creative.color_variation_service import ColorVariationService
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,19 @@ class ArtDirectorAgent(BaseAgent):
                     "cta_style": style_overrides.get("cta_style"),
                     "cta_text": style_overrides.get("cta_text")
                 }
+            
+            # NEW: Apply color variations to prevent all businesses looking identical
+            business_id = business_data.get("id", "")
+            if business_id and brief.get("colors"):
+                original_primary = brief["colors"].get("primary", "N/A")
+                brief["colors"] = ColorVariationService.generate_variations(
+                    brief["colors"],
+                    business_id,
+                    variation_intensity=0.15  # 15% variation
+                )
+                logger.info(
+                    f"Applied color variation: {original_primary} → {brief['colors'].get('primary')}"
+                )
             
             logger.info(
                 f"Design brief created: {brief.get('vibe')} vibe, "
