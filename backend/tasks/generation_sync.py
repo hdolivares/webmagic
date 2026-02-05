@@ -143,12 +143,14 @@ def generate_site_for_business(self, business_id: str):
                 result = await orchestrator.generate_website(business_data)
                 
                 # Update site with generated content
-                site.html_content = result.get("html")
-                site.css_content = result.get("css")
-                site.js_content = result.get("js")
+                # CRITICAL FIX: Orchestrator returns website content in result["website"]
+                website = result.get("website", {})
+                site.html_content = website.get("html")
+                site.css_content = website.get("css")
+                site.js_content = website.get("js")
                 site.brand_analysis = result.get("analysis")
-                site.brand_concept = result.get("concept")
-                site.design_brief = result.get("brief")
+                site.brand_concept = result.get("concepts", {}).get("creative_dna")
+                site.design_brief = result.get("design_brief")
                 site.status = "completed"
                 site.generation_completed_at = datetime.utcnow()
                 
