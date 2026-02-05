@@ -93,6 +93,7 @@ class BusinessService:
         self,
         data: Dict[str, Any],
         source: str = "outscraper_gmaps",
+        coverage_grid_id: Optional[UUID] = None,
         discovery_city: Optional[str] = None,
         discovery_state: Optional[str] = None,
         discovery_zone_id: Optional[str] = None,
@@ -109,6 +110,7 @@ class BusinessService:
         Args:
             data: Business data dictionary
             source: Data source identifier (not stored in Business model)
+            coverage_grid_id: Coverage grid ID to link business to (stored)
             discovery_city: City where business was discovered (not stored)
             discovery_state: State where business was discovered (not stored)
             discovery_zone_id: Zone ID where business was discovered (not stored)
@@ -146,6 +148,10 @@ class BusinessService:
                 k: v for k, v in data.items() 
                 if k in valid_fields and v is not None
             }
+            
+            # **FIX: Set coverage_grid_id to link business to zone**
+            if coverage_grid_id is not None:
+                business_data["coverage_grid_id"] = coverage_grid_id
             
             # Add qualification score if provided
             if lead_score is not None:
