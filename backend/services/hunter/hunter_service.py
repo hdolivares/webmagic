@@ -178,12 +178,11 @@ class HunterService:
             )
             logger.info(f"Coverage grid {'created' if created else 'found'}: {coverage.id}")
             
-            # Process and qualify leads
-            qualified_count = 0
+            # Process and save ALL leads (we're paying for the Outscraper call!)
+            total_saved = 0
             new_businesses = 0
-            businesses_with_websites = 0
-            businesses_without_websites = 0
-            invalid_websites = 0
+            businesses_with_valid_websites = 0
+            businesses_needing_websites = 0
             businesses_needing_generation = []
             
             # Create validation service and website validator with async context
@@ -191,8 +190,7 @@ class HunterService:
                        WebsiteValidator() as website_validator:
                 for biz_data in raw_businesses:
                     try:
-                        # Validate website if present (old validator for backwards compatibility)
-                        # FIX: Scraper normalizes to 'website_url', not 'website'
+                        # Validate website if present
                         website_url = biz_data.get("website_url")
                         
                         if website_url:
@@ -205,56 +203,58 @@ class HunterService:
                         else:
                             biz_data["website_validation_status"] = "missing"
                         
-                        # Qualify the lead
+                        # Qualify to calculate score (but SAVE ALL regardless)
                         qualification_result = self.qualifier.qualify(biz_data)
-                        is_qualified = qualification_result["qualified"]
                         score = qualification_result["score"]
                         reasons = qualification_result["reasons"]
                         
-                        # Store if qualified
-                        if is_qualified:
-                            # **FIX: Pass coverage_grid_id so businesses are linked properly**
-                            business = await self.business_service.create_or_update_business(
-                                data=biz_data,
-                                source="outscraper_gmaps",
-                                coverage_grid_id=coverage.id,
-                                discovery_city=city,
-                                discovery_state=state,
-                                discovery_zone_id=zone_id,
-                                discovery_zone_lat=zone_lat,
-                                discovery_zone_lon=zone_lon,
-                                lead_score=score,
-                                qualification_reasons=reasons
+                        # Determine if business needs a website
+                        # Valid = has working, legitimate website
+                        # Invalid = has URL but it's broken/social media/PDF
+                        # Missing = no URL at all
+                        needs_website = biz_data["website_validation_status"] in ["invalid", "missing"]
+                        
+                        # **SAVE ALL BUSINESSES** (we paid for them!)
+                        business = await self.business_service.create_or_update_business(
+                            data=biz_data,
+                            source="outscraper_gmaps",
+                            coverage_grid_id=coverage.id,
+                            discovery_city=city,
+                            discovery_state=state,
+                            discovery_zone_id=zone_id,
+                            discovery_zone_lat=zone_lat,
+                            discovery_zone_lon=zone_lon,
+                            lead_score=score,
+                            qualification_reasons=reasons
+                        )
+                        
+                        if business:
+                            total_saved += 1
+                            if hasattr(business, '_is_new') and business._is_new:
+                                new_businesses += 1
+                            
+                            # **Phase 2: Comprehensive website validation**
+                            validation_result = await validation_service.validate_business_website(
+                                {
+                                    "id": str(business.id),
+                                    "name": business.name,
+                                    "website_url": business.website_url,
+                                    "gmb_place_id": business.gmb_place_id
+                                },
+                                store_result=True
                             )
                             
-                            if business:
-                                qualified_count += 1
-                                if hasattr(business, '_is_new') and business._is_new:
-                                    new_businesses += 1
+                            # Track website metrics
+                            if validation_result.status == "valid":
+                                businesses_with_valid_websites += 1
+                            else:
+                                # Invalid or missing = needs a website!
+                                businesses_needing_websites += 1
                                 
-                                # **NEW Phase 2: Validate website using comprehensive validation service**
-                                validation_result = await validation_service.validate_business_website(
-                                    {
-                                        "id": str(business.id),
-                                        "name": business.name,
-                                        "website_url": business.website_url,
-                                        "gmb_place_id": business.gmb_place_id
-                                    },
-                                    store_result=True
-                                )
-                                
-                                # Track website metrics
-                                if validation_result.status == "valid":
-                                    businesses_with_websites += 1
-                                elif validation_result.status in ["invalid", "missing"]:
-                                    businesses_without_websites += 1
-                                    if validation_result.status == "invalid":
-                                        invalid_websites += 1
-                                    
-                                    # Queue for generation if recommended
-                                    if validation_result.recommendation == "generate":
-                                        businesses_needing_generation.append(business.id)
-                                        logger.debug(f"Business {business.name} queued for website generation")
+                                # Queue for generation if recommended
+                                if validation_result.recommendation == "generate":
+                                    businesses_needing_generation.append(business.id)
+                                    logger.info(f"✅ {business.name} needs website - queued for generation")
                         
                     except Exception as e:
                         logger.error(f"Error processing business: {e}")
@@ -274,13 +274,13 @@ class HunterService:
             # **FIX: Coverage was already created at the start, just update it now**
             # **NEW Phase 2: Store detailed scrape metrics**
             last_scrape_details = {
+                "zone_id": zone_id,
                 "raw_businesses": len(raw_businesses),
-                "qualified_leads": qualified_count,
+                "total_saved": total_saved,
                 "new_businesses": new_businesses,
-                "existing_businesses": qualified_count - new_businesses,
-                "with_websites": businesses_with_websites,
-                "without_websites": businesses_without_websites,
-                "invalid_websites": invalid_websites,
+                "existing_businesses": total_saved - new_businesses,
+                "with_valid_websites": businesses_with_valid_websites,
+                "needing_websites": businesses_needing_websites,
                 "queued_for_generation": len(businesses_needing_generation),
                 "timestamp": datetime.utcnow().isoformat()
             }
@@ -305,14 +305,14 @@ class HunterService:
                 coverage_id=coverage.id,
                 updates={
                     "status": "completed",
-                    "lead_count": qualified_count,
-                    "qualified_count": qualified_count,
+                    "lead_count": total_saved,
+                    "qualified_count": businesses_needing_websites,  # Qualified = needs website
                     "last_scrape_size": len(raw_businesses),
                     "last_scraped_at": datetime.utcnow(),
                     # New Phase 2 metrics
-                    "businesses_with_websites": businesses_with_websites,
-                    "businesses_without_websites": businesses_without_websites,
-                    "invalid_websites": invalid_websites,
+                    "businesses_with_websites": businesses_with_valid_websites,
+                    "businesses_without_websites": businesses_needing_websites,
+                    "invalid_websites": 0,  # Deprecated, now included in needing_websites
                     "generation_in_progress": len(businesses_needing_generation),
                     "avg_qualification_score": avg_qualification_score,
                     "avg_rating": avg_rating,
@@ -324,15 +324,16 @@ class HunterService:
             await self.geo_strategy_service.mark_zone_complete(
                 strategy_id=str(strategy.id),
                 zone_id=zone_id,
-                businesses_found=qualified_count
+                businesses_found=total_saved
             )
             
             # Refresh strategy to get updated stats
             await self.db.refresh(strategy)
             
             logger.info(
-                f"Zone {zone_id} complete: {qualified_count} qualified from {len(raw_businesses)} raw "
-                f"({strategy.zones_completed}/{strategy.total_zones} zones done)"
+                f"✅ Zone {zone_id} complete: Saved {total_saved} businesses "
+                f"({businesses_needing_websites} need websites) from {len(raw_businesses)} raw results. "
+                f"Progress: {strategy.zones_completed}/{strategy.total_zones} zones"
             )
             
             # Prepare enhanced response with Phase 2 metrics
@@ -352,12 +353,11 @@ class HunterService:
                 },
                 "results": {
                     "raw_businesses": len(raw_businesses),
-                    "qualified_leads": qualified_count,
+                    "total_saved": total_saved,
                     "new_businesses": new_businesses,
                     # **NEW Phase 2: Website metrics**
-                    "with_websites": businesses_with_websites,
-                    "without_websites": businesses_without_websites,
-                    "invalid_websites": invalid_websites,
+                    "with_valid_websites": businesses_with_valid_websites,
+                    "needing_websites": businesses_needing_websites,
                     "queued_for_generation": len(businesses_needing_generation)
                 },
                 "progress": {
