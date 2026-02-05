@@ -15,9 +15,11 @@ settings = get_settings()
 # Create async engine
 # Note: statement_cache_size=0 is required for Supabase pooler (pgbouncer)
 # which doesn't support prepared statements
+# IMPORTANT: Keep pool_size small for managed databases (Supabase reserves connections)
 engine = create_async_engine(
     settings.DATABASE_URL,
-    pool_size=settings.DATABASE_POOL_SIZE,
+    pool_size=2,  # Reduced from default - managed DB has connection limits
+    max_overflow=3,  # Allow temporary overflow
     pool_pre_ping=True,
     echo=settings.DEBUG,
     connect_args={
@@ -36,11 +38,14 @@ AsyncSessionLocal = async_sessionmaker(
 
 # Create synchronous engine for Celery tasks
 # Convert postgresql+asyncpg:// to postgresql:// (psycopg2)
+# IMPORTANT: Even smaller pool for Celery workers (each worker gets its own pool)
 sync_db_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
 sync_engine = create_engine(
     sync_db_url,
-    pool_size=settings.DATABASE_POOL_SIZE,
+    pool_size=1,  # Small pool per worker (we have multiple workers)
+    max_overflow=2,  # Allow temporary overflow
     pool_pre_ping=True,
+    pool_recycle=3600,  # Recycle connections after 1 hour
     echo=settings.DEBUG,
     connect_args={
         "options": "-c statement_timeout=30000",  # 30 second timeout
