@@ -210,42 +210,48 @@ async def add_scroll_animations_guidance():
     with get_db_session_sync() as db:
         # 1. Add scroll animations guidance
         result = db.execute(
-            select(PromptSetting).where(PromptSetting.key == "scroll_animations_guidance")
+            select(PromptSetting).where(
+                PromptSetting.agent_name == "architect",
+                PromptSetting.section_name == "scroll_animations_guidance"
+            )
         )
         existing = result.scalar_one_or_none()
         
         if existing:
-            existing.value = SCROLL_ANIMATION_GUIDANCE
+            existing.content = SCROLL_ANIMATION_GUIDANCE
             logger.info("Updated existing scroll_animations_guidance")
         else:
             scroll_setting = PromptSetting(
-                agent="architect",
-                key="scroll_animations_guidance",
-                value=SCROLL_ANIMATION_GUIDANCE,
+                agent_name="architect",
+                section_name="scroll_animations_guidance",
+                content=SCROLL_ANIMATION_GUIDANCE,
                 description="Guidance for implementing scroll-triggered animations on all websites",
-                category="animations",
-                order_index=50
+                is_active=True,
+                weight=100
             )
             db.add(scroll_setting)
             logger.info("Created new scroll_animations_guidance")
         
         # 2. Add image generation guidance
         result = db.execute(
-            select(PromptSetting).where(PromptSetting.key == "image_generation_guidance")
+            select(PromptSetting).where(
+                PromptSetting.agent_name == "architect",
+                PromptSetting.section_name == "image_generation_guidance"
+            )
         )
         existing = result.scalar_one_or_none()
         
         if existing:
-            existing.value = IMAGE_GENERATION_GUIDANCE
+            existing.content = IMAGE_GENERATION_GUIDANCE
             logger.info("Updated existing image_generation_guidance")
         else:
             image_setting = PromptSetting(
-                agent="architect",
-                key="image_generation_guidance",
-                value=IMAGE_GENERATION_GUIDANCE,
+                agent_name="architect",
+                section_name="image_generation_guidance",
+                content=IMAGE_GENERATION_GUIDANCE,
                 description="Guidance for integrating AI-generated images (Nano Banana) into websites",
-                category="images",
-                order_index=51
+                is_active=True,
+                weight=100
             )
             db.add(image_setting)
             logger.info("Created new image_generation_guidance")
