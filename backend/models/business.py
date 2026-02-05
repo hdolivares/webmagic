@@ -1,7 +1,7 @@
 """
 Business (leads) model.
 """
-from sqlalchemy import Column, String, Integer, Numeric, Text, DateTime, ForeignKey
+from sqlalchemy import Column, String, Integer, Numeric, Text, DateTime, ForeignKey, Float, Boolean
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from models.base import BaseModel
@@ -25,6 +25,13 @@ class Business(BaseModel):
     phone = Column(String(50), nullable=True)
     website_url = Column(String(500), nullable=True)
     
+    # Enhanced Website Detection (New in Migration 012)
+    website_type = Column(String(20), default="none", nullable=True, index=True)
+    # Values: website, booking, ordering, none
+    
+    website_confidence = Column(Float, nullable=True)
+    # Confidence level of website detection (0.0-1.0)
+    
     # Location
     address = Column(Text, nullable=True)
     city = Column(String(100), nullable=True, index=True)
@@ -39,6 +46,26 @@ class Business(BaseModel):
     subcategory = Column(String(100), nullable=True)
     rating = Column(Numeric(2, 1), nullable=True, index=True)
     review_count = Column(Integer, default=0, nullable=True)
+    
+    # Enhanced Business Data (New in Migration 012)
+    verified = Column(Boolean, default=False, nullable=True, index=True)
+    # Verified Google Business Profile
+    
+    operational = Column(Boolean, default=True, nullable=True, index=True)
+    # Business operational status (from business_status field)
+    
+    business_status = Column(String(30), nullable=True)
+    # Raw business status from Outscraper (OPERATIONAL, CLOSED_TEMPORARILY, etc)
+    
+    photos_count = Column(Integer, default=0, nullable=True)
+    # Number of photos on Google Business Profile (engagement indicator)
+    
+    subtypes = Column(Text, nullable=True)
+    # Additional business categories/services from Outscraper
+    
+    # Data Quality Scoring (New in Migration 012)
+    quality_score = Column(Float, nullable=True, index=True)
+    # Business quality score (0-100) based on verification, reviews, engagement, completeness
     
     # Extracted Data (from AI analysis)
     reviews_summary = Column(Text, nullable=True)
