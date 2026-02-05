@@ -4,10 +4,12 @@
 
 Playwright requires specific system dependencies to run headless browsers. Due to package name changes in Ubuntu 24.04 (Noble), we need to manually install compatible versions.
 
-### Option 1: Manual Dependency Installation (Recommended for Ubuntu 24.04+)
+### Option 1: Manual Dependency Installation (Recommended for Ubuntu 24.04+) ✅ TESTED & WORKING
+
+**This is the working solution for Ubuntu 24.04 Noble:**
 
 ```bash
-# Install compatible system libraries
+# Install compatible system libraries with t64 suffix (Ubuntu 24.04+)
 apt-get update
 apt-get install -y \
     libasound2t64 \
@@ -27,12 +29,31 @@ apt-get install -y \
     libxext6 \
     libxfixes3 \
     libxkbcommon0 \
-    libxrandr2
+    libxrandr2 \
+    fonts-liberation \
+    xdg-utils
 
-# Install Chromium browser for Playwright
+# Install Chromium browser for Playwright (already downloaded if playwright is installed)
 cd /var/www/webmagic/backend
 source .venv/bin/activate
 playwright install chromium
+
+# Test the installation
+python scripts/test_playwright_validation.py
+```
+
+**Expected test output:**
+```
+🚀 Testing Playwright Validation Service...
+✅ Service initialized successfully
+🔍 Validating: https://example.com
+📊 Validation Result:
+  ✓ Is Valid: True
+  ✓ Title: Example Domain
+  ✓ Status Code: 200
+  ✓ Load Time: ~4000ms
+  ✓ Quality Score: 0/100
+✅ Test completed successfully!
 ```
 
 ### Option 2: Docker Deployment (Recommended for Production)
