@@ -13,6 +13,7 @@ from services.hunter.filters import LeadQualifier
 from services.hunter.business_service import BusinessService
 from services.hunter.coverage_service import CoverageService
 from services.hunter.geo_strategy_service import GeoStrategyService
+from services.hunter.data_quality_service import DataQualityService
 # Simple HTTP-based validation for initial filtering
 from services.hunter.website_validator import WebsiteValidator
 from services.hunter.website_generation_queue_service import WebsiteGenerationQueueService
@@ -181,19 +182,54 @@ class HunterService:
             businesses_with_valid_websites = 0
             businesses_needing_websites = 0
             businesses_needing_generation = []
+            businesses_to_validate = []  # For async Playwright validation
             
-            # Create validation service with async context (Phase 2 only - comprehensive)
-            async with WebsiteValidationService(self.db) as validation_service:
+            # Initialize data quality service for enhanced processing
+            data_quality_service = DataQualityService()
+            
+            # Simple HTTP validator for initial filtering
+            async with WebsiteValidator() as website_validator:
                 for biz_data in raw_businesses:
                     try:
-                        # Set initial status based on URL presence (Phase 2 will validate)
-                        website_url = biz_data.get("website_url")
+                        # **ENHANCED: Use data quality service for comprehensive analysis**
+                        raw_data = biz_data.get("raw_data", {})
+                        
+                        # 1. Multi-tier website detection
+                        website_detection = data_quality_service.detect_website_presence(raw_data)
+                        biz_data["website_type"] = website_detection["type"]
+                        biz_data["website_confidence"] = website_detection["confidence"]
+                        
+                        # 2. Geo-validation (ensure business is in correct region)
+                        geo_validation = data_quality_service.validate_geo_location(
+                            raw_data, 
+                            expected_country="US",
+                            expected_state=state
+                        )
+                        if not geo_validation["is_valid"]:
+                            logger.warning(f"Geo-validation failed for {biz_data.get('name')}: {geo_validation['reason']}")
+                            continue  # Skip businesses outside target region
+                        
+                        # 3. Quality scoring
+                        quality_analysis = data_quality_service.calculate_quality_score(raw_data)
+                        biz_data["quality_score"] = quality_analysis["score"]
+                        biz_data["verified"] = quality_analysis["verified"]
+                        biz_data["operational"] = quality_analysis["operational"]
+                        
+                        # 4. Simple HTTP validation for websites
+                        website_url = website_detection.get("url") or biz_data.get("website_url")
                         if website_url:
-                            biz_data["website_validation_status"] = "pending"  # Will be validated in Phase 2
+                            simple_validation = await website_validator.validate_url(website_url)
+                            if not simple_validation.is_valid and not simple_validation.is_real_website:
+                                biz_data["website_validation_status"] = "invalid"
+                                biz_data["website_url"] = None  # Clear invalid URL
+                                logger.debug(f"Rejected URL: {website_url} - {simple_validation.error_message}")
+                            else:
+                                biz_data["website_validation_status"] = "pending"  # Queue for Playwright
+                                biz_data["website_url"] = website_url
                         else:
                             biz_data["website_validation_status"] = "missing"
                         
-                        # Qualify to calculate score (but SAVE ALL regardless)
+                        # 5. Lead qualification
                         qualification_result = self.qualifier.qualify(biz_data)
                         score = qualification_result["score"]
                         reasons = qualification_result["reasons"]
@@ -217,39 +253,34 @@ class HunterService:
                             if hasattr(business, '_is_new') and business._is_new:
                                 new_businesses += 1
                             
-                            # **Phase 2: Comprehensive website validation** (ONLY validation pass now!)
-                            validation_result = await validation_service.validate_business_website(
-                                {
-                                    "id": str(business.id),
-                                    "name": business.name,
-                                    "website_url": business.website_url,
-                                    "gmb_place_id": business.gmb_place_id
-                                },
-                                store_result=True
-                            )
-                            
-                            # Update business with validation result
-                            business.website_validation_status = validation_result.status
-                            business.website_validated_at = datetime.utcnow()
-                            await self.db.flush()
-                            
                             # Track website metrics
-                            if validation_result.status == "valid":
-                                businesses_with_valid_websites += 1
-                            else:
-                                # Invalid or missing = needs a website!
+                            if business.website_validation_status == "pending":
+                                businesses_to_validate.append(str(business.id))
+                            elif business.website_validation_status == "missing":
                                 businesses_needing_websites += 1
-                                
-                                # Queue for generation if recommended
-                                if validation_result.recommendation == "generate":
+                                # High-quality businesses without websites = generation candidates
+                                if quality_analysis["score"] >= 50:
                                     businesses_needing_generation.append(business.id)
-                                    logger.info(f"✅ {business.name} needs website - queued for generation")
+                                    logger.info(f"✅ {business.name} (score: {quality_analysis['score']}) needs website")
+                            else:
+                                businesses_with_valid_websites += 1
                         
                     except Exception as e:
                         logger.error(f"Error processing business: {e}")
                         continue
             
-            # **NEW Phase 2: Queue businesses for website generation**
+            # **Queue Playwright validation for businesses with websites**
+            if businesses_to_validate:
+                settings = get_settings()
+                if settings.ENABLE_AUTO_VALIDATION:
+                    logger.info(f"Queuing {len(businesses_to_validate)} businesses for Playwright validation")
+                    try:
+                        from tasks.validation_tasks import batch_validate_websites
+                        batch_validate_websites.delay(businesses_to_validate)
+                    except Exception as e:
+                        logger.error(f"Failed to queue validation tasks: {e}")
+            
+            # **Queue businesses for website generation**
             if businesses_needing_generation:
                 queue_result = await self.generation_queue_service.queue_multiple(
                     business_ids=businesses_needing_generation,
