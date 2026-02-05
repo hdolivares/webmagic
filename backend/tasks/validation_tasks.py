@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 import logging
 
-from core.database import get_sync_db
+from core.database import get_db_session_sync
 from core.config import get_settings
 from services.validation.playwright_service import PlaywrightValidationService
 
@@ -43,9 +43,7 @@ def validate_business_website(self, business_id: str):
         logger.info(f"Starting validation for business {business_id}")
         
         # Get database session
-        db: Session = next(get_sync_db())
-        
-        try:
+        with get_db_session_sync() as db:
             # Import here to avoid circular imports
             from models.business import Business
             
@@ -60,7 +58,7 @@ def validate_business_website(self, business_id: str):
                 logger.warning(f"Business {business_id} has no website URL")
                 business.website_validation_status = "no_website"
                 business.website_validated_at = datetime.utcnow()
-                db.commit()
+                # db.commit() is handled by context manager
                 return {"error": "No website URL", "business_id": business_id}
             
             # Run validation (sync wrapper for async code)
@@ -77,7 +75,7 @@ def validate_business_website(self, business_id: str):
                 # business.website_screenshot_url = await upload_screenshot(...)
                 pass
             
-            db.commit()
+            # db.commit() is handled by context manager
             
             logger.info(
                 f"Validation completed for business {business_id}: "
@@ -92,9 +90,6 @@ def validate_business_website(self, business_id: str):
                 "quality_score": result.get("quality_score", 0)
             }
             
-        finally:
-            db.close()
-            
     except Exception as e:
         logger.error(f"Validation task failed for business {business_id}: {e}", exc_info=True)
         
@@ -105,8 +100,7 @@ def validate_business_website(self, business_id: str):
             logger.error(f"Max retries exceeded for business {business_id}")
             
             # Mark as failed in database
-            db = next(get_sync_db())
-            try:
+            with get_db_session_sync() as db:
                 from models.business import Business
                 business = db.query(Business).filter(Business.id == business_id).first()
                 if business:
@@ -116,9 +110,7 @@ def validate_business_website(self, business_id: str):
                         "is_valid": False
                     }
                     business.website_validated_at = datetime.utcnow()
-                    db.commit()
-            finally:
-                db.close()
+                    # db.commit() is handled by context manager
             
             return {
                 "business_id": business_id,
@@ -186,9 +178,7 @@ def validate_all_pending():
     Validate all businesses with pending website validation status.
     Useful for periodic batch processing.
     """
-    db = next(get_sync_db())
-    
-    try:
+    with get_db_session_sync() as db:
         from models.business import Business
         
         # Find businesses with pending validation
@@ -213,7 +203,4 @@ def validate_all_pending():
             "queued": len(tasks),
             "tasks": tasks
         }
-        
-    finally:
-        db.close()
 
