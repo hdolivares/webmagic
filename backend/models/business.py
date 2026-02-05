@@ -92,6 +92,7 @@ class Business(BaseModel):
     # coverage_grid = relationship("CoverageGrid", back_populates="businesses")
     # generated_sites = relationship("GeneratedSite", back_populates="business")
     # campaigns = relationship("Campaign", back_populates="business")
+    sms_messages = relationship("SMSMessage", back_populates="business", lazy="dynamic")
     
     def __repr__(self):
         return f"<Business {self.name} ({self.city}, {self.state})>"
