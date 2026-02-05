@@ -51,9 +51,9 @@ async def fix_business_coverage_links():
             no_match_count = 0
             
             for business in businesses:
-                # Skip None businesses
-                if business is None:
-                    logger.warning("Skipping None business object")
+                # Skip None or invalid businesses
+                if business is None or not isinstance(business, Business):
+                    logger.warning(f"Skipping invalid business object: {type(business)}")
                     no_match_count += 1
                     continue
                 
