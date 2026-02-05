@@ -105,7 +105,14 @@ class WebsiteValidator:
         self.session = aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=self.timeout),
             headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                # Full realistic browser User-Agent to avoid bot detection
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+                "DNT": "1",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1"
             }
         )
         return self
@@ -240,15 +247,29 @@ class WebsiteValidator:
                 # Check if accessible (2xx status code)
                 is_accessible = 200 <= status_code < 300
                 
+                # IMPORTANT: 403/429 often means anti-bot protection, not a broken site
+                # These businesses likely HAVE websites, they're just protected
                 if not is_accessible:
-                    return WebsiteValidationResult(
-                        url=normalized_url,
-                        is_valid=False,
-                        is_accessible=False,
-                        status_code=status_code,
-                        final_url=final_url,
-                        error_message=f"HTTP {status_code}"
-                    )
+                    # 403 Forbidden or 429 Too Many Requests = Protected website (likely valid)
+                    if status_code in [403, 429]:
+                        return WebsiteValidationResult(
+                            url=normalized_url,
+                            is_valid=True,  # Assume valid - just protected
+                            is_accessible=False,
+                            status_code=status_code,
+                            final_url=final_url,
+                            error_message=f"Protected by anti-bot (HTTP {status_code}) - likely valid website"
+                        )
+                    # 404 Not Found or other errors = Actually broken
+                    else:
+                        return WebsiteValidationResult(
+                            url=normalized_url,
+                            is_valid=False,
+                            is_accessible=False,
+                            status_code=status_code,
+                            final_url=final_url,
+                            error_message=f"HTTP {status_code}"
+                        )
                 
                 # Get content
                 html = await response.text()
