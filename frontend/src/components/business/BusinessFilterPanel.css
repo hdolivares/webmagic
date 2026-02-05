@@ -58,11 +58,17 @@
   transform: translateY(-1px);
 }
 
-/* Website Status Checkboxes */
+/* Website Status Checkboxes - Horizontal Layout */
 .website-status-checkboxes {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 0.5rem;
+}
+
+@media (min-width: 1200px) {
+  .website-status-checkboxes {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 .website-status-checkbox {
