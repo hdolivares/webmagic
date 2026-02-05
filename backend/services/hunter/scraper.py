@@ -168,9 +168,14 @@ class OutscraperClient:
             
             if results and len(results) > 0:
                 logger.info(f"First element type: {type(results[0])}, length: {len(results[0]) if isinstance(results[0], (list, dict)) else 'N/A'}")
-                logger.info(f"Total results from Outscraper: {len(results)}")
                 
-                # Outscraper returns a flat list of dicts (not a list of lists)
+                # CRITICAL FIX: Outscraper Python library returns [[{}, {}]] not [{}, {}]
+                # Flatten if we got a nested list
+                if isinstance(results[0], list):
+                    logger.info("Flattening nested list structure from Outscraper")
+                    results = results[0]  # Extract inner list
+                
+                logger.info(f"Total results from Outscraper: {len(results)}")
                 return results  # Return the whole list
             
             logger.warning("Outscraper returned empty results")
@@ -251,7 +256,7 @@ class OutscraperClient:
                     
                     # Contact
                     "phone": business.get("phone"),
-                    "website_url": business.get("site"),
+                    "website_url": business.get("website") or business.get("site"),  # FIXED: 'website' not 'site'
                     "email": None,  # Not provided by Outscraper
                     
                     # Location
