@@ -35,22 +35,22 @@ celery_app.conf.update(
 celery_app.autodiscover_tasks([
     "tasks.scraping",
     "tasks.generation",
-    "tasks.generation_sync",  # NEW: Synchronous generation tasks
+    "tasks.generation_sync",  # Synchronous generation tasks
+    "tasks.monitoring_sync",  # Synchronous monitoring tasks (replaces monitoring)
+    "tasks.sms_sync",  # Synchronous SMS tasks (replaces sms_campaign_tasks)
     "tasks.campaigns",
-    "tasks.sms_campaign_tasks",  # SMS campaigns (Phase 7)
-    "tasks.monitoring",
 ])
 
-# Periodic task schedule
+# Periodic task schedule (using SYNC tasks only)
 celery_app.conf.beat_schedule = {
     # Scrape new territories every 6 hours
     "scrape-territories": {
         "task": "tasks.scraping.scrape_pending_territories",
         "schedule": crontab(minute=0, hour="*/6"),  # Every 6 hours
     },
-    # Generate sites for qualified leads every hour
+    # Generate sites for qualified leads every hour (using SYNC task)
     "generate-sites": {
-        "task": "tasks.generation.generate_pending_sites",
+        "task": "tasks.generation_sync.generate_pending_sites",
         "schedule": crontab(minute=0),  # Every hour
     },
     # Send pending campaigns every 30 minutes
@@ -58,14 +58,14 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.campaigns.send_pending_campaigns",
         "schedule": crontab(minute="*/30"),  # Every 30 minutes
     },
-    # Process scheduled SMS campaigns every minute
+    # Process scheduled SMS campaigns every 5 minutes (using SYNC task, reduced frequency)
     "process-scheduled-sms": {
-        "task": "tasks.sms.process_scheduled_sms_campaigns",
-        "schedule": crontab(minute="*"),  # Every minute
+        "task": "tasks.sms_sync.process_scheduled_sms_campaigns",
+        "schedule": crontab(minute="*/5"),  # Every 5 minutes (reduced from 1)
     },
-    # Calculate SMS stats daily
+    # Calculate SMS stats daily (using SYNC task)
     "calculate-sms-stats": {
-        "task": "tasks.sms.calculate_sms_campaign_stats",
+        "task": "tasks.sms_sync.calculate_sms_campaign_stats",
         "schedule": crontab(minute=0, hour=2),  # 2 AM daily
     },
     # Clean up old cooldowns daily
@@ -73,21 +73,21 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.scraping.cleanup_expired_cooldowns",
         "schedule": crontab(minute=0, hour=3),  # 3 AM daily
     },
-    # Health check every 5 minutes
+    # Health check every 10 minutes (using SYNC task, reduced frequency)
     "health-check": {
-        "task": "tasks.monitoring.health_check",
-        "schedule": crontab(minute="*/5"),  # Every 5 minutes
+        "task": "tasks.monitoring_sync.health_check",
+        "schedule": crontab(minute="*/10"),  # Every 10 minutes (reduced from 5)
     },
 }
 
-# Task routes (optional: route specific tasks to specific queues)
+# Task routes (route tasks to dedicated queues for isolation)
 celery_app.conf.task_routes = {
     "tasks.scraping.*": {"queue": "scraping"},
     "tasks.generation.*": {"queue": "generation"},
-    "tasks.generation_sync.*": {"queue": "generation"},  # NEW: Sync tasks use same queue
+    "tasks.generation_sync.*": {"queue": "generation"},  # Sync generation tasks
     "tasks.campaigns.*": {"queue": "campaigns"},
-    "tasks.sms.*": {"queue": "campaigns"},  # SMS uses same queue as campaigns
-    "tasks.monitoring.*": {"queue": "monitoring"},
+    "tasks.sms_sync.*": {"queue": "campaigns"},  # Sync SMS uses campaigns queue
+    "tasks.monitoring_sync.*": {"queue": "monitoring"},  # Sync monitoring tasks
 }
 
 if __name__ == "__main__":
