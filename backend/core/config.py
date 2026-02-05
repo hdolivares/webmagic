@@ -31,27 +31,50 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: str
     TELNYX_API_KEY: Optional[str] = None
     TELNYX_PUBLIC_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+    BREVO_API_KEY: Optional[str] = None
+    
+    # Payment Providers (Recurrente - Legacy)
+    RECURRENTE_PUBLIC_KEY: Optional[str] = None
+    RECURRENTE_SECRET_KEY: Optional[str] = None
+    RECURRENTE_WEBHOOK_SECRET: Optional[str] = None
+    RECURRENTE_BASE_URL: Optional[str] = None
     
     # JWT / Auth
     SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
+    # API Versioning
+    API_VERSION: str = "v1"
+    
     # Frontend URL
     FRONTEND_URL: str = "https://web.lavish.solutions"
     
     # Site Serving
     SITES_DOMAIN: str = "sites.lavish.solutions"
+    SITES_BASE_PATH: str = "/var/www/sites"
+    
+    # Email Configuration
+    EMAIL_PROVIDER: str = "brevo"
+    EMAIL_FROM: str = "hello@lavish.solutions"
     
     # Stripe Webhooks
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
     
-    # Telnyx Webhooks
+    # Telnyx Configuration
     TELNYX_WEBHOOK_SECRET: Optional[str] = None
-    
-    # SMS Configuration
     TELNYX_MESSAGING_PROFILE_ID: Optional[str] = None
     TELNYX_FROM_NUMBER: Optional[str] = None
+    TELNYX_PHONE_NUMBER: Optional[str] = None
+    
+    # SMS Configuration
+    SMS_PROVIDER: str = "telnyx"
+    SMS_DAILY_BUDGET: str = "10.00"
+    SMS_MAX_COST_PER_MESSAGE: str = "0.05"
+    SMS_ENABLE_COST_ALERTS: str = "true"
+    SMS_ENFORCE_BUSINESS_HOURS: str = "true"
+    SMS_DEFAULT_TIMEZONE: str = "America/Chicago"
     
     # Website Validation (NEW)
     ENABLE_AUTO_VALIDATION: bool = True  # Auto-validate websites after scraping
@@ -62,6 +85,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "allow"  # Allow extra fields from .env
 
 
 # Singleton instance
