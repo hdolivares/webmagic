@@ -132,6 +132,7 @@ class BusinessService:
                 existing = await self.get_business_by_gmb_id(str(gmb_id))
             
             # Only pass fields that exist in the Business model
+            # NOTE: coverage_grid_id is handled separately as a parameter
             valid_fields = {
                 "gmb_id", "gmb_place_id", "name", "slug",
                 "email", "phone", "website_url",
@@ -140,7 +141,7 @@ class BusinessService:
                 "reviews_summary", "review_highlight", "brand_archetype",
                 "photos_urls", "logo_url",
                 "website_status", "contact_status", "qualification_score",
-                "creative_dna", "coverage_grid_id", "scraped_at"
+                "creative_dna", "scraped_at"
             }
             
             # Filter business data to only valid fields
@@ -148,10 +149,6 @@ class BusinessService:
                 k: v for k, v in data.items() 
                 if k in valid_fields and v is not None
             }
-            
-            # **FIX: Set coverage_grid_id to link business to zone**
-            if coverage_grid_id is not None:
-                business_data["coverage_grid_id"] = coverage_grid_id
             
             # Add qualification score if provided
             if lead_score is not None:
@@ -165,8 +162,11 @@ class BusinessService:
                     updated._is_new = False
                 return updated
             else:
-                # Create new business
-                business = await self.create_business(business_data)
+                # Create new business with coverage_grid_id link
+                business = await self.create_business(
+                    business_data, 
+                    coverage_grid_id=coverage_grid_id
+                )
                 if business:
                     business._is_new = True
                 return business
