@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     
     # Site Serving
     SITES_DOMAIN: str = "sites.lavish.solutions"
+    SITES_BASE_URL: str = "https://sites.lavish.solutions"
     SITES_BASE_PATH: str = "/var/www/sites"
     
     # Email Configuration
