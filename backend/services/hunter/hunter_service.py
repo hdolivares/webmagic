@@ -132,32 +132,28 @@ class HunterService:
             }
         
         zone_id = next_zone["zone_id"]
-        zone_lat = next_zone["lat"]
-        zone_lon = next_zone["lon"]
-        zone_radius = next_zone["radius_km"]
+        target_city = next_zone.get("city") or next_zone.get("target_city")
+        zone_lat = next_zone.get("lat")  # Keep for backwards compatibility
+        zone_lon = next_zone.get("lon")  # Keep for backwards compatibility
+        zone_radius = next_zone.get("radius_km", 3.0)
         
         logger.info(
-            f"Scraping zone {zone_id} ({zone_lat}, {zone_lon}) "
-            f"radius {zone_radius}km, priority: {next_zone.get('priority')}"
+            f"Scraping zone {zone_id} (City: {target_city}) "
+            f"priority: {next_zone.get('priority')}"
         )
         
-        # Scrape the zone
+        # Scrape the zone (now city-based, not coordinate-based)
         try:
-            logger.info(
-                f"Scraper params: zone_lat={zone_lat} (type: {type(zone_lat).__name__}), "
-                f"zone_lon={zone_lon} (type: {type(zone_lon).__name__}), "
-                f"zone_radius={zone_radius} (type: {type(zone_radius).__name__})"
-            )
+            logger.info(f"Scraper params: target_city={target_city}, limit={limit_per_zone}")
             
             results = await self.scraper.search_businesses(
                 query=category,
-                city=city,
+                city=city,  # Metro area name (e.g., "Los Angeles")
                 state=state,
                 country=country,
                 limit=limit_per_zone,
-                zone_lat=zone_lat,
-                zone_lon=zone_lon,
-                zone_id=zone_id
+                zone_id=zone_id,
+                target_city=target_city  # Specific city to scrape (e.g., "Pasadena")
             )
             
             raw_businesses = results.get("businesses", [])

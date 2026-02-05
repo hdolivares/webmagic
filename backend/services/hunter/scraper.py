@@ -37,9 +37,10 @@ class OutscraperClient:
         country: str = "US",
         limit: int = 50,
         language: str = "en",
-        zone_lat: Optional[float] = None,
-        zone_lon: Optional[float] = None,
-        zone_id: Optional[str] = None
+        zone_lat: Optional[float] = None,  # DEPRECATED: Outscraper ignores coordinates
+        zone_lon: Optional[float] = None,  # DEPRECATED: Outscraper ignores coordinates
+        zone_id: Optional[str] = None,
+        target_city: Optional[str] = None  # NEW: Target specific city for multi-city metro areas
     ) -> Dict[str, Any]:
         """
         Search for businesses on Google Maps.
@@ -67,19 +68,17 @@ class OutscraperClient:
         """
         try:
             # Build search query
-            # If zone coordinates provided, use geo-specific search
-            if zone_lat is not None and zone_lon is not None:
-                search_query = f"{query} near {zone_lat},{zone_lon}"
-                zone_str = f" [Zone {zone_id}]" if zone_id else ""
-                logger.info(f"Geo-search: {search_query}{zone_str} (limit: {limit})")
-            else:
-                # Traditional city-based search
-                location = f"{city}, {state}, {country}"
-                search_query = f"{query} in {location}"
-                logger.info(f"City-search: {search_query} (limit: {limit})")
+            # ALWAYS use city-based search (Outscraper ignores "near X,Y" coordinates!)
+            # If target_city provided, use that instead of main city (for metro areas)
+            search_city = target_city if target_city else city
+            location = f"{search_city}, {state}, {country}"
+            search_query = f"{query} in {location}"
+            
+            zone_str = f" [City: {search_city}]" if target_city else ""
+            logger.info(f"City-search: {search_query}{zone_str} (limit: {limit})")
             
             # ANTI-DUPLICATE: Check if this exact search is already running
-            search_key = f"{query}|{city}|{state}|{zone_lat}|{zone_lon}|{limit}"
+            search_key = f"{query}|{search_city}|{state}|{limit}"
             if search_key in self._active_searches:
                 logger.warning(f"⚠️  DUPLICATE CALL BLOCKED: {search_query}")
                 logger.warning("This search is already in progress - preventing duplicate Outscraper charge!")
