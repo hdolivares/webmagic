@@ -58,14 +58,17 @@ class Business(BaseModel):
     
     qualification_score = Column(Integer, default=0, nullable=True)
     
-    # Website Validation (New in Migration 007)
+    # Website Validation (New in Migration 007, Extended in Migration 010)
     website_validation_status = Column(String(30), default="pending", nullable=True, index=True)
-    # Values: pending, valid, invalid, missing, timeout
+    # Values: pending, valid, invalid, no_website, error
     
     website_validation_result = Column(JSONB, nullable=True)
-    # Stores full ValidationResult: status, url_type, accessibility, issues, etc.
+    # Stores full ValidationResult: status, url_type, accessibility, issues, quality_score, etc.
     
     website_validated_at = Column(DateTime, nullable=True)
+    
+    website_screenshot_url = Column(Text, nullable=True)
+    # URL to website screenshot (if captured)
     
     discovered_urls = Column(JSONB, default=list, nullable=True)
     # URLs found in Google web results that weren't in the site field
