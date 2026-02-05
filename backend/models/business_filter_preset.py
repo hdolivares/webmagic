@@ -36,6 +36,9 @@ class BusinessFilterPreset(BaseModel):
     description = Column(Text, nullable=True)
     """Optional description of what this filter does"""
     
+    is_public = Column(Integer, default=0, nullable=False, index=True)
+    """Whether this preset is shared with all users (1) or private (0)"""
+    
     # Filter criteria
     filters = Column(JSONB, nullable=False)
     """
@@ -81,6 +84,7 @@ class BusinessFilterPreset(BaseModel):
             "user_id": str(self.user_id),
             "name": self.name,
             "description": self.description,
+            "is_public": bool(self.is_public),
             "filters": self.filters,
             "last_used_at": self.last_used_at.isoformat() if self.last_used_at else None,
             "use_count": self.use_count,
