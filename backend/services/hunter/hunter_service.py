@@ -165,6 +165,20 @@ class HunterService:
             logger.info(f"Zone {zone_id} returned {len(raw_businesses)} businesses from scraper")
             logger.debug(f"Scraper result keys: {list(results.keys())}")
             
+            # **FIX: Get or create coverage FIRST so we can link businesses to it**
+            # Convert floats to strings for database schema compatibility
+            coverage, created = await self.coverage_service.get_or_create_coverage(
+                city=city,
+                state=state,
+                industry=category,
+                country=country,
+                zone_id=zone_id,
+                zone_lat=str(zone_lat) if zone_lat is not None else None,
+                zone_lon=str(zone_lon) if zone_lon is not None else None,
+                zone_radius_km=str(zone_radius) if zone_radius is not None else None
+            )
+            logger.info(f"Coverage grid {'created' if created else 'found'}: {coverage.id}")
+            
             # Process and qualify leads
             qualified_count = 0
             new_businesses = 0
@@ -193,9 +207,11 @@ class HunterService:
                         
                         # Store if qualified
                         if is_qualified:
+                            # **FIX: Pass coverage_grid_id so businesses are linked properly**
                             business = await self.business_service.create_or_update_business(
                                 data=biz_data,
                                 source="outscraper_gmaps",
+                                coverage_grid_id=coverage.id,
                                 discovery_city=city,
                                 discovery_state=state,
                                 discovery_zone_id=zone_id,
@@ -249,19 +265,7 @@ class HunterService:
                     f"businesses for website generation"
                 )
             
-            # Update coverage tracking
-            # Convert floats to strings for database schema compatibility
-            coverage, created = await self.coverage_service.get_or_create_coverage(
-                city=city,
-                state=state,
-                industry=category,
-                country=country,
-                zone_id=zone_id,
-                zone_lat=str(zone_lat) if zone_lat is not None else None,
-                zone_lon=str(zone_lon) if zone_lon is not None else None,
-                zone_radius_km=str(zone_radius) if zone_radius is not None else None
-            )
-            
+            # **FIX: Coverage was already created at the start, just update it now**
             # **NEW Phase 2: Store detailed scrape metrics**
             last_scrape_details = {
                 "raw_businesses": len(raw_businesses),

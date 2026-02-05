@@ -140,9 +140,10 @@
 }
 
 /* ==========================================================================
-   DARK MODE SUPPORT (Optional - Future Enhancement)
+   DARK MODE SUPPORT
    ========================================================================== */
 
+/* Support both system preference and manual toggle via .dark class */
 @media (prefers-color-scheme: dark) {
   :root {
     /* Override colors for dark mode */
@@ -156,7 +157,43 @@
     
     --coverage-border-color: #334155;
     --coverage-border-color-hover: #475569;
+    
+    --coverage-progress-bg: #334155;
+    --coverage-button-secondary-bg: #334155;
+    --coverage-button-secondary-hover: #475569;
   }
+}
+
+/* Manual dark mode toggle via .dark class */
+.dark {
+  /* Override colors for dark mode */
+  --coverage-bg-primary: #0f172a;
+  --coverage-bg-secondary: #1e293b;
+  --coverage-bg-tertiary: #334155;
+  
+  --coverage-text-primary: #f8fafc;
+  --coverage-text-secondary: #cbd5e1;
+  --coverage-text-tertiary: #94a3b8;
+  --coverage-text-disabled: #475569;
+  
+  --coverage-border-color: #334155;
+  --coverage-border-color-hover: #475569;
+  
+  --coverage-progress-bg: #334155;
+  
+  --coverage-button-secondary-bg: #334155;
+  --coverage-button-secondary-hover: #475569;
+  --coverage-button-secondary-text: #cbd5e1;
+  
+  --coverage-bg-success: #064e3b;
+  --coverage-bg-warning: #78350f;
+  --coverage-bg-error: #7f1d1d;
+  --coverage-bg-info: #1e3a8a;
+  
+  --coverage-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --coverage-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --coverage-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+  --coverage-shadow-hover: 0 6px 10px -1px rgb(0 0 0 / 0.5);
 }
 
 /* ==========================================================================
