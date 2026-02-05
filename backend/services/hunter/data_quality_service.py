@@ -1,0 +1,436 @@
+"""
+Data Quality Service for Outscraper Results
+
+Analyzes and scores business data quality using the rich information
+provided by Outscraper to:
+1. Filter out irrelevant/low-quality results
+2. Score businesses for lead prioritization
+3. Verify geo-targeting accuracy
+4. Identify businesses truly without websites
+
+Best Practices:
+- Use all available Outscraper fields
+- Multi-tier website detection
+- Geo-validation (country_code, state_code)
+- Business quality scoring
+"""
+import logging
+from typing import Dict, Any, List, Optional, Tuple
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+
+class DataQualityService:
+    """
+    Analyzes Outscraper data quality and filters/scores results.
+    """
+    
+    # Geo-targeting filters
+    VALID_COUNTRY_CODES = {"US", "CA", "GB", "AU"}  # Expand as needed
+    
+    # Business status filters
+    OPERATIONAL_STATUSES = {"OPERATIONAL"}
+    EXCLUDED_STATUSES = {"CLOSED_TEMPORARILY", "CLOSED_PERMANENTLY"}
+    
+    def __init__(
+        self,
+        strict_geo_filter: bool = True,
+        require_operational: bool = True,
+        min_quality_score: float = 30.0
+    ):
+        """
+        Initialize Data Quality Service.
+        
+        Args:
+            strict_geo_filter: If True, filter out businesses outside target geo
+            require_operational: If True, filter out closed businesses
+            min_quality_score: Minimum quality score threshold (0-100)
+        """
+        self.strict_geo_filter = strict_geo_filter
+        self.require_operational = require_operational
+        self.min_quality_score = min_quality_score
+    
+    def validate_geo_targeting(
+        self,
+        business: Dict[str, Any],
+        target_country: str,
+        target_state: Optional[str] = None,
+        target_city: Optional[str] = None
+    ) -> Tuple[bool, List[str]]:
+        """
+        Validate that business matches target geographic location.
+        
+        CRITICAL: Prevents getting UK results when searching for US businesses.
+        
+        Args:
+            business: Raw Outscraper business data
+            target_country: Target country code (e.g., "US")
+            target_state: Target state code (e.g., "TX")
+            target_city: Target city name (e.g., "Houston")
+            
+        Returns:
+            Tuple of (is_valid, reasons)
+        """
+        raw_data = business.get("raw_data", {})
+        reasons = []
+        
+        # Check country code (most reliable)
+        country_code = raw_data.get("country_code")
+        if country_code != target_country:
+            reasons.append(f"Country mismatch: {country_code} != {target_country}")
+            return False, reasons
+        
+        # Check state code (if provided)
+        if target_state:
+            state_code = raw_data.get("state_code")
+            if state_code != target_state:
+                reasons.append(f"State mismatch: {state_code} != {target_state}")
+                if self.strict_geo_filter:
+                    return False, reasons
+        
+        # Check city (less reliable due to spelling variations)
+        if target_city:
+            city = raw_data.get("city", "").lower()
+            if target_city.lower() not in city and city not in target_city.lower():
+                reasons.append(f"City mismatch: {city} != {target_city}")
+                # Don't fail on city mismatch (metro areas have many cities)
+        
+        return True, ["Geo-targeting validated"]
+    
+    def detect_website(self, business: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Multi-tier website detection strategy.
+        
+        Checks multiple fields to determine if business has an online presence:
+        1. website field (primary)
+        2. booking_appointment_link (alternative)
+        3. order_links (alternative for restaurants/retail)
+        
+        Args:
+            business: Raw Outscraper business data
+            
+        Returns:
+            Dict with:
+                - has_website: bool
+                - website_url: str or None
+                - website_type: "website" | "booking" | "ordering" | "none"
+                - confidence: float (0-1)
+        """
+        raw_data = business.get("raw_data", {})
+        
+        # Primary: Check website field
+        website = raw_data.get("website")
+        if website and isinstance(website, str) and len(website) > 10:
+            return {
+                "has_website": True,
+                "website_url": website,
+                "website_type": "website",
+                "confidence": 1.0
+            }
+        
+        # Secondary: Check booking link (some businesses only have this)
+        booking_link = raw_data.get("booking_appointment_link")
+        if booking_link and isinstance(booking_link, str):
+            return {
+                "has_website": True,
+                "website_url": booking_link,
+                "website_type": "booking",
+                "confidence": 0.8
+            }
+        
+        # Tertiary: Check order links (restaurants/retail)
+        order_links = raw_data.get("order_links")
+        if order_links:
+            if isinstance(order_links, list) and len(order_links) > 0:
+                return {
+                    "has_website": True,
+                    "website_url": order_links[0],
+                    "website_type": "ordering",
+                    "confidence": 0.7
+                }
+            elif isinstance(order_links, str):
+                return {
+                    "has_website": True,
+                    "website_url": order_links,
+                    "website_type": "ordering",
+                    "confidence": 0.7
+                }
+        
+        # No online presence found
+        return {
+            "has_website": False,
+            "website_url": None,
+            "website_type": "none",
+            "confidence": 1.0  # High confidence they have NO website
+        }
+    
+    def calculate_quality_score(self, business: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Calculate comprehensive business quality score.
+        
+        Scoring factors (0-100 total):
+        - Verification status (0-15 points)
+        - Operational status (0-10 points)
+        - Review quality (0-25 points)
+        - Review quantity (0-20 points)
+        - Engagement (photos, description) (0-15 points)
+        - Data completeness (0-15 points)
+        
+        Args:
+            business: Raw Outscraper business data
+            
+        Returns:
+            Dict with score, breakdown, and recommendations
+        """
+        raw_data = business.get("raw_data", {})
+        score = 0.0
+        breakdown = {}
+        
+        # 1. Verification (0-15 points)
+        verified = raw_data.get("verified", False)
+        verification_score = 15 if verified else 0
+        score += verification_score
+        breakdown["verification"] = verification_score
+        
+        # 2. Operational Status (0-10 points)
+        business_status = raw_data.get("business_status", "").upper()
+        if business_status == "OPERATIONAL":
+            operational_score = 10
+        elif business_status in self.EXCLUDED_STATUSES:
+            operational_score = 0
+        else:
+            operational_score = 5  # Unknown status
+        score += operational_score
+        breakdown["operational"] = operational_score
+        
+        # 3. Review Quality (0-25 points) - based on rating and distribution
+        rating = raw_data.get("rating")
+        reviews_per_score = raw_data.get("reviews_per_score", {})
+        
+        if rating:
+            # Base rating score (0-20)
+            rating_score = (rating / 5.0) * 20
+            
+            # Bonus for high % of 5-star reviews (0-5)
+            if reviews_per_score:
+                total_reviews = sum(reviews_per_score.values())
+                five_star = reviews_per_score.get("5", 0)
+                if total_reviews > 0:
+                    five_star_pct = five_star / total_reviews
+                    rating_score += five_star_pct * 5
+            
+            score += rating_score
+            breakdown["review_quality"] = rating_score
+        else:
+            breakdown["review_quality"] = 0
+        
+        # 4. Review Quantity (0-20 points)
+        review_count = raw_data.get("reviews", 0)
+        if review_count:
+            # Logarithmic scale: 10 reviews = 10 pts, 100 reviews = 16 pts, 500+ = 20 pts
+            import math
+            review_quantity_score = min(20, 10 + math.log10(review_count) * 5)
+            score += review_quantity_score
+            breakdown["review_quantity"] = review_quantity_score
+        else:
+            breakdown["review_quantity"] = 0
+        
+        # 5. Engagement (0-15 points)
+        engagement_score = 0
+        
+        # Photos (0-8 points)
+        photos_count = raw_data.get("photos_count", 0)
+        if photos_count:
+            engagement_score += min(8, photos_count / 20)  # 160+ photos = max
+        
+        # Description (0-5 points)
+        description = raw_data.get("description")
+        if description and len(str(description)) > 50:
+            engagement_score += 5
+        
+        # Working hours (0-2 points)
+        working_hours = raw_data.get("working_hours")
+        if working_hours:
+            engagement_score += 2
+        
+        score += engagement_score
+        breakdown["engagement"] = engagement_score
+        
+        # 6. Data Completeness (0-15 points)
+        completeness_score = 0
+        required_fields = [
+            "phone", "address", "city", "state_code", "postal_code",
+            "category", "latitude", "longitude"
+        ]
+        filled_fields = sum(1 for field in required_fields if raw_data.get(field))
+        completeness_score = (filled_fields / len(required_fields)) * 15
+        
+        score += completeness_score
+        breakdown["completeness"] = completeness_score
+        
+        return {
+            "score": round(score, 2),
+            "breakdown": breakdown,
+            "verified": verified,
+            "operational": business_status == "OPERATIONAL",
+            "high_quality": score >= 70,
+            "medium_quality": 50 <= score < 70,
+            "low_quality": score < 50
+        }
+    
+    def should_generate_website(self, business: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Determine if we should generate a website for this business.
+        
+        Criteria:
+        1. No existing website (all detection methods failed)
+        2. Business is operational
+        3. Business meets minimum quality threshold
+        4. Business is verified (preferred)
+        
+        Args:
+            business: Raw Outscraper business data
+            
+        Returns:
+            Dict with recommendation and reasoning
+        """
+        # Check website detection
+        website_info = self.detect_website(business)
+        
+        if website_info["has_website"]:
+            return {
+                "should_generate": False,
+                "reason": f"Business has {website_info['website_type']}: {website_info['website_url']}",
+                "confidence": website_info["confidence"]
+            }
+        
+        # Check quality score
+        quality_info = self.calculate_quality_score(business)
+        
+        if quality_info["score"] < self.min_quality_score:
+            return {
+                "should_generate": False,
+                "reason": f"Quality score too low: {quality_info['score']} < {self.min_quality_score}",
+                "confidence": 0.9,
+                "quality_score": quality_info["score"]
+            }
+        
+        if not quality_info["operational"]:
+            return {
+                "should_generate": False,
+                "reason": "Business not operational",
+                "confidence": 1.0
+            }
+        
+        # Recommend generation
+        return {
+            "should_generate": True,
+            "reason": "No website found, business is operational and high quality",
+            "confidence": website_info["confidence"],
+            "quality_score": quality_info["score"],
+            "priority": "high" if quality_info["verified"] else "medium"
+        }
+    
+    def filter_and_score_results(
+        self,
+        businesses: List[Dict[str, Any]],
+        target_country: str,
+        target_state: Optional[str] = None,
+        target_city: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Filter and score a batch of Outscraper results.
+        
+        Args:
+            businesses: List of raw Outscraper business data
+            target_country: Target country code
+            target_state: Target state code (optional)
+            target_city: Target city name (optional)
+            
+        Returns:
+            Dict with filtered businesses, statistics, and recommendations
+        """
+        results = {
+            "total_received": len(businesses),
+            "filtered_businesses": [],
+            "excluded_businesses": [],
+            "statistics": {
+                "geo_filtered": 0,
+                "quality_filtered": 0,
+                "closed_filtered": 0,
+                "passed": 0
+            },
+            "generation_candidates": []
+        }
+        
+        for business in businesses:
+            # Geo-validation
+            geo_valid, geo_reasons = self.validate_geo_targeting(
+                business, target_country, target_state, target_city
+            )
+            
+            if not geo_valid:
+                results["excluded_businesses"].append({
+                    "business": business,
+                    "reason": "geo_filter",
+                    "details": geo_reasons
+                })
+                results["statistics"]["geo_filtered"] += 1
+                logger.warning(f"Geo-filtered: {business.get('name')} - {geo_reasons}")
+                continue
+            
+            # Calculate quality score
+            quality_info = self.calculate_quality_score(business)
+            business["quality_score"] = quality_info["score"]
+            business["quality_breakdown"] = quality_info["breakdown"]
+            
+            # Check operational status
+            if self.require_operational and not quality_info["operational"]:
+                results["excluded_businesses"].append({
+                    "business": business,
+                    "reason": "not_operational",
+                    "details": ["Business is closed or not operational"]
+                })
+                results["statistics"]["closed_filtered"] += 1
+                continue
+            
+            # Check quality threshold
+            if quality_info["score"] < self.min_quality_score:
+                results["excluded_businesses"].append({
+                    "business": business,
+                    "reason": "low_quality",
+                    "details": [f"Score {quality_info['score']} < {self.min_quality_score}"]
+                })
+                results["statistics"]["quality_filtered"] += 1
+                continue
+            
+            # Passed all filters
+            results["filtered_businesses"].append(business)
+            results["statistics"]["passed"] += 1
+            
+            # Check if generation candidate
+            generation_rec = self.should_generate_website(business)
+            if generation_rec["should_generate"]:
+                results["generation_candidates"].append({
+                    "business": business,
+                    "recommendation": generation_rec
+                })
+        
+        # Add summary
+        results["summary"] = {
+            "pass_rate": results["statistics"]["passed"] / max(1, results["total_received"]) * 100,
+            "geo_filter_rate": results["statistics"]["geo_filtered"] / max(1, results["total_received"]) * 100,
+            "generation_candidates_count": len(results["generation_candidates"]),
+            "generation_rate": len(results["generation_candidates"]) / max(1, results["statistics"]["passed"]) * 100
+        }
+        
+        logger.info(f"Filtered {results['total_received']} businesses:")
+        logger.info(f"  ✅ Passed: {results['statistics']['passed']}")
+        logger.info(f"  🌍 Geo-filtered: {results['statistics']['geo_filtered']}")
+        logger.info(f"  📊 Quality-filtered: {results['statistics']['quality_filtered']}")
+        logger.info(f"  🚫 Closed: {results['statistics']['closed_filtered']}")
+        logger.info(f"  🎯 Generation candidates: {len(results['generation_candidates'])}")
+        
+        return results
+
