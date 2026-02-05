@@ -147,10 +147,18 @@ class BusinessService:
             }
             
             # Filter business data to only valid fields
-            business_data = {
-                k: v for k, v in data.items() 
-                if k in valid_fields and v is not None
-            }
+            # IMPORTANT: raw_data should ALWAYS be saved, even if it's a dict (don't check None)
+            business_data = {}
+            for k, v in data.items():
+                if k not in valid_fields:
+                    continue
+                # Always save raw_data regardless of value
+                if k == "raw_data":
+                    business_data[k] = v
+                    logger.info(f"Saving raw_data: {type(v)}, keys: {list(v.keys()) if isinstance(v, dict) else 'N/A'}")
+                # For other fields, skip if None
+                elif v is not None:
+                    business_data[k] = v
             
             # Add qualification score if provided
             if lead_score is not None:

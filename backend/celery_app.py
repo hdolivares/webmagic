@@ -50,10 +50,11 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour="*/6"),  # Every 6 hours
     },
     # Generate sites for qualified leads every hour (using SYNC task)
-    "generate-sites": {
-        "task": "tasks.generation_sync.generate_pending_sites",
-        "schedule": crontab(minute=0),  # Every hour
-    },
+    # DISABLED: Temporarily disabled until website detection is fixed
+    # "generate-sites": {
+    #     "task": "tasks.generation_sync.generate_pending_sites",
+    #     "schedule": crontab(minute=0),  # Every hour
+    # },
     # Send pending campaigns every 30 minutes
     "send-campaigns": {
         "task": "tasks.campaigns.send_pending_campaigns",

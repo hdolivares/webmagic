@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     TELNYX_PUBLIC_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
     BREVO_API_KEY: Optional[str] = None
+    SCRAPINGDOG_API_KEY: Optional[str] = None  # For Google search verification
     
     # Payment Providers (Recurrente - Legacy)
     RECURRENTE_PUBLIC_KEY: Optional[str] = None
