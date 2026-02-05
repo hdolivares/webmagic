@@ -24,7 +24,7 @@ class GeneratedSite(BaseModel):
     custom_domain = Column(String(255), nullable=True, index=True)
     
     # Content
-    html_content = Column(Text, nullable=False)
+    html_content = Column(Text, nullable=True)  # Nullable during generation
     css_content = Column(Text, nullable=True)
     js_content = Column(Text, nullable=True)
     
