@@ -13,7 +13,7 @@ from services.hunter.filters import LeadQualifier
 from services.hunter.business_service import BusinessService
 from services.hunter.coverage_service import CoverageService
 from services.hunter.geo_strategy_service import GeoStrategyService
-from services.hunter.website_validator import WebsiteValidator
+# WebsiteValidator removed - using only WebsiteValidationService for comprehensive validation
 from services.hunter.website_validation_service import WebsiteValidationService
 from services.hunter.website_generation_queue_service import WebsiteGenerationQueueService
 from core.exceptions import ExternalAPIException
@@ -185,21 +185,14 @@ class HunterService:
             businesses_needing_websites = 0
             businesses_needing_generation = []
             
-            # Create validation service and website validator with async context
-            async with WebsiteValidationService(self.db) as validation_service, \
-                       WebsiteValidator() as website_validator:
+            # Create validation service with async context (Phase 2 only - comprehensive)
+            async with WebsiteValidationService(self.db) as validation_service:
                 for biz_data in raw_businesses:
                     try:
-                        # Validate website if present
+                        # Set initial status based on URL presence (Phase 2 will validate)
                         website_url = biz_data.get("website_url")
-                        
                         if website_url:
-                            validation_result = await website_validator.validate_url(website_url)
-                            # Convert WebsiteValidationResult object to string status
-                            if validation_result.is_valid:
-                                biz_data["website_validation_status"] = "valid"
-                            else:
-                                biz_data["website_validation_status"] = "invalid"
+                            biz_data["website_validation_status"] = "pending"  # Will be validated in Phase 2
                         else:
                             biz_data["website_validation_status"] = "missing"
                         
@@ -207,12 +200,6 @@ class HunterService:
                         qualification_result = self.qualifier.qualify(biz_data)
                         score = qualification_result["score"]
                         reasons = qualification_result["reasons"]
-                        
-                        # Determine if business needs a website
-                        # Valid = has working, legitimate website
-                        # Invalid = has URL but it's broken/social media/PDF
-                        # Missing = no URL at all
-                        needs_website = biz_data["website_validation_status"] in ["invalid", "missing"]
                         
                         # **SAVE ALL BUSINESSES** (we paid for them!)
                         business = await self.business_service.create_or_update_business(
@@ -233,7 +220,7 @@ class HunterService:
                             if hasattr(business, '_is_new') and business._is_new:
                                 new_businesses += 1
                             
-                            # **Phase 2: Comprehensive website validation**
+                            # **Phase 2: Comprehensive website validation** (ONLY validation pass now!)
                             validation_result = await validation_service.validate_business_website(
                                 {
                                     "id": str(business.id),
@@ -243,6 +230,11 @@ class HunterService:
                                 },
                                 store_result=True
                             )
+                            
+                            # Update business with validation result
+                            business.website_validation_status = validation_result.status
+                            business.website_validated_at = datetime.utcnow()
+                            await self.db.flush()
                             
                             # Track website metrics
                             if validation_result.status == "valid":
