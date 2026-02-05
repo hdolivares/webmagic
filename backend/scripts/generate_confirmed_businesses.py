@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from core.database import AsyncSessionLocal
 from models.business import Business
-from tasks.generation_sync import generate_website_for_business
+from tasks.generation_sync import generate_site_for_business
 from sqlalchemy import select
 
 logging.basicConfig(
