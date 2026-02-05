@@ -259,7 +259,7 @@ export function BusinessFilterPanel({ onFilterApply, onFilterClear, initialFilte
         <h4 className="filter-section-title">Website Status</h4>
         <div className="website-status-checkboxes">
           {[
-            { value: 'none', label: 'No Website', color: 'amber' },
+            { value: 'missing', label: 'No Website', color: 'amber' },
             { value: 'valid', label: 'Valid Website', color: 'green' },
             { value: 'invalid', label: 'Invalid Website', color: 'red' },
             { value: 'pending', label: 'Pending Validation', color: 'gray' }
