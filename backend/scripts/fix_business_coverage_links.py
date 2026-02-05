@@ -51,6 +51,14 @@ async def fix_business_coverage_links():
             no_match_count = 0
             
             for business in businesses:
+                # Skip businesses without required fields
+                if not business.city or not business.state or not business.category:
+                    logger.warning(
+                        f"Skipping business {business.name} - missing city, state, or category"
+                    )
+                    no_match_count += 1
+                    continue
+                
                 # Try to find matching coverage grid
                 # Match by city, state, and industry
                 coverage_query = select(CoverageGrid).where(
