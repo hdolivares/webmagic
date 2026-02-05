@@ -16,7 +16,7 @@ backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
 from sqlalchemy import select, update, func
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from core.config import get_settings
 from models.business import Business
 from models.coverage import CoverageGrid
@@ -32,11 +32,12 @@ async def fix_business_coverage_links():
     """
     settings = get_settings()
     engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     
     try:
-        async with engine.begin() as conn:
+        async with AsyncSessionLocal() as db:
             # Get all businesses without coverage_grid_id
-            result = await conn.execute(
+            result = await db.execute(
                 select(Business).where(Business.coverage_grid_id.is_(None))
             )
             businesses = result.scalars().all()
@@ -73,7 +74,7 @@ async def fix_business_coverage_links():
                     CoverageGrid.industry.ilike(f"%{business.category}%")
                 )
                 
-                coverage_result = await conn.execute(coverage_query)
+                coverage_result = await db.execute(coverage_query)
                 coverages = coverage_result.scalars().all()
                 
                 if len(coverages) == 0:
@@ -93,7 +94,7 @@ async def fix_business_coverage_links():
                         coverage = zone_coverage[0]
                 
                 # Update business with coverage_grid_id
-                await conn.execute(
+                await db.execute(
                     update(Business)
                     .where(Business.id == business.id)
                     .values(coverage_grid_id=coverage.id)
@@ -109,8 +110,11 @@ async def fix_business_coverage_links():
             logger.info(f"\n✅ Fixed {fixed_count} businesses")
             logger.info(f"⚠️  Could not find coverage grids for {no_match_count} businesses")
             
+            # Commit the changes
+            await db.commit()
+            
             # Print summary statistics
-            result = await conn.execute(
+            result = await db.execute(
                 select(
                     func.count(Business.id).label("total"),
                     func.count(Business.coverage_grid_id).label("with_coverage")
@@ -141,12 +145,13 @@ async def verify_coverage_stats():
     """
     settings = get_settings()
     engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     
     try:
-        async with engine.begin() as conn:
+        async with AsyncSessionLocal() as db:
             # Check la_downtown and la_koreatown zones
             for zone_id in ["la_downtown", "la_koreatown"]:
-                result = await conn.execute(
+                result = await db.execute(
                     select(CoverageGrid).where(CoverageGrid.zone_id == zone_id)
                 )
                 coverage = result.scalar_one_or_none()
@@ -156,7 +161,7 @@ async def verify_coverage_stats():
                     continue
                 
                 # Count businesses for this zone
-                result = await conn.execute(
+                result = await db.execute(
                     select(func.count(Business.id))
                     .where(Business.coverage_grid_id == coverage.id)
                 )
