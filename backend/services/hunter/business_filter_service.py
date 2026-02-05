@@ -438,7 +438,7 @@ class BusinessFilterService:
             "website_status": business.website_status,
             "website_validation_status": business.website_validation_status,
             "qualification_score": float(business.qualification_score) if business.qualification_score else None,
-            "status": business.status,
+            "contact_status": business.contact_status,
             "generation_queued_at": business.generation_queued_at.isoformat() if business.generation_queued_at else None,
             "generation_attempts": business.generation_attempts,
             "scraped_at": business.scraped_at.isoformat() if business.scraped_at else None,
