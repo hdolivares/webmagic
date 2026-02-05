@@ -381,6 +381,9 @@ class WebsiteValidationService:
         """
         Store validation result in database for audit trail.
         
+        NOTE: Does NOT commit - caller must commit the transaction.
+        This allows validation to be part of a larger transaction.
+        
         Args:
             business_id: Business UUID
             result: ValidationResult to store
@@ -406,8 +409,7 @@ class WebsiteValidationService:
             )
             
             self.db.add(validation)
-            await self.db.commit()
-            await self.db.refresh(validation)
+            await self.db.flush()  # Flush to get ID, but don't commit
             
             logger.debug(f"Stored validation result for business {business_id}: {result.status}")
             
@@ -415,7 +417,6 @@ class WebsiteValidationService:
         
         except Exception as e:
             logger.error(f"Failed to store validation result: {str(e)}")
-            await self.db.rollback()
             raise
     
     async def fetch_google_web_results(self, place_id: str) -> List[str]:
