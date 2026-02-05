@@ -94,7 +94,7 @@ class Business(BaseModel):
     
     # Relationships
     # coverage_grid = relationship("CoverageGrid", back_populates="businesses")
-    # generated_sites = relationship("GeneratedSite", back_populates="business")
+    generated_sites = relationship("GeneratedSite", back_populates="business", lazy="select")
     # campaigns = relationship("Campaign", back_populates="business")
     sms_messages = relationship("SMSMessage", back_populates="business", lazy="dynamic")
     

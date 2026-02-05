@@ -3,6 +3,7 @@ Generated Site model.
 """
 from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.orm import relationship
 from models.base import BaseModel
 
 
@@ -18,6 +19,7 @@ class GeneratedSite(BaseModel):
         nullable=False,
         index=True
     )
+    business = relationship("Business", back_populates="generated_sites", lazy="select")
     
     # Site info
     subdomain = Column(String(100), unique=True, nullable=False, index=True)
