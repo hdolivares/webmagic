@@ -68,3 +68,4 @@ async def generate_confirmed_businesses():
 if __name__ == "__main__":
     asyncio.run(generate_confirmed_businesses())
 
+
