@@ -194,11 +194,16 @@ class HunterService:
                         # Validate website if present (old validator for backwards compatibility)
                         # FIX: Scraper normalizes to 'website_url', not 'website'
                         website_url = biz_data.get("website_url")
-                        website_status = "unknown"
                         
                         if website_url:
-                            website_status = await self.website_validator.validate_url(website_url)
-                            biz_data["website_status"] = website_status
+                            validation_result = await self.website_validator.validate_url(website_url)
+                            # Convert WebsiteValidationResult object to string status
+                            if validation_result.is_valid:
+                                biz_data["website_validation_status"] = "valid"
+                            else:
+                                biz_data["website_validation_status"] = "invalid"
+                        else:
+                            biz_data["website_validation_status"] = "missing"
                         
                         # Qualify the lead
                         qualification_result = self.qualifier.qualify(biz_data)
@@ -542,8 +547,14 @@ class HunterService:
                 # FIX: Scraper normalizes to 'website_url', not 'website'
                 website_url = biz_data.get("website_url")
                 if website_url:
-                    website_status = await self.website_validator.validate_url(website_url)
-                    biz_data["website_status"] = website_status
+                    validation_result = await self.website_validator.validate_url(website_url)
+                    # Convert WebsiteValidationResult object to string status
+                    if validation_result.is_valid:
+                        biz_data["website_validation_status"] = "valid"
+                    else:
+                        biz_data["website_validation_status"] = "invalid"
+                else:
+                    biz_data["website_validation_status"] = "missing"
                 
                 # Qualify
                 qualification_result = self.qualifier.qualify(biz_data)
