@@ -370,7 +370,7 @@ class BusinessFilterService:
             query = query.where(
                 or_(
                     BusinessFilterPreset.user_id == user_id,
-                    BusinessFilterPreset.is_public == True
+                    BusinessFilterPreset.is_public == 1
                 )
             )
         else:
