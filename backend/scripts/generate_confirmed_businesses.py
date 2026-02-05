@@ -48,8 +48,7 @@ async def generate_confirmed_businesses():
             logger.info(f"[{i}/{len(businesses)}] Queuing generation for: {business.name}")
             try:
                 # Queue the Celery task
-                from tasks.generation_sync import generate_website_for_business
-                task = generate_website_for_business.delay(str(business.id))
+                task = generate_site_for_business.delay(str(business.id))
                 logger.info(f"  ✅ Task queued: {task.id}")
                 
                 # Update generation_started_at to prevent duplicate processing
