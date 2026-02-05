@@ -59,10 +59,11 @@ class GeneratedSite(BaseModel):
     
     @property
     def full_url(self) -> str:
-        """Get full URL for the site."""
+        """Get full URL for the site (path-based routing)."""
         if self.custom_domain:
             return f"https://{self.custom_domain}"
-        return f"https://{self.subdomain}.webmagic.com"
+        # Use path-based routing on sites.lavish.solutions
+        return f"https://sites.lavish.solutions/{self.subdomain}"
     
     @property
     def is_live(self) -> bool:
