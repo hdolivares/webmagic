@@ -124,7 +124,23 @@ def generate_site_for_business(self, business_id: str):
                 # Generate site using orchestrator
                 logger.info(f"Generating site content for {business.name}...")
                 orchestrator = CreativeOrchestrator(db)
-                result = await orchestrator.generate_complete_site(business.id)
+                
+                # Prepare business data for generation
+                business_data = {
+                    "id": str(business.id),
+                    "name": business.name,
+                    "category": business.category,
+                    "subcategory": business.subcategory,
+                    "city": business.city,
+                    "state": business.state,
+                    "phone": business.phone,
+                    "email": business.email,
+                    "rating": business.rating,
+                    "review_count": business.review_count,
+                    "reviews_summary": business.reviews_summary,
+                }
+                
+                result = await orchestrator.generate_website(business_data)
                 
                 # Update site with generated content
                 site.html_content = result.get("html")
