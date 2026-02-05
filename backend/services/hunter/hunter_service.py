@@ -194,8 +194,10 @@ class HunterService:
                         # **ENHANCED: Use data quality service for comprehensive analysis**
                         
                         # 1. Geo-validation (ensure business is in correct region)
+                        # Wrap biz_data in the format expected by validate_geo_targeting
+                        business_for_validation = {"raw_data": biz_data}
                         is_valid_geo, geo_reasons = data_quality_service.validate_geo_targeting(
-                            business=biz_data,
+                            business=business_for_validation,
                             target_country=country,
                             target_state=state
                         )
