@@ -6,6 +6,7 @@ optimizing zone placement based on geographic, demographic, and industry factors
 """
 from sqlalchemy import Column, String, Integer, Float, JSON, DateTime, Index, Text
 from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.orm.attributes import flag_modified
 from datetime import datetime
 import uuid
 
@@ -218,6 +219,9 @@ class GeoStrategy(BaseModel):
             "variance_pct": round(variance, 1) if variance is not None else None,
             "completed_at": datetime.utcnow().isoformat()
         })
+        
+        # CRITICAL: Mark the JSONB field as modified so SQLAlchemy commits it
+        flag_modified(self, "performance_data")
         
         # Calculate overall accuracy
         results_with_estimates = [
