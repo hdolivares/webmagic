@@ -27,8 +27,8 @@ class Settings(BaseSettings):
     # API Keys
     OUTSCRAPER_API_KEY: str
     ANTHROPIC_API_KEY: str
-    STRIPE_SECRET_KEY: str
-    STRIPE_PUBLISHABLE_KEY: str
+    STRIPE_SECRET_KEY: Optional[str] = None
+    STRIPE_PUBLISHABLE_KEY: Optional[str] = None
     TELNYX_API_KEY: Optional[str] = None
     TELNYX_PUBLIC_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
