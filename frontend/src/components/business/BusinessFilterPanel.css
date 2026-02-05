@@ -1,15 +1,124 @@
 /**
- * BusinessFilterPanel Component Styles
+ * BusinessFilterPanel Component Styles - Horizontal Layout
  * 
  * Uses semantic CSS variables from filter-theme.css for consistent theming
  */
 
 @import '../../styles/filter-theme.css';
 
-/* Component Container */
+/* Component Container - Horizontal Layout */
 .business-filter-panel {
   position: relative;
-  max-width: 400px;
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+/* Collapsed Filter Bar */
+.filter-bar-collapsed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: var(--filter-panel-bg);
+  border: var(--filter-border-width) solid var(--filter-panel-border);
+  border-radius: var(--filter-panel-radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.filter-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+  min-width: 0; /* Allow flex items to shrink */
+}
+
+.filter-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.filter-toggle-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--filter-button-primary-text);
+  background: var(--filter-button-primary-bg);
+  border: none;
+  border-radius: var(--filter-button-radius);
+  cursor: pointer;
+  transition: all var(--filter-transition-fast);
+  white-space: nowrap;
+}
+
+.filter-toggle-button:hover {
+  background: var(--filter-button-primary-hover);
+  transform: translateY(-1px);
+}
+
+.filter-toggle-icon {
+  transition: transform var(--filter-transition-fast);
+}
+
+.filter-toggle-button.expanded .filter-toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* Active Filters Chips - Horizontal */
+.filter-chips-horizontal {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.filter-chips-horizontal::-webkit-scrollbar {
+  height: 4px;
+}
+
+.filter-chips-horizontal::-webkit-scrollbar-thumb {
+  background: var(--filter-input-border);
+  border-radius: 2px;
+}
+
+/* Expanded Filter Content */
+.filter-content-expanded {
+  margin-top: 1rem;
+  padding: 1.5rem;
+  background: var(--filter-panel-bg);
+  border: var(--filter-border-width) solid var(--filter-panel-border);
+  border-radius: var(--filter-panel-radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  animation: slideDown var(--filter-transition-normal);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Horizontal Filter Sections */
+.filter-sections-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
 }
 
 /* Header */
@@ -32,16 +141,16 @@
   gap: 0.5rem;
 }
 
-/* Quick Filters */
+/* Quick Filters - Horizontal */
 .quick-filters-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
 .quick-filter-button {
-  padding: 0.625rem 0.75rem;
-  font-size: var(--filter-label-size);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
   font-weight: 500;
   color: var(--filter-button-secondary-text);
   background: var(--filter-button-secondary-bg);
@@ -49,7 +158,7 @@
   border-radius: var(--filter-button-radius);
   cursor: pointer;
   transition: all var(--filter-transition-fast);
-  text-align: left;
+  white-space: nowrap;
 }
 
 .quick-filter-button:hover {
@@ -58,17 +167,11 @@
   transform: translateY(-1px);
 }
 
-/* Website Status Checkboxes - Horizontal Layout */
+/* Website Status Checkboxes - Compact Horizontal */
 .website-status-checkboxes {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
-}
-
-@media (min-width: 1200px) {
-  .website-status-checkboxes {
-    grid-template-columns: repeat(4, 1fr);
-  }
 }
 
 .website-status-checkbox {
@@ -119,33 +222,38 @@
   border-left: 4px solid #9ca3af;
 }
 
-/* Form Groups */
+/* Form Groups - Horizontal Layout */
 .filter-form-group {
-  margin-bottom: 0.75rem;
+  margin-bottom: 0;
 }
 
 .filter-form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
-/* Active Filters Section */
+.filter-form-row .filter-form-group {
+  flex: 1;
+  min-width: 200px;
+}
+
+/* Active Filters Section - Hidden in horizontal layout */
 .active-filters-section {
-  background: var(--filter-chip-bg);
-  border-color: var(--filter-chip-border);
+  display: none; /* Chips shown in collapsed bar instead */
 }
 
-/* Action Buttons */
+/* Action Buttons - Horizontal */
 .filter-actions {
   display: flex;
-  flex-direction: column;
   gap: 0.5rem;
-  margin-top: var(--filter-section-gap);
+  justify-content: flex-end;
+  padding-top: 1rem;
+  border-top: var(--filter-border-width) solid var(--filter-panel-header-border);
 }
 
 .filter-actions .filter-button {
-  width: 100%;
+  min-width: 120px;
 }
 
 /* Presets Panel */
@@ -309,19 +417,52 @@
     margin: 0;
     border-radius: 0;
   }
+  
+  .filter-sections-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {
-  .business-filter-panel {
-    max-width: none;
+  .filter-bar-collapsed {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .filter-bar-left,
+  .filter-bar-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .filter-chips-horizontal {
+    order: 3;
+    width: 100%;
+    margin-top: 0.5rem;
   }
   
   .quick-filters-grid {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+  
+  .website-status-checkboxes {
+    flex-direction: column;
   }
   
   .filter-form-row {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+  
+  .filter-form-row .filter-form-group {
+    min-width: 100%;
+  }
+  
+  .filter-actions {
+    flex-direction: column;
+  }
+  
+  .filter-actions .filter-button {
+    width: 100%;
   }
   
   .save-preset-dialog {

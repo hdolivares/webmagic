@@ -43,6 +43,7 @@ export function BusinessFilterPanel({ onFilterApply, onFilterClear, initialFilte
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [presetName, setPresetName] = useState('')
   const [presetIsPublic, setPresetIsPublic] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false) // NEW: Collapse/expand state
   
   // Active filters count
   const [activeFiltersCount, setActiveFiltersCount] = useState(0)
@@ -218,212 +219,235 @@ export function BusinessFilterPanel({ onFilterApply, onFilterClear, initialFilte
 
   return (
     <div className="filter-panel business-filter-panel">
-      {/* Header */}
-      <div className="filter-panel-header">
-        <h3 className="filter-title">
-          Filter Businesses
+      {/* Collapsed Filter Bar */}
+      <div className="filter-bar-collapsed">
+        <div className="filter-bar-left">
+          <button
+            className={`filter-toggle-button ${isExpanded ? 'expanded' : ''}`}
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            <span className="filter-toggle-icon">▼</span>
+            Filters
+            {activeFiltersCount > 0 && (
+              <span className="filter-count-badge">{activeFiltersCount}</span>
+            )}
+          </button>
+          
+          {/* Active Filter Chips - Horizontal */}
           {activeFiltersCount > 0 && (
-            <span className="filter-count-badge">{activeFiltersCount}</span>
+            <div className="filter-chips-horizontal">
+              {websiteStatus.map(status => (
+                <div key={status} className="filter-chip">
+                  Website: {status}
+                  <span className="filter-chip-close" onClick={() => toggleWebsiteStatus(status)}>
+                    ×
+                  </span>
+                </div>
+              ))}
+              {state && (
+                <div className="filter-chip">
+                  State: {state}
+                  <span className="filter-chip-close" onClick={() => setState('')}>×</span>
+                </div>
+              )}
+              {city && (
+                <div className="filter-chip">
+                  City: {city}
+                  <span className="filter-chip-close" onClick={() => setCity('')}>×</span>
+                </div>
+              )}
+              {category && (
+                <div className="filter-chip">
+                  Category: {category}
+                  <span className="filter-chip-close" onClick={() => setCategory('')}>×</span>
+                </div>
+              )}
+              {minRating !== '' && (
+                <div className="filter-chip">
+                  Rating ≥ {minRating}
+                  <span className="filter-chip-close" onClick={() => setMinRating('')}>×</span>
+                </div>
+              )}
+              {minScore !== '' && (
+                <div className="filter-chip">
+                  Score ≥ {minScore}
+                  <span className="filter-chip-close" onClick={() => setMinScore('')}>×</span>
+                </div>
+              )}
+            </div>
           )}
-        </h3>
-        <div className="filter-header-actions">
+        </div>
+        
+        <div className="filter-bar-right">
           <button
             className="filter-button filter-button-ghost"
             onClick={() => setShowPresets(!showPresets)}
           >
-            📁 Saved Filters
+            📁 Saved
           </button>
+          {activeFiltersCount > 0 && (
+            <button
+              className="filter-button filter-button-ghost"
+              onClick={handleClearFilters}
+            >
+              Clear All
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Quick Filters */}
-      {Object.keys(quickFilters).length > 0 && (
-        <div className="filter-section">
-          <h4 className="filter-section-title">Quick Filters</h4>
-          <div className="quick-filters-grid">
-            {Object.entries(quickFilters).map(([key, filter]) => (
-              <button
-                key={key}
-                className="quick-filter-button"
-                onClick={() => handleQuickFilter(key)}
-              >
-                {filter.name}
-              </button>
-            ))}
+      {/* Expanded Filter Content */}
+      {isExpanded && (
+        <div className="filter-content-expanded">
+          {/* Filter Sections Grid */}
+          <div className="filter-sections-grid">
+
+            {/* Quick Filters Section */}
+            {Object.keys(quickFilters).length > 0 && (
+              <div className="filter-section">
+                <h4 className="filter-section-title">Quick Filters</h4>
+                <div className="quick-filters-grid">
+                  {Object.entries(quickFilters).map(([key, filter]) => (
+                    <button
+                      key={key}
+                      className="quick-filter-button"
+                      onClick={() => handleQuickFilter(key)}
+                    >
+                      {filter.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Website Status Section */}
+            <div className="filter-section">
+              <h4 className="filter-section-title">Website Status</h4>
+              <div className="website-status-checkboxes">
+                {[
+                  { value: 'missing', label: 'No Website', color: 'amber' },
+                  { value: 'valid', label: 'Valid Website', color: 'green' },
+                  { value: 'invalid', label: 'Invalid Website', color: 'red' },
+                  { value: 'pending', label: 'Pending Validation', color: 'gray' }
+                ].map(({ value, label, color }) => (
+                  <label key={value} className={`website-status-checkbox status-${color}`}>
+                    <input
+                      type="checkbox"
+                      checked={websiteStatus.includes(value)}
+                      onChange={() => toggleWebsiteStatus(value)}
+                    />
+                    <span className="checkbox-label">{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Location Section */}
+            <div className="filter-section">
+              <h4 className="filter-section-title">Location</h4>
+              <div className="filter-form-row">
+                <div className="filter-form-group">
+                  <label className="filter-label">
+                    State
+                    <input
+                      type="text"
+                      className="filter-input"
+                      placeholder="e.g., CA, NY, TX"
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="filter-form-group">
+                  <label className="filter-label">
+                    City
+                    <input
+                      type="text"
+                      className="filter-input"
+                      placeholder="Search city..."
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Business Details Section */}
+            <div className="filter-section">
+              <h4 className="filter-section-title">Business Details</h4>
+              <div className="filter-form-row">
+                <div className="filter-form-group">
+                  <label className="filter-label">
+                    Category
+                    <input
+                      type="text"
+                      className="filter-input"
+                      placeholder="e.g., plumbers, dentists"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="filter-form-group">
+                  <label className="filter-label">
+                    Min Rating
+                    <input
+                      type="number"
+                      className="filter-input"
+                      placeholder="0-5"
+                      min="0"
+                      max="5"
+                      step="0.1"
+                      value={minRating}
+                      onChange={(e) => setMinRating(e.target.value ? parseFloat(e.target.value) : '')}
+                    />
+                  </label>
+                </div>
+                <div className="filter-form-group">
+                  <label className="filter-label">
+                    Min Score
+                    <input
+                      type="number"
+                      className="filter-input"
+                      placeholder="0-100"
+                      min="0"
+                      max="100"
+                      value={minScore}
+                      onChange={(e) => setMinScore(e.target.value ? parseInt(e.target.value) : '')}
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="filter-actions">
+            <button
+              className="filter-button filter-button-ghost"
+              onClick={() => setShowSaveDialog(true)}
+              disabled={activeFiltersCount === 0}
+            >
+              💾 Save Preset
+            </button>
+            <button
+              className="filter-button filter-button-secondary"
+              onClick={handleClearFilters}
+              disabled={activeFiltersCount === 0}
+            >
+              Clear All
+            </button>
+            <button
+              className="filter-button filter-button-primary"
+              onClick={handleApplyFilters}
+              disabled={activeFiltersCount === 0}
+            >
+              Apply Filters
+            </button>
           </div>
         </div>
       )}
-
-      {/* Website Status Filter */}
-      <div className="filter-section">
-        <h4 className="filter-section-title">Website Status</h4>
-        <div className="website-status-checkboxes">
-          {[
-            { value: 'missing', label: 'No Website', color: 'amber' },
-            { value: 'valid', label: 'Valid Website', color: 'green' },
-            { value: 'invalid', label: 'Invalid Website', color: 'red' },
-            { value: 'pending', label: 'Pending Validation', color: 'gray' }
-          ].map(({ value, label, color }) => (
-            <label key={value} className={`website-status-checkbox status-${color}`}>
-              <input
-                type="checkbox"
-                checked={websiteStatus.includes(value)}
-                onChange={() => toggleWebsiteStatus(value)}
-              />
-              <span className="checkbox-label">{label}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* Location Filters */}
-      <div className="filter-section">
-        <h4 className="filter-section-title">Location</h4>
-        <div className="filter-form-group">
-          <label className="filter-label">
-            State
-            <input
-              type="text"
-              className="filter-input"
-              placeholder="e.g., CA, NY, TX"
-              value={state}
-              onChange={(e) => setState(e.target.value)}
-            />
-          </label>
-        </div>
-        <div className="filter-form-group">
-          <label className="filter-label">
-            City
-            <input
-              type="text"
-              className="filter-input"
-              placeholder="Search city..."
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-            />
-          </label>
-        </div>
-      </div>
-
-      {/* Business Filters */}
-      <div className="filter-section">
-        <h4 className="filter-section-title">Business Details</h4>
-        <div className="filter-form-group">
-          <label className="filter-label">
-            Category
-            <input
-              type="text"
-              className="filter-input"
-              placeholder="e.g., plumbers, dentists"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            />
-          </label>
-        </div>
-        <div className="filter-form-row">
-          <div className="filter-form-group">
-            <label className="filter-label">
-              Min Rating
-              <input
-                type="number"
-                className="filter-input"
-                placeholder="0-5"
-                min="0"
-                max="5"
-                step="0.1"
-                value={minRating}
-                onChange={(e) => setMinRating(e.target.value ? parseFloat(e.target.value) : '')}
-              />
-            </label>
-          </div>
-          <div className="filter-form-group">
-            <label className="filter-label">
-              Min Score
-              <input
-                type="number"
-                className="filter-input"
-                placeholder="0-100"
-                min="0"
-                max="100"
-                value={minScore}
-                onChange={(e) => setMinScore(e.target.value ? parseInt(e.target.value) : '')}
-              />
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {/* Active Filters */}
-      {activeFiltersCount > 0 && (
-        <div className="filter-section active-filters-section">
-          <h4 className="filter-section-title">Active Filters ({activeFiltersCount})</h4>
-          <div className="filter-chips-container">
-            {websiteStatus.map(status => (
-              <div key={status} className="filter-chip">
-                Website: {status}
-                <span className="filter-chip-close" onClick={() => toggleWebsiteStatus(status)}>
-                  ×
-                </span>
-              </div>
-            ))}
-            {state && (
-              <div className="filter-chip">
-                State: {state}
-                <span className="filter-chip-close" onClick={() => setState('')}>×</span>
-              </div>
-            )}
-            {city && (
-              <div className="filter-chip">
-                City: {city}
-                <span className="filter-chip-close" onClick={() => setCity('')}>×</span>
-              </div>
-            )}
-            {category && (
-              <div className="filter-chip">
-                Category: {category}
-                <span className="filter-chip-close" onClick={() => setCategory('')}>×</span>
-              </div>
-            )}
-            {minRating !== '' && (
-              <div className="filter-chip">
-                Rating ≥ {minRating}
-                <span className="filter-chip-close" onClick={() => setMinRating('')}>×</span>
-              </div>
-            )}
-            {minScore !== '' && (
-              <div className="filter-chip">
-                Score ≥ {minScore}
-                <span className="filter-chip-close" onClick={() => setMinScore('')}>×</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Action Buttons */}
-      <div className="filter-actions">
-        <button
-          className="filter-button filter-button-primary"
-          onClick={handleApplyFilters}
-          disabled={activeFiltersCount === 0}
-        >
-          Apply Filters
-        </button>
-        <button
-          className="filter-button filter-button-secondary"
-          onClick={handleClearFilters}
-          disabled={activeFiltersCount === 0}
-        >
-          Clear All
-        </button>
-        <button
-          className="filter-button filter-button-ghost"
-          onClick={() => setShowSaveDialog(true)}
-          disabled={activeFiltersCount === 0}
-        >
-          💾 Save Preset
-        </button>
-      </div>
 
       {/* Saved Presets Panel */}
       {showPresets && (
