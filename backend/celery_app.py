@@ -35,6 +35,7 @@ celery_app.conf.update(
 celery_app.autodiscover_tasks([
     "tasks.scraping",
     "tasks.generation",
+    "tasks.generation_sync",  # NEW: Synchronous generation tasks
     "tasks.campaigns",
     "tasks.sms_campaign_tasks",  # SMS campaigns (Phase 7)
     "tasks.monitoring",
@@ -83,6 +84,7 @@ celery_app.conf.beat_schedule = {
 celery_app.conf.task_routes = {
     "tasks.scraping.*": {"queue": "scraping"},
     "tasks.generation.*": {"queue": "generation"},
+    "tasks.generation_sync.*": {"queue": "generation"},  # NEW: Sync tasks use same queue
     "tasks.campaigns.*": {"queue": "campaigns"},
     "tasks.sms.*": {"queue": "campaigns"},  # SMS uses same queue as campaigns
     "tasks.monitoring.*": {"queue": "monitoring"},
