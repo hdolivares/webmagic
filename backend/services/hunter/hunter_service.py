@@ -197,7 +197,7 @@ class HunterService:
                         website_status = "unknown"
                         
                         if website_url:
-                            website_status = await self.website_validator.validate_website(website_url)
+                            website_status = await self.website_validator.validate_url(website_url)
                             biz_data["website_status"] = website_status
                         
                         # Qualify the lead
@@ -542,7 +542,7 @@ class HunterService:
                 # FIX: Scraper normalizes to 'website_url', not 'website'
                 website_url = biz_data.get("website_url")
                 if website_url:
-                    website_status = await self.website_validator.validate_website(website_url)
+                    website_status = await self.website_validator.validate_url(website_url)
                     biz_data["website_status"] = website_status
                 
                 # Qualify
