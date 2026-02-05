@@ -53,7 +53,6 @@ class HunterService:
         self.business_service = BusinessService(db)
         self.coverage_service = CoverageService(db)
         self.geo_strategy_service = GeoStrategyService(db)
-        self.website_validator = WebsiteValidator()
         # New Phase 2 services
         self.generation_queue_service = WebsiteGenerationQueueService(db)
     
@@ -187,8 +186,9 @@ class HunterService:
             invalid_websites = 0
             businesses_needing_generation = []
             
-            # Create validation service with async context
-            async with WebsiteValidationService(self.db) as validation_service:
+            # Create validation service and website validator with async context
+            async with WebsiteValidationService(self.db) as validation_service, \
+                       WebsiteValidator() as website_validator:
                 for biz_data in raw_businesses:
                     try:
                         # Validate website if present (old validator for backwards compatibility)
@@ -196,7 +196,7 @@ class HunterService:
                         website_url = biz_data.get("website_url")
                         
                         if website_url:
-                            validation_result = await self.website_validator.validate_url(website_url)
+                            validation_result = await website_validator.validate_url(website_url)
                             # Convert WebsiteValidationResult object to string status
                             if validation_result.is_valid:
                                 biz_data["website_validation_status"] = "valid"
@@ -539,22 +539,23 @@ class HunterService:
         
         raw_businesses = results.get("businesses", [])
         
-        # Process businesses
+        # Process businesses with website validator context
         qualified_count = 0
-        for biz_data in raw_businesses:
-            try:
-                # Validate website
-                # FIX: Scraper normalizes to 'website_url', not 'website'
-                website_url = biz_data.get("website_url")
-                if website_url:
-                    validation_result = await self.website_validator.validate_url(website_url)
-                    # Convert WebsiteValidationResult object to string status
-                    if validation_result.is_valid:
-                        biz_data["website_validation_status"] = "valid"
+        async with WebsiteValidator() as website_validator:
+            for biz_data in raw_businesses:
+                try:
+                    # Validate website
+                    # FIX: Scraper normalizes to 'website_url', not 'website'
+                    website_url = biz_data.get("website_url")
+                    if website_url:
+                        validation_result = await website_validator.validate_url(website_url)
+                        # Convert WebsiteValidationResult object to string status
+                        if validation_result.is_valid:
+                            biz_data["website_validation_status"] = "valid"
+                        else:
+                            biz_data["website_validation_status"] = "invalid"
                     else:
-                        biz_data["website_validation_status"] = "invalid"
-                else:
-                    biz_data["website_validation_status"] = "missing"
+                        biz_data["website_validation_status"] = "missing"
                 
                 # Qualify
                 qualification_result = self.qualifier.qualify(biz_data)
@@ -572,10 +573,10 @@ class HunterService:
                         qualification_reasons=reasons
                     )
                     qualified_count += 1
-                    
-            except Exception as e:
-                logger.error(f"Error processing business: {e}")
-                continue
+                        
+                except Exception as e:
+                    logger.error(f"Error processing business: {e}")
+                    continue
         
         # Update coverage
         await self.coverage_service.update_or_create_coverage(
