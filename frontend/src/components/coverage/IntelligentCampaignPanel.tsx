@@ -146,15 +146,28 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
     
     setLoading(true)
     setError(null)
+    setScrapeResult(null) // Clear previous results
     
     try {
+      console.log('🔵 Starting zone scrape...')
       const response = await api.scrapeIntelligentZone({
         strategy_id: strategy.strategy_id,
         limit_per_zone: 50,
         draft_mode: draftMode
       })
       
+      console.log('✅ Scrape complete:', response)
+      
+      // Validate response has data
+      if (!response || !response.results) {
+        throw new Error('Invalid response from server - no results returned')
+      }
+      
       setScrapeResult(response)
+      
+      // Show success notification inline
+      const { raw_businesses = 0, qualified_leads = 0, without_websites = 0, queued_for_generation = 0 } = response.results
+      console.log(`✅ Success! Found ${raw_businesses} businesses, ${qualified_leads} qualified, ${without_websites} need websites, ${queued_for_generation} queued for generation`)
       
       // Refresh strategy
       const strategyResponse = await api.getIntelligentStrategy(strategy.strategy_id)
@@ -165,8 +178,14 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
         onCampaignUpdate()
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to scrape zone')
-      console.error('Scrape error:', err)
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to scrape zone'
+      setError(errorMessage)
+      console.error('❌ Scrape error:', err)
+      console.error('Error details:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message
+      })
     } finally {
       setLoading(false)
     }
