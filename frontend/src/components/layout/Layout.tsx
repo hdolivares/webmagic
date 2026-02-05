@@ -16,6 +16,8 @@ import {
   LogOut,
   Sun,
   Moon,
+  Wand2,
+  ChevronDown,
 } from 'lucide-react'
 
 export const Layout = () => {
@@ -31,7 +33,18 @@ export const Layout = () => {
   const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/businesses', icon: Building2, label: 'Businesses' },
-    { to: '/sites', icon: Globe, label: 'Sites' },
+    { 
+      to: '/sites', 
+      icon: Globe, 
+      label: 'Customer Sites',
+      badge: 'Deployed'
+    },
+    { 
+      to: '/sites/generated', 
+      icon: Wand2, 
+      label: 'Generated Sites',
+      badge: 'AI'
+    },
     { to: '/campaigns', icon: Mail, label: 'Campaigns' },
     { to: '/messages', icon: MessageSquare, label: 'Messages' },
     { to: '/customers', icon: Users, label: 'Customers' },
@@ -58,7 +71,12 @@ export const Layout = () => {
               className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}
             >
               <item.icon className="w-5 h-5" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {item.badge && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-primary-500/20 text-primary-600 dark:text-primary-400">
+                  {item.badge}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
