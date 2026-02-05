@@ -270,6 +270,16 @@ class WebsiteValidationService:
                         'content_type': self._parse_content_type(content_type),
                         'accessibility': 'accessible'
                     }
+                # 403/429 = Protected website (anti-bot), treat as accessible
+                elif response.status in [403, 429]:
+                    return {
+                        'accessible': True,  # Protected but exists!
+                        'status_code': response.status,
+                        'response_time_ms': response_time_ms,
+                        'content_type': 'html',  # Assume HTML
+                        'accessibility': 'protected',
+                        'protected': True
+                    }
                 else:
                     return {
                         'accessible': False,
