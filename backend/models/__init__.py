@@ -23,6 +23,7 @@ from models.support_ticket import (
     TicketTemplate
 )
 from models.sms_opt_out import SMSOptOut
+from models.sms_message import SMSMessage
 from models.activity_log import ActivityLog
 from models.analytics_snapshot import AnalyticsSnapshot
 from models.geo_strategy import GeoStrategy
@@ -56,6 +57,7 @@ __all__ = [
     "TicketTemplate",
     # SMS models
     "SMSOptOut",
+    "SMSMessage",
     # Analytics & Audit models
     "ActivityLog",
     "AnalyticsSnapshot",

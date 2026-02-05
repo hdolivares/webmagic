@@ -3,6 +3,7 @@ Campaign model for multi-channel outreach tracking (email + SMS).
 """
 from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, Numeric
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 from models.base import BaseModel
 
 
@@ -79,6 +80,9 @@ class Campaign(BaseModel):
     
     # Scheduling
     scheduled_for = Column(DateTime, nullable=True, index=True)
+    
+    # Relationships
+    sms_messages = relationship("SMSMessage", back_populates="campaign", lazy="dynamic")
     
     def __repr__(self):
         recipient = self.recipient_email or self.recipient_phone or "N/A"

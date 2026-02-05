@@ -912,6 +912,70 @@ class ApiClient {
     const response = await this.client.delete(`/businesses/filters/presets/${presetId}`)
     return response.data
   }
+
+  // ============================================
+  // SMS MESSAGES METHODS (Phase 7)
+  // ============================================
+
+  /**
+   * Get all SMS messages with pagination and filtering
+   */
+  async getMessages(params?: {
+    page?: number
+    page_size?: number
+    direction?: 'inbound' | 'outbound'
+    status?: string
+    business_id?: string
+    search?: string
+  }): Promise<{
+    messages: any[]
+    total: number
+    page: number
+    page_size: number
+    pages: number
+  }> {
+    const response = await this.client.get('/messages/', { params })
+    return response.data
+  }
+
+  /**
+   * Get SMS message statistics
+   */
+  async getMessageStats(): Promise<{
+    total_messages: number
+    inbound_count: number
+    outbound_count: number
+    delivered_count: number
+    failed_count: number
+    opt_out_count: number
+    total_cost: number
+    avg_cost_per_message: number
+    messages_today: number
+    messages_this_week: number
+    inbound_today: number
+  }> {
+    const response = await this.client.get('/messages/stats')
+    return response.data
+  }
+
+  /**
+   * Get a single SMS message by ID
+   */
+  async getMessage(messageId: string): Promise<any> {
+    const response = await this.client.get(`/messages/${messageId}`)
+    return response.data
+  }
+
+  /**
+   * Get all SMS messages for a specific business
+   */
+  async getBusinessMessages(businessId: string, params?: {
+    page?: number
+    page_size?: number
+  }): Promise<any> {
+    const response = await this.client.get(`/messages/business/${businessId}`, { params })
+    return response.data
+  }
 }
 
 // Export singleton instance

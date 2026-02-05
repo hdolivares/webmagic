@@ -21,6 +21,7 @@ from datetime import datetime
 
 from api.deps import get_db
 from models.campaign import Campaign
+from models.sms_message import SMSMessage
 from services.sms import SMSComplianceService
 from services.pitcher.sms_campaign_helper import SMSCampaignHelper
 from services.crm import BusinessLifecycleService
@@ -271,6 +272,15 @@ async def handle_incoming_sms(
         
         logger.info(f"Incoming SMS from {from_phone}: {message_body[:50]}...")
         
+        # Store the inbound message in sms_messages table
+        # (We'll link to campaign/business after finding them)
+        inbound_message = SMSMessage.create_inbound(
+            from_phone=from_phone,
+            to_phone=to_phone or "",
+            body=message_body,
+            telnyx_message_id=message_id
+        )
+        
         # Find campaign(s) sent to this phone number
         result = await db.execute(
             select(Campaign)
@@ -281,6 +291,10 @@ async def handle_incoming_sms(
         
         if not campaigns:
             logger.warning(f"No campaigns found for phone: {from_phone}")
+            # Save the inbound message without campaign link
+            db.add(inbound_message)
+            await db.commit()
+            
             # Still process opt-out if needed
             compliance = SMSComplianceService(db)
             await compliance.process_reply(
@@ -293,6 +307,11 @@ async def handle_incoming_sms(
         
         # Process reply with most recent campaign
         latest_campaign = campaigns[0]
+        
+        # Link the inbound message to campaign and business
+        inbound_message.campaign_id = latest_campaign.id
+        inbound_message.business_id = latest_campaign.business_id
+        db.add(inbound_message)
         
         compliance = SMSComplianceService(db)
         result = await SMSCampaignHelper.handle_sms_reply(

@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import update
 
 from models.campaign import Campaign
+from models.sms_message import SMSMessage
 from services.sms import SMSSender, SMSComplianceService
 from services.crm import BusinessLifecycleService
 from core.config import get_settings
@@ -105,6 +106,21 @@ class SMSCampaignHelper:
                     sms_cost=result.get("cost")
                 )
             )
+            
+            # Store outbound message in sms_messages table
+            outbound_message = SMSMessage.create_outbound(
+                to_phone=campaign.recipient_phone,
+                from_phone=result.get("from", settings.TELNYX_PHONE_NUMBER),
+                body=campaign.sms_body,
+                campaign_id=campaign.id,
+                business_id=campaign.business_id,
+                telnyx_message_id=result.get("message_id")
+            )
+            outbound_message.status = "sent"
+            outbound_message.segments = result.get("segments", 1)
+            outbound_message.cost = result.get("cost")
+            db.add(outbound_message)
+            
             await db.commit()
             
             # CRM Integration: Update business contact status

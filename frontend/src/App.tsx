@@ -25,6 +25,7 @@ import { CustomersPage } from '@/pages/Customers/CustomersPage'
 import { CoveragePage } from '@/pages/Coverage/CoveragePage'
 import { SettingsPage } from '@/pages/Settings/SettingsPage'
 import { ImageGenerationPage } from '@/pages/ImageGeneration/ImageGenerationPage'
+import { MessagesPage } from '@/pages/Messages/MessagesPage'
 
 // Customer Pages
 import MySitesPage from '@/pages/CustomerPortal/MySitesPage'
@@ -93,6 +94,7 @@ function App() {
             <Route path="sites" element={<SitesPage />} />
             <Route path="sites/image-generator" element={<ImageGenerationPage />} />
             <Route path="campaigns" element={<CampaignsPage />} />
+            <Route path="messages" element={<MessagesPage />} />
             <Route path="customers" element={<CustomersPage />} />
             <Route path="coverage" element={<CoveragePage />} />
             <Route path="settings" element={<SettingsPage />} />
