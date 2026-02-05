@@ -1,0 +1,250 @@
+"""
+Generated Sites Preview API
+
+Serves HTML content for generated sites (from generated_sites table).
+This is a PUBLIC endpoint that serves the actual website HTML.
+"""
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import HTMLResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from typing import Optional
+import logging
+
+from core.database import get_db
+from models.site import GeneratedSite
+
+router = APIRouter(tags=["generated-preview"])
+logger = logging.getLogger(__name__)
+
+
+@router.get(
+    "/{subdomain}",
+    response_class=HTMLResponse,
+    summary="View generated site",
+    description="""
+    **PUBLIC ENDPOINT** - Serves the HTML content of a generated site.
+    
+    This endpoint is called when accessing:
+    `https://sites.lavish.solutions/{subdomain}`
+    
+    Returns the full HTML content with inline CSS and JavaScript.
+    """
+)
+async def view_generated_site(
+    subdomain: str,
+    db: AsyncSession = Depends(get_db)
+) -> HTMLResponse:
+    """
+    Serve generated site HTML content.
+    
+    Args:
+        subdomain: Site subdomain/slug (e.g., 'mayfair-plumbers-1770254203251-83b6e7b8')
+        db: Database session
+    
+    Returns:
+        HTMLResponse with complete site HTML
+    """
+    try:
+        # Query generated_sites table
+        query = select(GeneratedSite).where(
+            GeneratedSite.subdomain == subdomain
+        )
+        result = await db.execute(query)
+        site = result.scalar_one_or_none()
+        
+        if not site:
+            logger.warning(f"Generated site not found: {subdomain}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Site not found: {subdomain}"
+            )
+        
+        # Check if site has content
+        if not site.html_content:
+            logger.warning(f"Site {subdomain} has no HTML content (status: {site.status})")
+            
+            # Return a friendly message if site is still generating
+            if site.status == "generating":
+                return HTMLResponse(content=_build_generating_page(site.subdomain))
+            elif site.status == "failed":
+                return HTMLResponse(content=_build_error_page(subdomain, "Site generation failed"))
+            else:
+                return HTMLResponse(content=_build_error_page(subdomain, "Site content not available"))
+        
+        # Build complete HTML with inline CSS and JS
+        complete_html = _build_complete_html(
+            html=site.html_content,
+            css=site.css_content,
+            js=site.js_content
+        )
+        
+        logger.info(f"Serving generated site: {subdomain} (status: {site.status})")
+        return HTMLResponse(content=complete_html)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error serving generated site {subdomain}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while loading the site"
+        )
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def _build_complete_html(
+    html: str,
+    css: Optional[str] = None,
+    js: Optional[str] = None
+) -> str:
+    """
+    Build complete HTML document with inline CSS and JS.
+    
+    Args:
+        html: HTML content
+        css: CSS content (optional)
+        js: JavaScript content (optional)
+    
+    Returns:
+        Complete HTML document
+    """
+    # If HTML already contains <!DOCTYPE html>, return as-is
+    if html.strip().lower().startswith('<!doctype html>'):
+        return html
+    
+    # Otherwise, wrap with CSS and JS
+    style_tag = f"<style>{css}</style>" if css else ""
+    script_tag = f"<script>{js}</script>" if js else ""
+    
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {style_tag}
+</head>
+<body>
+    {html}
+    {script_tag}
+</body>
+</html>"""
+
+
+def _build_generating_page(subdomain: str) -> str:
+    """Build a friendly "generating" page."""
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site Generating...</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }}
+        .container {{
+            text-align: center;
+            padding: 2rem;
+        }}
+        .spinner {{
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1.5rem;
+        }}
+        @keyframes spin {{
+            0% {{ transform: rotate(0deg); }}
+            100% {{ transform: rotate(360deg); }}
+        }}
+        h1 {{
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }}
+        p {{
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }}
+    </style>
+    <script>
+        // Refresh page every 10 seconds to check if generation is complete
+        setTimeout(() => {{
+            window.location.reload();
+        }}, 10000);
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="spinner"></div>
+        <h1>✨ Website Generating...</h1>
+        <p>Your AI-generated website is being created.</p>
+        <p style="font-size: 0.9rem; margin-top: 1rem;">This page will auto-refresh when ready.</p>
+    </div>
+</body>
+</html>"""
+
+
+def _build_error_page(subdomain: str, message: str) -> str:
+    """Build a friendly error page."""
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site Not Available</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: #f7fafc;
+            color: #2d3748;
+        }}
+        .container {{
+            text-align: center;
+            padding: 2rem;
+            max-width: 500px;
+        }}
+        h1 {{
+            font-size: 4rem;
+            margin: 0 0 1rem;
+        }}
+        h2 {{
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #4a5568;
+        }}
+        p {{
+            color: #718096;
+            line-height: 1.6;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚧</h1>
+        <h2>Site Not Available</h2>
+        <p>{message}</p>
+        <p style="font-size: 0.9rem; margin-top: 1.5rem;">
+            Site: <code>{subdomain}</code>
+        </p>
+    </div>
+</body>
+</html>"""
+
