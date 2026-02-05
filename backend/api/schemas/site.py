@@ -31,6 +31,7 @@ class SiteResponse(BaseModel):
     updated_at: datetime
     full_url: str
     is_live: bool
+    business: Optional[dict] = None  # Include business data
     
     class Config:
         from_attributes = True

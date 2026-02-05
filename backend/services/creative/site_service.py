@@ -108,8 +108,10 @@ class SiteService:
         limit: int = 50,
         status: Optional[str] = None
     ) -> tuple[List[GeneratedSite], int]:
-        """List sites with pagination."""
-        query = select(GeneratedSite)
+        """List sites with pagination. Includes business relationship."""
+        from sqlalchemy.orm import joinedload
+        
+        query = select(GeneratedSite).options(joinedload(GeneratedSite.business))
         count_query = select(func.count(GeneratedSite.id))
         
         if status:

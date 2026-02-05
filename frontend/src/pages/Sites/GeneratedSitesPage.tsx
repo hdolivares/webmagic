@@ -7,12 +7,13 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
 import { Card, CardHeader, CardBody, CardTitle, Badge, Button } from '@/components/ui'
-import { Wand2, Search, ExternalLink, Eye, Calendar, TrendingUp } from 'lucide-react'
+import { Wand2, Search, ExternalLink, Eye, Calendar, TrendingUp, ChevronDown, ChevronUp, ExternalLink as LinkIcon } from 'lucide-react'
 
 export const GeneratedSitesPage = () => {
   const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [expandedSites, setExpandedSites] = useState<Set<string>>(new Set())
   
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['generated-sites', statusFilter],
@@ -23,15 +24,29 @@ export const GeneratedSitesPage = () => {
     refetchInterval: 10000, // Refresh every 10 seconds to see generation progress
   })
   
-  // Filter sites based on search term
-  const filteredSites = data?.sites.filter((site: any) => {
-    const search = searchTerm.toLowerCase()
-    return (
-      site.subdomain?.toLowerCase().includes(search) ||
-      site.business_name?.toLowerCase().includes(search) ||
-      site.id?.toLowerCase().includes(search)
-    )
-  }) || []
+  // Sort sites by created_at descending (most recent first) and filter
+  const filteredAndSortedSites = [...(data?.sites || [])]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .filter((site: any) => {
+      const search = searchTerm.toLowerCase()
+      return (
+        site.subdomain?.toLowerCase().includes(search) ||
+        site.business?.name?.toLowerCase().includes(search) ||
+        site.id?.toLowerCase().includes(search)
+      )
+    })
+  
+  const toggleExpanded = (siteId: string) => {
+    setExpandedSites(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(siteId)) {
+        newSet.delete(siteId)
+      } else {
+        newSet.add(siteId)
+      }
+      return newSet
+    })
+  }
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { variant: any; label: string }> = {
@@ -156,7 +171,7 @@ export const GeneratedSitesPage = () => {
 
       {searchTerm && (
         <p className="text-sm text-text-secondary mb-4">
-          Found {filteredSites.length} of {data?.sites.length || 0} sites
+          Found {filteredAndSortedSites.length} of {data?.sites.length || 0} sites
         </p>
       )}
 
@@ -168,7 +183,7 @@ export const GeneratedSitesPage = () => {
             <p className="text-text-secondary">Loading generated sites...</p>
           </div>
         </div>
-      ) : filteredSites.length === 0 ? (
+      ) : filteredAndSortedSites.length === 0 ? (
         <Card>
           <CardBody className="text-center py-xl">
             <Wand2 className="w-16 h-16 text-text-tertiary mx-auto mb-4" />
@@ -183,89 +198,153 @@ export const GeneratedSitesPage = () => {
           </CardBody>
         </Card>
       ) : (
-        /* Sites Grid */
-        <div className="grid grid-cols-1 gap-4">
-          {filteredSites.map((site: any) => (
-            <Card key={site.id} className="hover:shadow-lg transition-shadow">
-              <CardBody className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-text-primary">
-                        {site.subdomain}
-                      </h3>
+        /* Sites Grid - 3 Columns */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredAndSortedSites.map((site: any, index: number) => {
+            const isExpanded = expandedSites.has(site.id)
+            const business = site.business
+            const rawData = business?.raw_data
+            const googleMapsUrl = rawData?.link || rawData?.google_maps_url
+            
+            return (
+              <Card key={site.id} className="hover:shadow-lg transition-shadow flex flex-col">
+                <CardBody className="p-4 flex flex-col h-full">
+                  {/* Header with number and status */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 text-primary-700 font-bold text-sm">
+                        {index + 1}
+                      </div>
                       {getStatusBadge(site.status)}
                     </div>
                     
-                    {site.business_name && (
-                      <p className="text-text-secondary mb-2">
-                        Business: <span className="font-medium text-text-primary">{site.business_name}</span>
-                      </p>
+                    {site.status === 'generating' && (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-info-500"></div>
                     )}
+                  </div>
+                  
+                  {/* Site info */}
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-text-primary mb-1 line-clamp-2">
+                      {business?.name || site.subdomain}
+                    </h3>
                     
-                    <div className="flex items-center gap-6 text-sm text-text-secondary">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        Created: {formatDate(site.created_at)}
-                      </div>
-                      
-                      {site.generation_completed_at && (
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          Completed: {formatDate(site.generation_completed_at)}
-                        </div>
-                      )}
-                      
-                      {site.version && (
-                        <div>Version: {site.version}</div>
-                      )}
+                    <p className="text-xs text-text-secondary mb-2 line-clamp-1">
+                      {site.subdomain}
+                    </p>
+                    
+                    <div className="flex items-center gap-1 text-xs text-text-secondary mb-3">
+                      <Calendar className="w-3 h-3" />
+                      {formatDate(site.created_at)}
                     </div>
                     
                     {site.error_message && (
-                      <div className="mt-2 p-2 bg-error-50 border border-error-200 rounded text-sm text-error-700">
+                      <div className="mb-3 p-2 bg-error-50 border border-error-200 rounded text-xs text-error-700 line-clamp-2">
                         Error: {site.error_message}
                       </div>
                     )}
                   </div>
                   
-                  <div className="flex items-center gap-2 ml-4">
-                    {(site.status === 'completed' || site.status === 'published') && (
-                      <>
+                  {/* Actions */}
+                  <div className="flex flex-col gap-2 mt-3">
+                    {(site.status === 'completed' || site.status === 'published') && site.subdomain && (
+                      <div className="flex gap-2">
                         <Button
                           variant="secondary"
                           size="sm"
-                          className="flex items-center gap-1"
+                          className="flex-1 flex items-center justify-center gap-1 text-xs"
                           onClick={() => navigate(`/sites/generated/${site.id}`)}
                         >
-                          <Eye className="w-4 h-4" />
+                          <Eye className="w-3 h-3" />
                           View
                         </Button>
                         
-                        {site.subdomain && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            className="flex items-center gap-1"
-                            onClick={() => window.open(`https://sites.lavish.solutions/${site.subdomain}`, '_blank')}
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                            Preview
-                          </Button>
-                        )}
-                      </>
-                    )}
-                    
-                    {site.status === 'generating' && (
-                      <div className="flex items-center gap-2 text-info-500">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-info-500"></div>
-                        <span className="text-sm">In Progress...</span>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          className="flex-1 flex items-center justify-center gap-1 text-xs"
+                          onClick={() => window.open(`https://sites.lavish.solutions/${site.subdomain}`, '_blank')}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          Preview
+                        </Button>
                       </div>
                     )}
+                    
+                    {/* Expandable data button */}
+                    {business && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full flex items-center justify-between text-xs"
+                        onClick={() => toggleExpanded(site.id)}
+                      >
+                        <span>Business Data</span>
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </Button>
+                    )}
                   </div>
-                </div>
-              </CardBody>
-            </Card>
-          ))}
+                  
+                  {/* Expanded business data */}
+                  {isExpanded && business && (
+                    <div className="mt-3 pt-3 border-t border-border text-xs space-y-2">
+                      {business.name && (
+                        <div>
+                          <span className="font-semibold">Name:</span> {business.name}
+                        </div>
+                      )}
+                      {business.category && (
+                        <div>
+                          <span className="font-semibold">Category:</span> {business.category}
+                        </div>
+                      )}
+                      {business.phone && (
+                        <div>
+                          <span className="font-semibold">Phone:</span> {business.phone}
+                        </div>
+                      )}
+                      {business.address && (
+                        <div>
+                          <span className="font-semibold">Address:</span> {business.address}
+                        </div>
+                      )}
+                      {business.rating && (
+                        <div>
+                          <span className="font-semibold">Rating:</span> {business.rating} ⭐ ({business.review_count || 0} reviews)
+                        </div>
+                      )}
+                      {business.website_url && (
+                        <div>
+                          <span className="font-semibold">Website:</span>{' '}
+                          <a 
+                            href={business.website_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-primary-500 hover:underline"
+                          >
+                            {business.website_url}
+                          </a>
+                        </div>
+                      )}
+                      {googleMapsUrl && (
+                        <div className="pt-2">
+                          <a
+                            href={googleMapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-primary-500 hover:underline font-semibold"
+                          >
+                            <LinkIcon className="w-3 h-3" />
+                            View on Google Maps
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+            )
+          })}
         </div>
       )}
     </div>
