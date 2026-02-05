@@ -192,7 +192,8 @@ class HunterService:
                 for biz_data in raw_businesses:
                     try:
                         # Validate website if present (old validator for backwards compatibility)
-                        website_url = biz_data.get("website")
+                        # FIX: Scraper normalizes to 'website_url', not 'website'
+                        website_url = biz_data.get("website_url")
                         website_status = "unknown"
                         
                         if website_url:
@@ -538,7 +539,8 @@ class HunterService:
         for biz_data in raw_businesses:
             try:
                 # Validate website
-                website_url = biz_data.get("website")
+                # FIX: Scraper normalizes to 'website_url', not 'website'
+                website_url = biz_data.get("website_url")
                 if website_url:
                     website_status = await self.website_validator.validate_website(website_url)
                     biz_data["website_status"] = website_status
