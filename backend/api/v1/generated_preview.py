@@ -112,8 +112,16 @@ def _build_complete_html(
     Returns:
         Complete HTML document
     """
-    # If HTML already contains <!DOCTYPE html>, return as-is
+    # If HTML already contains <!DOCTYPE html>, inject CSS and JS into it
     if html.strip().lower().startswith('<!doctype html>'):
+        # Find the closing </head> tag and inject CSS before it
+        if css and '</head>' in html:
+            html = html.replace('</head>', f'<style>{css}</style>\n</head>', 1)
+        
+        # Find the closing </body> tag and inject JS before it
+        if js and '</body>' in html:
+            html = html.replace('</body>', f'<script>{js}</script>\n</body>', 1)
+        
         return html
     
     # Otherwise, wrap with CSS and JS
