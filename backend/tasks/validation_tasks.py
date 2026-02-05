@@ -9,6 +9,7 @@ from datetime import datetime
 import logging
 
 from core.database import get_sync_db
+from core.config import get_settings
 from services.validation.playwright_service import PlaywrightValidationService
 
 logger = logging.getLogger(__name__)
@@ -167,8 +168,13 @@ async def _run_validation(url: str) -> dict:
     Returns:
         Validation result dictionary
     """
+    settings = get_settings()
     async with PlaywrightValidationService() as validator:
-        return await validator.validate_website(url, capture_screenshot=True)
+        return await validator.validate_website(
+            url,
+            timeout=settings.VALIDATION_TIMEOUT_MS,
+            capture_screenshot=settings.VALIDATION_CAPTURE_SCREENSHOTS
+        )
 
 
 @shared_task(
