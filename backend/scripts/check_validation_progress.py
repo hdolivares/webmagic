@@ -63,11 +63,14 @@ def get_validation_stats():
         
         avg_score = sum(scores) / len(scores) if scores else 0
         
-        # Recently validated
+        # Recently validated (last hour)
+        from datetime import datetime, timedelta
+        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+        
         recently_validated = db.query(func.count(Business.id)).filter(
             and_(
                 Business.website_validated_at.isnot(None),
-                Business.website_validated_at >= func.now() - func.cast('1 hour', func.Interval)
+                Business.website_validated_at >= one_hour_ago
             )
         ).scalar()
         
