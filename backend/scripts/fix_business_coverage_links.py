@@ -51,6 +51,12 @@ async def fix_business_coverage_links():
             no_match_count = 0
             
             for business in businesses:
+                # Skip None businesses
+                if business is None:
+                    logger.warning("Skipping None business object")
+                    no_match_count += 1
+                    continue
+                
                 # Skip businesses without required fields
                 if not business.city or not business.state or not business.category:
                     logger.warning(
