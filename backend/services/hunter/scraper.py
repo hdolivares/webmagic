@@ -252,7 +252,7 @@ class OutscraperClient:
                     # Identity
                     "gmb_id": business.get("google_id"),
                     "gmb_place_id": business.get("place_id"),
-                    "name": business.get("name", "").strip(),
+                    "name": (business.get("name") or "").strip(),
                     
                     # Contact
                     "phone": business.get("phone"),
