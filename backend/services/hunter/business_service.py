@@ -142,7 +142,8 @@ class BusinessService:
                 "photos_urls", "logo_url",
                 "website_status", "contact_status", "qualification_score",
                 "website_validation_status", "website_validated_at",  # NEW: Website validation fields
-                "creative_dna", "scraped_at"
+                "creative_dna", "scraped_at",
+                "raw_data"  # NEW: Store full Outscraper response for reprocessing
             }
             
             # Filter business data to only valid fields

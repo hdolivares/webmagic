@@ -79,6 +79,10 @@ class Business(BaseModel):
     # Creative DNA (stored after AI generation)
     creative_dna = Column(JSONB, nullable=True)
     
+    # Raw Data Storage (for reprocessing without wasting API credits)
+    raw_data = Column(JSONB, nullable=True)
+    # Stores full Outscraper response for data recovery and debugging
+    
     # Tracking
     coverage_grid_id = Column(
         UUID(as_uuid=True),
