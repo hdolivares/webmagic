@@ -181,10 +181,14 @@ async def list_sites(
                 "id": str(s.business.id),
                 "name": s.business.name,
                 "category": s.business.category,
+                "phone": s.business.phone,
+                "address": s.business.address,
                 "city": s.business.city,
                 "state": s.business.state,
                 "rating": float(s.business.rating) if s.business.rating else None,
                 "review_count": s.business.review_count,
+                "website_url": s.business.website_url,
+                "gmb_place_id": s.business.gmb_place_id,
             } if s.business else None
         }
         site_responses.append(SiteResponse.model_validate(site_dict))
