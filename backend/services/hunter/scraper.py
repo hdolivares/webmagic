@@ -242,10 +242,29 @@ class OutscraperClient:
                 photos = business.get("photos_data_id", [])
                 photo_urls = [photo for photo in photos[:10] if photo]  # Top 10 photos
                 
-                # DEBUG: Log website field for each business
-                site_value = business.get("site")
-                if site_value:
-                    logger.info(f"Business '{business.get('name')}' has site: {site_value}")
+                # ENHANCED: Try ALL possible website field names from Outscraper
+                website_url = (
+                    business.get("website") or
+                    business.get("site") or
+                    business.get("url") or
+                    business.get("domain") or
+                    business.get("website_url") or
+                    business.get("business_url") or
+                    business.get("web") or
+                    business.get("homepage")
+                )
+                
+                # COMPREHENSIVE LOGGING: Log all website-related fields
+                business_name = business.get("name", "Unknown")
+                logger.info(f"Processing business: {business_name}")
+                logger.info(f"  Available keys: {list(business.keys())}")
+                logger.info(f"  Website fields check:")
+                logger.info(f"    - website: {business.get('website')}")
+                logger.info(f"    - site: {business.get('site')}")
+                logger.info(f"    - url: {business.get('url')}")
+                logger.info(f"    - domain: {business.get('domain')}")
+                logger.info(f"    - website_url: {business.get('website_url')}")
+                logger.info(f"  Final website_url: {website_url}")
                 
                 normalized_business = {
                     # Identity
@@ -255,7 +274,7 @@ class OutscraperClient:
                     
                     # Contact
                     "phone": business.get("phone"),
-                    "website_url": business.get("website") or business.get("site"),  # FIXED: 'website' not 'site'
+                    "website_url": website_url,
                     "email": None,  # Not provided by Outscraper
                     
                     # Location
