@@ -192,31 +192,30 @@ class HunterService:
                 for biz_data in raw_businesses:
                     try:
                         # **ENHANCED: Use data quality service for comprehensive analysis**
-                        raw_data = biz_data.get("raw_data", {})
                         
-                        # 1. Multi-tier website detection
-                        website_detection = data_quality_service.detect_website_presence(raw_data)
-                        biz_data["website_type"] = website_detection["type"]
-                        biz_data["website_confidence"] = website_detection["confidence"]
-                        
-                        # 2. Geo-validation (ensure business is in correct region)
-                        geo_validation = data_quality_service.validate_geo_location(
-                            raw_data, 
-                            expected_country="US",
-                            expected_state=state
+                        # 1. Geo-validation (ensure business is in correct region)
+                        is_valid_geo, geo_reasons = data_quality_service.validate_geo_targeting(
+                            business=biz_data,
+                            target_country=country,
+                            target_state=state
                         )
-                        if not geo_validation["is_valid"]:
-                            logger.warning(f"Geo-validation failed for {biz_data.get('name')}: {geo_validation['reason']}")
+                        if not is_valid_geo:
+                            logger.warning(f"Geo-validation failed for {biz_data.get('name')}: {', '.join(geo_reasons)}")
                             continue  # Skip businesses outside target region
                         
+                        # 2. Multi-tier website detection
+                        website_detection = data_quality_service.detect_website(biz_data)
+                        biz_data["website_type"] = website_detection.get("website_type", "none")
+                        biz_data["website_confidence"] = website_detection.get("confidence", 0.0)
+                        
                         # 3. Quality scoring
-                        quality_analysis = data_quality_service.calculate_quality_score(raw_data)
+                        quality_analysis = data_quality_service.calculate_quality_score(biz_data)
                         biz_data["quality_score"] = quality_analysis["score"]
                         biz_data["verified"] = quality_analysis["verified"]
                         biz_data["operational"] = quality_analysis["operational"]
                         
                         # 4. Simple HTTP validation for websites
-                        website_url = website_detection.get("url") or biz_data.get("website_url")
+                        website_url = website_detection.get("website_url") or biz_data.get("website_url")
                         if website_url:
                             simple_validation = await website_validator.validate_url(website_url)
                             if not simple_validation.is_valid and not simple_validation.is_real_website:
