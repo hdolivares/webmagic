@@ -141,6 +141,7 @@ class BusinessService:
                 "reviews_summary", "review_highlight", "brand_archetype",
                 "photos_urls", "logo_url",
                 "website_status", "contact_status", "qualification_score",
+                "website_validation_status", "website_validated_at",  # NEW: Website validation fields
                 "creative_dna", "scraped_at"
             }
             
