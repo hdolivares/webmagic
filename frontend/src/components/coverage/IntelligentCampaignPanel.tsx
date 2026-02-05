@@ -117,11 +117,13 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
   }
 
   const handleCreateStrategy = async () => {
+    console.log('🔵 handleCreateStrategy called', { city, state, category, loading })
     setLoading(true)
     setError(null)
     setScrapeResult(null)
     
     try {
+      console.log('🔵 Calling api.createIntelligentStrategy...')
       const response = await api.createIntelligentStrategy({
         city,
         state,
@@ -129,10 +131,11 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
         force_regenerate: false
       })
       
+      console.log('✅ Strategy response:', response)
       setStrategy(response)
     } catch (err: any) {
+      console.error('❌ Strategy creation error:', err)
       setError(err.response?.data?.detail || 'Failed to create strategy')
-      console.error('Strategy creation error:', err)
     } finally {
       setLoading(false)
     }
