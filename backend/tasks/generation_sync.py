@@ -110,13 +110,11 @@ def generate_site_for_business(self, business_id: str):
                 if existing_site:
                     site = existing_site
                     site.status = "generating"
-                    site.generation_started_at = datetime.utcnow()
                 else:
                     site = GeneratedSite(
                         business_id=business.id,
                         subdomain=f"{business.slug}-{str(business.id)[:8]}",
-                        status="generating",
-                        generation_started_at=datetime.utcnow()
+                        status="generating"
                     )
                     db.add(site)
                 
