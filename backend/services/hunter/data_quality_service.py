@@ -77,13 +77,46 @@ class DataQualityService:
         
         # Check country code (most reliable)
         country_code = raw_data.get("country_code")
+        state_code = raw_data.get("state_code")
+        
+        # **CRITICAL FIX**: If country_code is missing, fall back to state validation
+        # Many Outscraper results don't have country_code but DO have state_code
+        if country_code is None:
+            logger.debug(f"⚠️  country_code is None, falling back to state validation")
+            # If we have a target state and the state matches, assume it's the right country
+            if target_state and state_code == target_state:
+                logger.debug(f"✅ State matches ({state_code} == {target_state}), assuming country is correct")
+                return True, ["Geo-targeting validated via state match"]
+            # If state doesn't match or is missing, check the state name field
+            elif target_state:
+                state_name = raw_data.get("state", "").lower()
+                # Map state codes to names for fallback
+                state_name_map = {
+                    "CA": ["california", "ca"],
+                    "TX": ["texas", "tx"],
+                    "NY": ["new york", "ny"],
+                    "FL": ["florida", "fl"],
+                    # Add more as needed
+                }
+                target_state_names = state_name_map.get(target_state, [target_state.lower()])
+                if any(name in state_name for name in target_state_names):
+                    logger.debug(f"✅ State name matches ({state_name}), assuming country is correct")
+                    return True, ["Geo-targeting validated via state name match"]
+                else:
+                    reasons.append(f"Country code missing and state mismatch: {state_code} != {target_state}")
+                    return False, reasons
+            else:
+                # No target state to validate against, can't determine if correct country
+                reasons.append(f"Country code missing and no state to validate against")
+                return False, reasons
+        
+        # Normal validation: country_code is present
         if country_code != target_country:
             reasons.append(f"Country mismatch: {country_code} != {target_country}")
             return False, reasons
         
         # Check state code (if provided)
         if target_state:
-            state_code = raw_data.get("state_code")
             if state_code != target_state:
                 reasons.append(f"State mismatch: {state_code} != {target_state}")
                 if self.strict_geo_filter:
