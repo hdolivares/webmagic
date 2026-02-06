@@ -194,10 +194,9 @@ class HunterService:
                         # **ENHANCED: Use data quality service for comprehensive analysis**
                         
                         # 1. Geo-validation (ensure business is in correct region)
-                        # Wrap biz_data in the format expected by validate_geo_targeting
-                        business_for_validation = {"raw_data": biz_data}
+                        # NOTE: biz_data already has "raw_data" key from scraper (line 303 in scraper.py)
                         is_valid_geo, geo_reasons = data_quality_service.validate_geo_targeting(
-                            business=business_for_validation,
+                            business=biz_data,
                             target_country=country,
                             target_state=state
                         )
@@ -206,12 +205,12 @@ class HunterService:
                             continue  # Skip businesses outside target region
                         
                         # 2. Multi-tier website detection
-                        website_detection = data_quality_service.detect_website(business_for_validation)
+                        website_detection = data_quality_service.detect_website(biz_data)
                         biz_data["website_type"] = website_detection.get("website_type", "none")
                         biz_data["website_confidence"] = website_detection.get("confidence", 0.0)
                         
                         # 3. Quality scoring
-                        quality_analysis = data_quality_service.calculate_quality_score(business_for_validation)
+                        quality_analysis = data_quality_service.calculate_quality_score(biz_data)
                         biz_data["quality_score"] = quality_analysis["score"]
                         biz_data["verified"] = quality_analysis["verified"]
                         biz_data["operational"] = quality_analysis["operational"]
