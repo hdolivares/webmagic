@@ -119,9 +119,13 @@ class DataQualityService:
         """
         raw_data = business.get("raw_data", {})
         
+        logger.debug(f"🔍 Website detection - raw_data has {len(raw_data)} keys")
+        
         # Primary: Check website field
         website = raw_data.get("website")
+        logger.debug(f"  ├─ website field: {website}")
         if website and isinstance(website, str) and len(website) > 10:
+            logger.debug(f"  └─ ✅ Found website (primary): {website}")
             return {
                 "has_website": True,
                 "website_url": website,
@@ -131,7 +135,9 @@ class DataQualityService:
         
         # Secondary: Check booking link (some businesses only have this)
         booking_link = raw_data.get("booking_appointment_link")
+        logger.debug(f"  ├─ booking_appointment_link field: {booking_link}")
         if booking_link and isinstance(booking_link, str):
+            logger.debug(f"  └─ ✅ Found booking link (secondary): {booking_link}")
             return {
                 "has_website": True,
                 "website_url": booking_link,
@@ -141,8 +147,10 @@ class DataQualityService:
         
         # Tertiary: Check order links (restaurants/retail)
         order_links = raw_data.get("order_links")
+        logger.debug(f"  ├─ order_links field: {order_links}")
         if order_links:
             if isinstance(order_links, list) and len(order_links) > 0:
+                logger.debug(f"  └─ ✅ Found order link (tertiary): {order_links[0]}")
                 return {
                     "has_website": True,
                     "website_url": order_links[0],
@@ -150,6 +158,7 @@ class DataQualityService:
                     "confidence": 0.7
                 }
             elif isinstance(order_links, str):
+                logger.debug(f"  └─ ✅ Found order link (tertiary): {order_links}")
                 return {
                     "has_website": True,
                     "website_url": order_links,
@@ -158,6 +167,7 @@ class DataQualityService:
                 }
         
         # No online presence found
+        logger.debug(f"  └─ ❌ No website found in any field")
         return {
             "has_website": False,
             "website_url": None,
@@ -187,11 +197,14 @@ class DataQualityService:
         score = 0.0
         breakdown = {}
         
+        logger.debug(f"🎯 Quality scoring - raw_data has {len(raw_data)} keys")
+        
         # 1. Verification (0-15 points)
         verified = raw_data.get("verified", False)
         verification_score = 15 if verified else 0
         score += verification_score
         breakdown["verification"] = verification_score
+        logger.debug(f"  ├─ Verification: {verification_score} pts (verified={verified})")
         
         # 2. Operational Status (0-10 points)
         business_status = raw_data.get("business_status", "").upper()
@@ -203,6 +216,7 @@ class DataQualityService:
             operational_score = 5  # Unknown status
         score += operational_score
         breakdown["operational"] = operational_score
+        logger.debug(f"  ├─ Operational: {operational_score} pts (status={business_status})")
         
         # 3. Review Quality (0-25 points) - based on rating and distribution
         rating = raw_data.get("rating")
@@ -269,8 +283,11 @@ class DataQualityService:
         score += completeness_score
         breakdown["completeness"] = completeness_score
         
+        final_score = round(score, 2)
+        logger.debug(f"  └─ FINAL SCORE: {final_score} pts")
+        
         return {
-            "score": round(score, 2),
+            "score": final_score,
             "breakdown": breakdown,
             "verified": verified,
             "operational": business_status == "OPERATIONAL",
