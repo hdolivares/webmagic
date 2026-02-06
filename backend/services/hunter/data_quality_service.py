@@ -89,7 +89,7 @@ class DataQualityService:
                 return True, ["Geo-targeting validated via state match"]
             # If state doesn't match or is missing, check the state name field
             elif target_state:
-                state_name = raw_data.get("state", "").lower()
+                state_name = (raw_data.get("state") or "").lower()
                 # Map state codes to names for fallback
                 state_name_map = {
                     "CA": ["california", "ca"],
