@@ -206,12 +206,12 @@ class HunterService:
                             continue  # Skip businesses outside target region
                         
                         # 2. Multi-tier website detection
-                        website_detection = data_quality_service.detect_website(biz_data)
+                        website_detection = data_quality_service.detect_website(business_for_validation)
                         biz_data["website_type"] = website_detection.get("website_type", "none")
                         biz_data["website_confidence"] = website_detection.get("confidence", 0.0)
                         
                         # 3. Quality scoring
-                        quality_analysis = data_quality_service.calculate_quality_score(biz_data)
+                        quality_analysis = data_quality_service.calculate_quality_score(business_for_validation)
                         biz_data["quality_score"] = quality_analysis["score"]
                         biz_data["verified"] = quality_analysis["verified"]
                         biz_data["operational"] = quality_analysis["operational"]
