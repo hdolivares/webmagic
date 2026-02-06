@@ -189,11 +189,15 @@ class HunterService:
             
             # Simple HTTP validator for initial filtering
             async with WebsiteValidator() as website_validator:
-                for biz_data in raw_businesses:
+                for idx, biz_data in enumerate(raw_businesses):
+                    business_name = biz_data.get('name', 'Unknown')
+                    logger.info(f"🔍 [{idx+1}/{len(raw_businesses)}] Processing: {business_name}")
+                    
                     try:
                         # **ENHANCED: Use data quality service for comprehensive analysis**
                         
                         # 1. Geo-validation (ensure business is in correct region)
+                        logger.debug(f"  ├─ Running geo-validation...")
                         # NOTE: biz_data already has "raw_data" key from scraper (line 303 in scraper.py)
                         is_valid_geo, geo_reasons = data_quality_service.validate_geo_targeting(
                             business=biz_data,
@@ -201,40 +205,74 @@ class HunterService:
                             target_state=state
                         )
                         if not is_valid_geo:
-                            logger.warning(f"Geo-validation failed for {biz_data.get('name')}: {', '.join(geo_reasons)}")
+                            logger.warning(f"  └─ ❌ Geo-validation FAILED: {', '.join(geo_reasons)}")
                             continue  # Skip businesses outside target region
+                        logger.debug(f"  ├─ ✅ Geo-validation PASSED")
                         
                         # 2. Multi-tier website detection
-                        website_detection = data_quality_service.detect_website(biz_data)
-                        biz_data["website_type"] = website_detection.get("website_type", "none")
-                        biz_data["website_confidence"] = website_detection.get("confidence", 0.0)
+                        logger.debug(f"  ├─ Running multi-tier website detection...")
+                        try:
+                            website_detection = data_quality_service.detect_website(biz_data)
+                            logger.debug(f"  │  └─ Result: type={website_detection.get('website_type')}, has_website={website_detection.get('has_website')}, url={website_detection.get('website_url')}")
+                            biz_data["website_type"] = website_detection.get("website_type", "none")
+                            biz_data["website_confidence"] = website_detection.get("confidence", 0.0)
+                        except Exception as e:
+                            logger.error(f"  │  └─ ❌ Website detection ERROR: {e}", exc_info=True)
+                            biz_data["website_type"] = "none"
+                            biz_data["website_confidence"] = 0.0
+                            website_detection = {"has_website": False, "website_url": None}
                         
-                        # 3. Quality scoring
-                        quality_analysis = data_quality_service.calculate_quality_score(biz_data)
-                        biz_data["quality_score"] = quality_analysis["score"]
-                        biz_data["verified"] = quality_analysis["verified"]
-                        biz_data["operational"] = quality_analysis["operational"]
+                        # 3. Quality scoring (for analytics only, NOT for generation decisions)
+                        logger.debug(f"  ├─ Running quality scoring...")
+                        try:
+                            quality_analysis = data_quality_service.calculate_quality_score(biz_data)
+                            logger.debug(f"  │  └─ Score: {quality_analysis['score']}, Verified: {quality_analysis['verified']}, Operational: {quality_analysis['operational']}")
+                            biz_data["quality_score"] = quality_analysis["score"]
+                            biz_data["verified"] = quality_analysis["verified"]
+                            biz_data["operational"] = quality_analysis["operational"]
+                        except Exception as e:
+                            logger.error(f"  │  └─ ❌ Quality scoring ERROR: {e}", exc_info=True)
+                            biz_data["quality_score"] = 0.0
+                            biz_data["verified"] = False
+                            biz_data["operational"] = True
+                            quality_analysis = {"score": 0.0, "verified": False, "operational": True}
                         
                         # 4. Simple HTTP validation for websites
+                        logger.debug(f"  ├─ Checking website URL...")
                         website_url = website_detection.get("website_url") or biz_data.get("website_url")
+                        logger.debug(f"  │  └─ URL from detection: {website_detection.get('website_url')}, from biz_data: {biz_data.get('website_url')}")
+                        
                         if website_url:
-                            simple_validation = await website_validator.validate_url(website_url)
-                            if not simple_validation.is_valid and not simple_validation.is_real_website:
+                            logger.info(f"  ├─ 🌐 Validating URL: {website_url}")
+                            try:
+                                simple_validation = await website_validator.validate_url(website_url)
+                                logger.debug(f"  │  └─ Validation result: valid={simple_validation.is_valid}, accessible={simple_validation.is_accessible}, real_website={simple_validation.is_real_website}, status={simple_validation.status_code}, error={simple_validation.error_message}")
+                                
+                                if not simple_validation.is_valid and not simple_validation.is_real_website:
+                                    biz_data["website_validation_status"] = "invalid"
+                                    biz_data["website_url"] = None  # Clear invalid URL
+                                    logger.info(f"  │  └─ ❌ INVALID: {simple_validation.error_message}")
+                                else:
+                                    biz_data["website_validation_status"] = "pending"  # Queue for Playwright
+                                    biz_data["website_url"] = website_url
+                                    logger.info(f"  │  └─ ✅ VALID (pending deep validation)")
+                            except Exception as e:
+                                logger.error(f"  │  └─ ❌ Validation ERROR: {e}", exc_info=True)
                                 biz_data["website_validation_status"] = "invalid"
-                                biz_data["website_url"] = None  # Clear invalid URL
-                                logger.debug(f"Rejected URL: {website_url} - {simple_validation.error_message}")
-                            else:
-                                biz_data["website_validation_status"] = "pending"  # Queue for Playwright
-                                biz_data["website_url"] = website_url
+                                biz_data["website_url"] = None
                         else:
                             biz_data["website_validation_status"] = "missing"
+                            logger.info(f"  ├─ 🚫 No website URL found")
                         
                         # 5. Lead qualification
+                        logger.debug(f"  ├─ Running lead qualification...")
                         qualification_result = self.qualifier.qualify(biz_data)
                         score = qualification_result["score"]
                         reasons = qualification_result["reasons"]
+                        logger.debug(f"  │  └─ Lead score: {score}, Reasons: {reasons}")
                         
                         # **SAVE ALL BUSINESSES** (we paid for them!)
+                        logger.debug(f"  ├─ Saving to database...")
                         business = await self.business_service.create_or_update_business(
                             data=biz_data,
                             source="outscraper_gmaps",
@@ -256,17 +294,20 @@ class HunterService:
                             # Track website metrics
                             if business.website_validation_status == "pending":
                                 businesses_to_validate.append(str(business.id))
+                                logger.info(f"  └─ 💾 SAVED - Has website (pending validation)")
                             elif business.website_validation_status == "missing":
                                 businesses_needing_websites += 1
-                                # High-quality businesses without websites = generation candidates
-                                if quality_analysis["score"] >= 50:
-                                    businesses_needing_generation.append(business.id)
-                                    logger.info(f"✅ {business.name} (score: {quality_analysis['score']}) needs website")
+                                # **CRITICAL FIX: Queue ALL businesses without websites, regardless of quality score**
+                                businesses_needing_generation.append(business.id)
+                                logger.info(f"  └─ 💾 SAVED - No website → QUEUED FOR GENERATION ✨")
                             else:
                                 businesses_with_valid_websites += 1
+                                logger.info(f"  └─ 💾 SAVED - Has valid website")
+                        else:
+                            logger.warning(f"  └─ ⚠️  Failed to save business")
                         
                     except Exception as e:
-                        logger.error(f"Error processing business: {e}")
+                        logger.error(f"  └─ ❌ CRITICAL ERROR processing {business_name}: {e}", exc_info=True)
                         continue
             
             # **Queue Playwright validation for businesses with websites**
