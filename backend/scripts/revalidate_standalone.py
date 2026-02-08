@@ -119,13 +119,18 @@ async def run_scrapingdog(
     return {"found": found, "confirmed_missing": confirmed, "errors": errors}
 
 
-# --- Playwright (Stage 2) - Validate businesses with website_url ---
+# --- LLM Validation (Stage 2) - Validate businesses with website_url using orchestrator ---
 
 async def run_playwright(limit: Optional[int] = None, dry_run: bool = False) -> dict:
     """
-    Run Playwright validation inline (no Celery). Validates businesses that have website_url.
+    Run LLM-powered validation inline (no Celery). Uses orchestrator for 3-stage pipeline:
+    1. URL Prescreener (fast checks)
+    2. Playwright (content extraction)
+    3. LLM (intelligent cross-referencing)
+    
+    Validates businesses that have website_url.
     """
-    from services.validation.playwright_service import PlaywrightValidationService
+    from services.validation.validation_orchestrator import ValidationOrchestrator
 
     settings = get_settings()
     async with AsyncSessionLocal() as db:
@@ -141,39 +146,74 @@ async def run_playwright(limit: Optional[int] = None, dry_run: bool = False) -> 
 
     if not businesses:
         logger.info("No businesses with website_url to validate")
-        return {"valid": 0, "invalid": 0, "errors": 0}
+        return {"valid": 0, "invalid": 0, "missing": 0, "errors": 0}
 
-    logger.info(f"Playwright: validating {len(businesses)} businesses")
+    logger.info(f"LLM Validation: processing {len(businesses)} businesses")
     valid_count = 0
     invalid_count = 0
+    missing_count = 0
     error_count = 0
 
-    async with PlaywrightValidationService() as validator:
+    async with ValidationOrchestrator() as orchestrator:
         for idx, biz in enumerate(businesses, 1):
             try:
-                result = await validator.validate_website(
-                    biz.website_url,
+                # Prepare business context for LLM
+                business_context = {
+                    "name": biz.name,
+                    "phone": biz.phone,
+                    "email": biz.email,
+                    "address": biz.address,
+                    "city": biz.city,
+                    "state": biz.state,
+                    "country": biz.country or "US",
+                }
+                
+                # Run complete validation pipeline
+                result = await orchestrator.validate_business_website(
+                    business=business_context,
+                    url=biz.website_url,
                     timeout=settings.VALIDATION_TIMEOUT_MS,
                     capture_screenshot=settings.VALIDATION_CAPTURE_SCREENSHOTS,
                 )
-                is_valid = result.get("is_valid", False)
-                quality = result.get("quality_score", 0)
-
-                if is_valid:
+                
+                verdict = result.get("verdict", "error")
+                confidence = result.get("confidence", 0)
+                reasoning = result.get("reasoning", "")
+                
+                # Log result with reasoning
+                logger.info(
+                    f"  [{idx}/{len(businesses)}] {biz.name}: {verdict} "
+                    f"(conf={confidence:.2f}) - {reasoning[:100]}"
+                )
+                
+                # Count by verdict
+                if verdict == "valid":
                     valid_count += 1
-                    logger.info(f"  [{idx}/{len(businesses)}] {biz.name}: valid (score={quality})")
-                else:
+                elif verdict == "invalid":
                     invalid_count += 1
-                    logger.info(f"  [{idx}/{len(businesses)}] {biz.name}: invalid")
+                elif verdict == "missing":
+                    missing_count += 1
+                else:
+                    error_count += 1
 
+                # Update database
                 if not dry_run:
                     async with AsyncSessionLocal() as db2:
                         b = await db2.get(Business, biz.id)
                         if b:
-                            b.website_validation_status = "valid" if is_valid else "invalid"
+                            # Map verdict to status
+                            b.website_validation_status = verdict
                             b.website_validation_result = result
                             b.website_validated_at = datetime.utcnow()
+                            
+                            # Clear URL if recommendation says so
+                            recommendation = result.get("recommendation", "")
+                            if "clear_url" in recommendation:
+                                logger.info(f"    -> Clearing URL (not business's actual website)")
+                                b.website_url = None
+                            
                             await db2.commit()
+                            
             except Exception as e:
                 error_count += 1
                 logger.error(f"  [{idx}/{len(businesses)}] {biz.name}: {e}")
@@ -182,12 +222,20 @@ async def run_playwright(limit: Optional[int] = None, dry_run: bool = False) -> 
                         b = await db2.get(Business, biz.id)
                         if b:
                             b.website_validation_status = "error"
-                            b.website_validation_result = {"error": str(e), "is_valid": False}
+                            b.website_validation_result = {"error": str(e), "verdict": "error"}
                             b.website_validated_at = datetime.utcnow()
                             await db2.commit()
 
-    logger.info(f"Playwright complete: valid={valid_count}, invalid={invalid_count}, errors={error_count}")
-    return {"valid": valid_count, "invalid": invalid_count, "errors": error_count}
+    logger.info(
+        f"LLM Validation complete: valid={valid_count}, invalid={invalid_count}, "
+        f"missing={missing_count}, errors={error_count}"
+    )
+    return {
+        "valid": valid_count,
+        "invalid": invalid_count,
+        "missing": missing_count,
+        "errors": error_count
+    }
 
 
 def main():

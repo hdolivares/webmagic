@@ -1,6 +1,6 @@
 """
 Celery tasks for website validation.
-Handles asynchronous website validation using Playwright.
+Handles asynchronous website validation using LLM-powered orchestrator.
 """
 import asyncio
 from celery import shared_task
@@ -10,7 +10,7 @@ import logging
 
 from core.database import get_db_session_sync
 from core.config import get_settings
-from services.validation.playwright_service import PlaywrightValidationService
+from services.validation.validation_orchestrator import ValidationOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +25,14 @@ logger = logging.getLogger(__name__)
 )
 def validate_business_website(self, business_id: str):
     """
-    Validate a business website using Playwright.
+    Validate a business website using LLM-powered orchestrator.
     
-    This task:
+    Pipeline:
     1. Fetches business from database
-    2. Validates the website URL
-    3. Extracts business information
-    4. Updates business record with results
+    2. URL Prescreener (fast checks)
+    3. Playwright (content extraction)
+    4. LLM (intelligent cross-referencing)
+    5. Updates business record with verdict
     
     Args:
         business_id: UUID of the business to validate
@@ -40,7 +41,7 @@ def validate_business_website(self, business_id: str):
         Dict with validation results
     """
     try:
-        logger.info(f"Starting validation for business {business_id}")
+        logger.info(f"Starting LLM validation for business {business_id}")
         
         # Get database session
         with get_db_session_sync() as db:
@@ -56,38 +57,55 @@ def validate_business_website(self, business_id: str):
             
             if not business.website_url:
                 logger.warning(f"Business {business_id} has no website URL")
-                business.website_validation_status = "no_website"
+                business.website_validation_status = "missing"
                 business.website_validated_at = datetime.utcnow()
                 # db.commit() is handled by context manager
                 return {"error": "No website URL", "business_id": business_id}
             
-            # Run validation (sync wrapper for async code)
-            result = asyncio.run(_run_validation(business.website_url))
+            # Prepare business context for LLM
+            business_context = {
+                "name": business.name,
+                "phone": business.phone,
+                "email": business.email,
+                "address": business.address,
+                "city": business.city,
+                "state": business.state,
+                "country": business.country or "US",
+            }
+            
+            # Run validation through orchestrator (sync wrapper for async code)
+            result = asyncio.run(_run_validation(
+                business_context=business_context,
+                url=business.website_url
+            ))
+            
+            # Extract verdict
+            verdict = result.get("verdict", "error")
+            confidence = result.get("confidence", 0)
+            recommendation = result.get("recommendation", "")
             
             # Update business record
-            business.website_validation_status = "valid" if result["is_valid"] else "invalid"
+            business.website_validation_status = verdict
             business.website_validation_result = result
             business.website_validated_at = datetime.utcnow()
             
-            # Optionally store screenshot URL (if implemented)
-            if result.get("screenshot_base64"):
-                # TODO: Upload to S3 and store URL
-                # business.website_screenshot_url = await upload_screenshot(...)
-                pass
+            # Clear URL if recommendation says so (directory/aggregator)
+            if "clear_url" in recommendation:
+                logger.info(f"Clearing URL for {business_id} (not business's actual website)")
+                business.website_url = None
             
             # db.commit() is handled by context manager
             
             logger.info(
-                f"Validation completed for business {business_id}: "
-                f"is_valid={result['is_valid']}, "
-                f"quality_score={result.get('quality_score', 0)}"
+                f"LLM validation completed for business {business_id}: "
+                f"verdict={verdict}, confidence={confidence:.2f}"
             )
             
             return {
                 "business_id": business_id,
                 "status": "success",
-                "is_valid": result["is_valid"],
-                "quality_score": result.get("quality_score", 0)
+                "verdict": verdict,
+                "confidence": confidence
             }
             
     except Exception as e:
@@ -107,7 +125,7 @@ def validate_business_website(self, business_id: str):
                     business.website_validation_status = "error"
                     business.website_validation_result = {
                         "error": str(e),
-                        "is_valid": False
+                        "verdict": "error"
                     }
                     business.website_validated_at = datetime.utcnow()
                     # db.commit() is handled by context manager
@@ -150,20 +168,22 @@ def batch_validate_websites(business_ids: list[str]):
     }
 
 
-async def _run_validation(url: str) -> dict:
+async def _run_validation(business_context: dict, url: str) -> dict:
     """
-    Run async validation.
+    Run async LLM-powered validation through orchestrator.
     
     Args:
+        business_context: Business data for cross-referencing
         url: Website URL to validate
         
     Returns:
-        Validation result dictionary
+        Validation result dictionary with verdict, confidence, reasoning
     """
     settings = get_settings()
-    async with PlaywrightValidationService() as validator:
-        return await validator.validate_website(
-            url,
+    async with ValidationOrchestrator() as orchestrator:
+        return await orchestrator.validate_business_website(
+            business=business_context,
+            url=url,
             timeout=settings.VALIDATION_TIMEOUT_MS,
             capture_screenshot=settings.VALIDATION_CAPTURE_SCREENSHOTS
         )
