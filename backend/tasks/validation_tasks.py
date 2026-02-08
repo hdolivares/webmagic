@@ -179,14 +179,19 @@ async def _run_validation(business_context: dict, url: str) -> dict:
     Returns:
         Validation result dictionary with verdict, confidence, reasoning
     """
+    from core.database import AsyncSessionLocal
+    
     settings = get_settings()
-    async with ValidationOrchestrator() as orchestrator:
-        return await orchestrator.validate_business_website(
-            business=business_context,
-            url=url,
-            timeout=settings.VALIDATION_TIMEOUT_MS,
-            capture_screenshot=settings.VALIDATION_CAPTURE_SCREENSHOTS
-        )
+    
+    # Create async DB session for loading system settings
+    async with AsyncSessionLocal() as db:
+        async with ValidationOrchestrator(db=db) as orchestrator:
+            return await orchestrator.validate_business_website(
+                business=business_context,
+                url=url,
+                timeout=settings.VALIDATION_TIMEOUT_MS,
+                capture_screenshot=settings.VALIDATION_CAPTURE_SCREENSHOTS
+            )
 
 
 @shared_task(
