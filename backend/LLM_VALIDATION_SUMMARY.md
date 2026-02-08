@@ -69,20 +69,29 @@ Successfully implemented intelligent website validation using Claude AI to repla
 
 ## Configuration
 
+### Model Selection Priority
+The system uses a layered approach for model selection:
+1. **Model Override** (highest priority) - Explicit parameter when calling API
+2. **System Settings Database** - Configured from Settings page UI
+3. **Environment Variable** - `LLM_MODEL` in `.env`
+4. **Default** - `claude-sonnet-4`
+
 ### Environment Variables (.env)
 ```bash
 # Required
 ANTHROPIC_API_KEY=sk-ant-api03-xxx
 
-# Optional (defaults to system settings)
+# Optional (fallback if system settings not configured)
 LLM_MODEL=claude-sonnet-4
 ```
 
-### System Settings (Database)
+### System Settings (Database) ⭐ Recommended
 The LLM model can be configured from the settings page UI:
-- Default: `claude-sonnet-4-5`
-- Available models: Claude Sonnet 4.5, 3.5, 3 Opus, 3 Sonnet, 3 Haiku
-- Changes take effect immediately without code deployment
+- **Default**: `claude-sonnet-4-5` 
+- **Location**: Settings → AI Configuration → LLM Model
+- **Available models**: Claude Sonnet 4.5, 3.5, 3 Opus, 3 Sonnet, 3 Haiku
+- **Changes take effect immediately** without code deployment
+- **Database table**: `system_settings` (key: `llm_model`)
 
 ## Usage
 
@@ -271,6 +280,21 @@ The LLM validator works without database access. It only needs:
 - `backend/tasks/validation_tasks.py` → Celery tasks updated
 - `backend/services/validation/__init__.py` → Lazy imports
 
+## Testing
+
+Run the integration test to verify settings are correctly loaded:
+
+```bash
+cd /root/webmagic/backend
+python -m scripts.test_settings_integration
+```
+
+This test verifies:
+- ✓ System settings database contains `llm_model`
+- ✓ ValidationOrchestrator reads from database when session provided
+- ✓ Falls back to config when database not available
+- ✓ Model override parameter works correctly
+
 ## Commits
 1. **cc87a47** - Phase 1-3: Prescreener, LLM validator, Orchestrator
 2. **717ed2b** - Phase 5: Updated scripts to use orchestrator
@@ -281,6 +305,9 @@ The LLM validator works without database access. It only needs:
 7. **465a1fd** - Model name fix
 8. **6de960c** - Fallback model
 9. **436b341** - Configurable model from settings
+10. **9e4dea8** - Documentation
+11. **fd60a77** - Database integration fix (reads from system_settings table)
+12. **6321829** - Settings integration test script
 
 ---
 
