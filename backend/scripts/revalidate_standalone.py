@@ -154,8 +154,10 @@ async def run_playwright(limit: Optional[int] = None, dry_run: bool = False) -> 
     missing_count = 0
     error_count = 0
 
-    async with ValidationOrchestrator() as orchestrator:
-        for idx, biz in enumerate(businesses, 1):
+    # Get database session for system settings
+    async with AsyncSessionLocal() as db:
+        async with ValidationOrchestrator(db=db) as orchestrator:
+            for idx, biz in enumerate(businesses, 1):
             try:
                 # Prepare business context for LLM
                 business_context = {
@@ -214,6 +216,7 @@ async def run_playwright(limit: Optional[int] = None, dry_run: bool = False) -> 
                             
                             await db2.commit()
                             
+                
             except Exception as e:
                 error_count += 1
                 logger.error(f"  [{idx}/{len(businesses)}] {biz.name}: {e}")

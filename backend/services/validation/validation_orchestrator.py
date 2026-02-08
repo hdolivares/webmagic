@@ -12,10 +12,13 @@ a final validation result with reasoning.
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.validation.url_prescreener import URLPrescreener
 from services.validation.playwright_service import PlaywrightValidationService
 from services.validation.llm_validator import LLMWebsiteValidator
+from services.system_settings_service import SystemSettingsService
+from core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -38,19 +41,53 @@ class ValidationOrchestrator:
     
     def __init__(
         self,
+        db: Optional[AsyncSession] = None,
         playwright_service: Optional[PlaywrightValidationService] = None,
-        llm_validator: Optional[LLMWebsiteValidator] = None
+        llm_validator: Optional[LLMWebsiteValidator] = None,
+        model_override: Optional[str] = None
     ):
         """
         Initialize orchestrator with services.
         
         Args:
+            db: Database session (optional, for loading model from system settings)
             playwright_service: Playwright service instance (creates if None)
             llm_validator: LLM validator instance (creates if None)
+            model_override: Optional model to override system/config settings
         """
         self.prescreener = URLPrescreener()
         self.playwright_service = playwright_service
-        self.llm_validator = llm_validator or LLMWebsiteValidator()
+        self.llm_validator = llm_validator  # Will be initialized in validate method
+        self.db = db
+        self.model_override = model_override
+        self._model = None  # Cache for loaded model
+    
+    async def _get_llm_model(self) -> str:
+        """Get LLM model from system settings or config."""
+        if self._model:
+            return self._model
+        
+        # Priority 1: Explicit override
+        if self.model_override:
+            self._model = self.model_override
+            logger.info(f"Using model override: {self._model}")
+            return self._model
+        
+        # Priority 2: System settings (from database)
+        if self.db:
+            try:
+                ai_config = await SystemSettingsService.get_ai_config(self.db)
+                self._model = ai_config["llm"]["model"]
+                logger.info(f"Using model from system settings: {self._model}")
+                return self._model
+            except Exception as e:
+                logger.warning(f"Failed to load model from system settings: {e}")
+        
+        # Priority 3: Config/environment
+        settings = get_settings()
+        self._model = getattr(settings, 'LLM_MODEL', 'claude-sonnet-4')
+        logger.info(f"Using model from config: {self._model}")
+        return self._model
     
     async def validate_business_website(
         self,
@@ -153,6 +190,11 @@ class ValidationOrchestrator:
             
             # STAGE 3: LLM Intelligent Validation
             logger.info(f"[Stage 3] LLM validation")
+            
+            # Initialize LLM validator with correct model if not already done
+            if self.llm_validator is None:
+                model = await self._get_llm_model()
+                self.llm_validator = LLMWebsiteValidator(model=model)
             
             # Prepare website data for LLM
             website_data = self._prepare_website_data_for_llm(url, playwright_result)
