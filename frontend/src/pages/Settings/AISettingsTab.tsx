@@ -151,8 +151,9 @@ export const AISettingsTab: React.FC = () => {
     if (aiConfig) {
       setLlmProvider(aiConfig.llm.provider);
       setLlmModel(aiConfig.llm.model);
-      setValidationProvider(aiConfig.validation.provider);
-      setValidationModel(aiConfig.validation.model);
+      // Handle validation config (fallback to llm if not present)
+      setValidationProvider(aiConfig.validation?.provider || aiConfig.llm.provider);
+      setValidationModel(aiConfig.validation?.model || 'claude-3-haiku-20240307');
       setImageProvider(aiConfig.image.provider);
       setImageModel(aiConfig.image.model);
     }
@@ -165,8 +166,8 @@ export const AISettingsTab: React.FC = () => {
     const changed =
       llmProvider !== aiConfig.llm.provider ||
       llmModel !== aiConfig.llm.model ||
-      validationProvider !== aiConfig.validation.provider ||
-      validationModel !== aiConfig.validation.model ||
+      validationProvider !== (aiConfig.validation?.provider || aiConfig.llm.provider) ||
+      validationModel !== (aiConfig.validation?.model || 'claude-3-haiku-20240307') ||
       imageProvider !== aiConfig.image.provider ||
       imageModel !== aiConfig.image.model;
     
@@ -211,8 +212,8 @@ export const AISettingsTab: React.FC = () => {
     if (aiConfig) {
       setLlmProvider(aiConfig.llm.provider);
       setLlmModel(aiConfig.llm.model);
-      setValidationProvider(aiConfig.validation.provider);
-      setValidationModel(aiConfig.validation.model);
+      setValidationProvider(aiConfig.validation?.provider || aiConfig.llm.provider);
+      setValidationModel(aiConfig.validation?.model || 'claude-3-haiku-20240307');
       setImageProvider(aiConfig.image.provider);
       setImageModel(aiConfig.image.model);
       setHasChanges(false);
@@ -358,20 +359,24 @@ export const AISettingsTab: React.FC = () => {
         <div className="ai-settings-tab__current-config">
           <h3 className="ai-settings-tab__current-config-title">Current Configuration</h3>
           <div className="ai-settings-tab__current-config-grid">
-            <div className="ai-settings-tab__config-item">
-              <span className="ai-settings-tab__config-label">Validation Provider:</span>
-              <code className="ai-settings-tab__config-value">
-                {aiConfig.validation.provider_info.name}
-              </code>
-            </div>
-            <div className="ai-settings-tab__config-item">
-              <span className="ai-settings-tab__config-label">Validation Model:</span>
-              <code className="ai-settings-tab__config-value">{aiConfig.validation.model}</code>
-            </div>
+            {aiConfig.validation && (
+              <>
+                <div className="ai-settings-tab__config-item">
+                  <span className="ai-settings-tab__config-label">Validation Provider:</span>
+                  <code className="ai-settings-tab__config-value">
+                    {aiConfig.validation.provider_info?.name || aiConfig.validation.provider}
+                  </code>
+                </div>
+                <div className="ai-settings-tab__config-item">
+                  <span className="ai-settings-tab__config-label">Validation Model:</span>
+                  <code className="ai-settings-tab__config-value">{aiConfig.validation.model}</code>
+                </div>
+              </>
+            )}
             <div className="ai-settings-tab__config-item">
               <span className="ai-settings-tab__config-label">Generation Provider:</span>
               <code className="ai-settings-tab__config-value">
-                {aiConfig.llm.provider_info.name}
+                {aiConfig.llm.provider_info?.name || aiConfig.llm.provider}
               </code>
             </div>
             <div className="ai-settings-tab__config-item">
@@ -381,7 +386,7 @@ export const AISettingsTab: React.FC = () => {
             <div className="ai-settings-tab__config-item">
               <span className="ai-settings-tab__config-label">Image Provider:</span>
               <code className="ai-settings-tab__config-value">
-                {aiConfig.image.provider_info.name}
+                {aiConfig.image.provider_info?.name || aiConfig.image.provider}
               </code>
             </div>
             <div className="ai-settings-tab__config-item">
