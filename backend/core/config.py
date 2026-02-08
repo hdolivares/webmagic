@@ -84,6 +84,9 @@ class Settings(BaseSettings):
     VALIDATION_CAPTURE_SCREENSHOTS: bool = False  # Disable screenshots for performance
     VALIDATION_TIMEOUT_MS: int = 30000  # 30 seconds per website
     
+    # LLM Configuration for Website Validation
+    LLM_MODEL: str = "claude-sonnet-4"  # Claude model for validation (can be overridden from system settings)
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
