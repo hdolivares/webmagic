@@ -44,6 +44,8 @@ const ModelSelector: React.FC<{
   description: string;
   currentProvider: string;
   currentModel: string;
+  savedProvider?: string;
+  savedModel?: string;
   providers: Record<string, AIProvider>;
   onProviderChange: (provider: string) => void;
   onModelChange: (model: string) => void;
@@ -54,6 +56,8 @@ const ModelSelector: React.FC<{
   description,
   currentProvider,
   currentModel,
+  savedProvider,
+  savedModel,
   providers,
   onProviderChange,
   onModelChange,
@@ -61,6 +65,7 @@ const ModelSelector: React.FC<{
   modelKeyName,
 }) => {
   const providerData = providers[currentProvider];
+  const hasChanges = savedProvider !== currentProvider || savedModel !== currentModel;
 
   return (
     <div className="model-selector">
@@ -68,6 +73,20 @@ const ModelSelector: React.FC<{
         <h3 className="model-selector__label">{label}</h3>
         <p className="model-selector__description">{description}</p>
       </div>
+
+      {/* Current Configuration Display */}
+      {savedProvider && savedModel && (
+        <div className="model-selector__current">
+          <div className="model-selector__current-label">Current Configuration:</div>
+          <div className="model-selector__current-values">
+            <span className="model-selector__current-badge">
+              {providers[savedProvider]?.name || savedProvider}
+            </span>
+            <span className="model-selector__current-separator">•</span>
+            <span className="model-selector__current-model">{savedModel}</span>
+          </div>
+        </div>
+      )}
 
       {/* Provider Selection */}
       <div className="model-selector__field">
@@ -107,16 +126,6 @@ const ModelSelector: React.FC<{
           ))}
         </select>
       </div>
-
-      {/* Info Message */}
-      {providerData && (
-        <div className="model-selector__info">
-          <span className="model-selector__info-icon">ℹ️</span>
-          <span className="model-selector__info-text">
-            Requires API key: <code>{providerData.requires_key}</code>
-          </span>
-        </div>
-      )}
     </div>
   );
 };
@@ -266,6 +275,8 @@ export const AISettingsTab: React.FC = () => {
           description="Used for fast, cost-effective website validation (verifying URLs, checking content)"
           currentProvider={validationProvider}
           currentModel={validationModel}
+          savedProvider={aiConfig.validation?.provider || aiConfig.llm.provider}
+          savedModel={aiConfig.validation?.model || 'claude-3-haiku-20240307'}
           providers={providers.llm}
           onProviderChange={(provider) => {
             setValidationProvider(provider);
@@ -286,6 +297,8 @@ export const AISettingsTab: React.FC = () => {
           description="Used for AI website generation: Analyst, Concept, Art Director, and Architect agents"
           currentProvider={llmProvider}
           currentModel={llmModel}
+          savedProvider={aiConfig.llm.provider}
+          savedModel={aiConfig.llm.model}
           providers={providers.llm}
           onProviderChange={(provider) => {
             setLlmProvider(provider);
@@ -306,6 +319,8 @@ export const AISettingsTab: React.FC = () => {
           description="Used for generating hero images, backgrounds, and service images"
           currentProvider={imageProvider}
           currentModel={imageModel}
+          savedProvider={aiConfig.image.provider}
+          savedModel={aiConfig.image.model}
           providers={providers.image}
           onProviderChange={(provider) => {
             setImageProvider(provider);
@@ -353,49 +368,6 @@ export const AISettingsTab: React.FC = () => {
           </button>
         </div>
       )}
-
-      {/* Current Configuration Display */}
-      <Card>
-        <div className="ai-settings-tab__current-config">
-          <h3 className="ai-settings-tab__current-config-title">Current Configuration</h3>
-          <div className="ai-settings-tab__current-config-grid">
-            {aiConfig.validation && (
-              <>
-                <div className="ai-settings-tab__config-item">
-                  <span className="ai-settings-tab__config-label">Validation Provider:</span>
-                  <code className="ai-settings-tab__config-value">
-                    {aiConfig.validation.provider_info?.name || aiConfig.validation.provider}
-                  </code>
-                </div>
-                <div className="ai-settings-tab__config-item">
-                  <span className="ai-settings-tab__config-label">Validation Model:</span>
-                  <code className="ai-settings-tab__config-value">{aiConfig.validation.model}</code>
-                </div>
-              </>
-            )}
-            <div className="ai-settings-tab__config-item">
-              <span className="ai-settings-tab__config-label">Generation Provider:</span>
-              <code className="ai-settings-tab__config-value">
-                {aiConfig.llm.provider_info?.name || aiConfig.llm.provider}
-              </code>
-            </div>
-            <div className="ai-settings-tab__config-item">
-              <span className="ai-settings-tab__config-label">Generation Model:</span>
-              <code className="ai-settings-tab__config-value">{aiConfig.llm.model}</code>
-            </div>
-            <div className="ai-settings-tab__config-item">
-              <span className="ai-settings-tab__config-label">Image Provider:</span>
-              <code className="ai-settings-tab__config-value">
-                {aiConfig.image.provider_info?.name || aiConfig.image.provider}
-              </code>
-            </div>
-            <div className="ai-settings-tab__config-item">
-              <span className="ai-settings-tab__config-label">Image Model:</span>
-              <code className="ai-settings-tab__config-value">{aiConfig.image.model}</code>
-            </div>
-          </div>
-        </div>
-      </Card>
     </div>
   );
 };
