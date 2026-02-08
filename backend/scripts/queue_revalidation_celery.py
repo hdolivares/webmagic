@@ -40,7 +40,7 @@ cur.execute("""
     UPDATE businesses 
     SET 
         website_validation_status = 'pending',
-        validation_notes = 'Reset for LLM revalidation - ' || CURRENT_TIMESTAMP
+        website_validated_at = NULL
     WHERE website_url IS NOT NULL AND website_url != ''
 """)
 conn.commit()
