@@ -112,7 +112,8 @@ async def queue_pending_validations(limit: int = 100, dry_run: bool = False, bat
         logger.info("  GROUP BY website_validation_status;")
 
 
-if __name__ == "__main__":
+async def main():
+    """Main entry point that handles both reset and queuing."""
     parser = argparse.ArgumentParser(description="Queue businesses for website validation")
     parser.add_argument("--limit", type=int, default=100,
                         help="Max businesses to queue (default: 100)")
@@ -126,12 +127,16 @@ if __name__ == "__main__":
     
     if args.reset_errors:
         logger.info("Resetting error statuses to pending...")
-        reset_count = asyncio.run(reset_error_businesses())
+        reset_count = await reset_error_businesses()
         logger.info(f"Reset {reset_count} businesses")
         logger.info("")
     
-    asyncio.run(queue_pending_validations(
+    await queue_pending_validations(
         limit=args.limit,
         dry_run=args.dry_run,
         batch_size=args.batch_size
-    ))
+    )
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
