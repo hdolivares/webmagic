@@ -21,6 +21,11 @@ interface AIConfig {
     model: string;
     provider_info: AIProvider;
   };
+  validation: {
+    provider: string;
+    model: string;
+    provider_info: AIProvider;
+  };
   image: {
     provider: string;
     model: string;
@@ -123,6 +128,8 @@ export const AISettingsTab: React.FC = () => {
   // State for form values
   const [llmProvider, setLlmProvider] = useState<string>('');
   const [llmModel, setLlmModel] = useState<string>('');
+  const [validationProvider, setValidationProvider] = useState<string>('');
+  const [validationModel, setValidationModel] = useState<string>('');
   const [imageProvider, setImageProvider] = useState<string>('');
   const [imageModel, setImageModel] = useState<string>('');
   const [hasChanges, setHasChanges] = useState(false);
@@ -144,6 +151,8 @@ export const AISettingsTab: React.FC = () => {
     if (aiConfig) {
       setLlmProvider(aiConfig.llm.provider);
       setLlmModel(aiConfig.llm.model);
+      setValidationProvider(aiConfig.validation.provider);
+      setValidationModel(aiConfig.validation.model);
       setImageProvider(aiConfig.image.provider);
       setImageModel(aiConfig.image.model);
     }
@@ -156,11 +165,13 @@ export const AISettingsTab: React.FC = () => {
     const changed =
       llmProvider !== aiConfig.llm.provider ||
       llmModel !== aiConfig.llm.model ||
+      validationProvider !== aiConfig.validation.provider ||
+      validationModel !== aiConfig.validation.model ||
       imageProvider !== aiConfig.image.provider ||
       imageModel !== aiConfig.image.model;
     
     setHasChanges(changed);
-  }, [llmProvider, llmModel, imageProvider, imageModel, aiConfig]);
+  }, [llmProvider, llmModel, validationProvider, validationModel, imageProvider, imageModel, aiConfig]);
 
   // Mutation to update settings
   const updateSettingMutation = useMutation({
@@ -175,10 +186,12 @@ export const AISettingsTab: React.FC = () => {
   // Save all changes
   const handleSave = async () => {
     try {
-      // Update all 4 settings
+      // Update all 6 settings
       await Promise.all([
         updateSettingMutation.mutateAsync({ key: 'llm_provider', value: llmProvider }),
         updateSettingMutation.mutateAsync({ key: 'llm_model', value: llmModel }),
+        updateSettingMutation.mutateAsync({ key: 'validation_provider', value: validationProvider }),
+        updateSettingMutation.mutateAsync({ key: 'validation_model', value: validationModel }),
         updateSettingMutation.mutateAsync({ key: 'image_provider', value: imageProvider }),
         updateSettingMutation.mutateAsync({ key: 'image_model', value: imageModel }),
       ]);
@@ -186,7 +199,7 @@ export const AISettingsTab: React.FC = () => {
       setHasChanges(false);
       
       // Show success message
-      alert('AI settings updated successfully! Changes will take effect on next generation.');
+      alert('AI settings updated successfully! Changes will take effect immediately.');
     } catch (error) {
       console.error('Failed to update settings:', error);
       alert('Failed to update settings. Please try again.');
@@ -198,6 +211,8 @@ export const AISettingsTab: React.FC = () => {
     if (aiConfig) {
       setLlmProvider(aiConfig.llm.provider);
       setLlmModel(aiConfig.llm.model);
+      setValidationProvider(aiConfig.validation.provider);
+      setValidationModel(aiConfig.validation.model);
       setImageProvider(aiConfig.image.provider);
       setImageModel(aiConfig.image.model);
       setHasChanges(false);
@@ -238,16 +253,36 @@ export const AISettingsTab: React.FC = () => {
       <div className="ai-settings-tab__header">
         <h2 className="ai-settings-tab__title">AI Model Configuration</h2>
         <p className="ai-settings-tab__subtitle">
-          Configure which AI models to use for website generation and image creation.
-          Changes take effect immediately on next generation.
+          Configure which AI models to use for website validation, generation, and image creation.
+          Changes take effect immediately.
         </p>
       </div>
 
-      {/* LLM Configuration */}
+      {/* Validation Model Configuration */}
       <Card>
         <ModelSelector
-          label="🧠 Language Model (LLM)"
-          description="Used for all AI agents: Analyst, Concept, Art Director, and Architect"
+          label="✅ Website Validation Model"
+          description="Used for fast, cost-effective website validation (verifying URLs, checking content)"
+          currentProvider={validationProvider}
+          currentModel={validationModel}
+          providers={providers.llm}
+          onProviderChange={(provider) => {
+            setValidationProvider(provider);
+            // Auto-select first model of new provider
+            const firstModel = providers.llm[provider]?.models[0]?.id;
+            if (firstModel) setValidationModel(firstModel);
+          }}
+          onModelChange={setValidationModel}
+          providerKeyName="validation_provider"
+          modelKeyName="validation_model"
+        />
+      </Card>
+
+      {/* Generation Model Configuration */}
+      <Card>
+        <ModelSelector
+          label="🧠 Website Generation Model"
+          description="Used for AI website generation: Analyst, Concept, Art Director, and Architect agents"
           currentProvider={llmProvider}
           currentModel={llmModel}
           providers={providers.llm}
@@ -289,10 +324,11 @@ export const AISettingsTab: React.FC = () => {
         <div className="ai-settings-tab__info-box-content">
           <h4 className="ai-settings-tab__info-box-title">About AI Models</h4>
           <ul className="ai-settings-tab__info-box-list">
+            <li><strong>Validation Model:</strong> Use faster, cheaper models (e.g., Claude 3 Haiku) for website validation tasks</li>
+            <li><strong>Generation Model:</strong> Use more capable models (e.g., Claude Sonnet 4) for high-quality website generation</li>
             <li>Different models have different costs and capabilities</li>
             <li>Recommended models are marked for best results</li>
             <li>Make sure you have valid API keys configured in environment variables</li>
-            <li>Model changes apply to all new website generations immediately</li>
           </ul>
         </div>
       </div>
@@ -323,13 +359,23 @@ export const AISettingsTab: React.FC = () => {
           <h3 className="ai-settings-tab__current-config-title">Current Configuration</h3>
           <div className="ai-settings-tab__current-config-grid">
             <div className="ai-settings-tab__config-item">
-              <span className="ai-settings-tab__config-label">LLM Provider:</span>
+              <span className="ai-settings-tab__config-label">Validation Provider:</span>
+              <code className="ai-settings-tab__config-value">
+                {aiConfig.validation.provider_info.name}
+              </code>
+            </div>
+            <div className="ai-settings-tab__config-item">
+              <span className="ai-settings-tab__config-label">Validation Model:</span>
+              <code className="ai-settings-tab__config-value">{aiConfig.validation.model}</code>
+            </div>
+            <div className="ai-settings-tab__config-item">
+              <span className="ai-settings-tab__config-label">Generation Provider:</span>
               <code className="ai-settings-tab__config-value">
                 {aiConfig.llm.provider_info.name}
               </code>
             </div>
             <div className="ai-settings-tab__config-item">
-              <span className="ai-settings-tab__config-label">LLM Model:</span>
+              <span className="ai-settings-tab__config-label">Generation Model:</span>
               <code className="ai-settings-tab__config-value">{aiConfig.llm.model}</code>
             </div>
             <div className="ai-settings-tab__config-item">

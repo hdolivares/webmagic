@@ -77,11 +77,11 @@ class ValidationOrchestrator:
         if self.db:
             try:
                 ai_config = await SystemSettingsService.get_ai_config(self.db)
-                self._model = ai_config["llm"]["model"]
-                logger.info(f"Using model from system settings: {self._model}")
+                self._model = ai_config["validation"]["model"]
+                logger.info(f"Using validation model from system settings: {self._model}")
                 return self._model
             except Exception as e:
-                logger.warning(f"Failed to load model from system settings: {e}")
+                logger.warning(f"Failed to load validation model from system settings: {e}")
         
         # Priority 3: Config/environment
         settings = get_settings()
