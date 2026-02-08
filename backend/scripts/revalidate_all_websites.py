@@ -165,6 +165,12 @@ Examples:
         help="Show what would be validated without actually queuing tasks"
     )
     
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip confirmation prompt (for automated/CI runs)"
+    )
+    
     args = parser.parse_args()
     
     # Validate arguments
@@ -240,18 +246,19 @@ Examples:
         return
     
     # Confirm
-    print("\n⚠️  READY TO QUEUE VALIDATION TASKS")
-    print("\nThis will:")
-    print(f"  • Queue {len(businesses)} businesses for Playwright validation")
-    print(f"  • Update their validation status and results in the database")
-    print(f"  • Each validation takes ~5-10 seconds")
-    print(f"  • Total estimated time: ~{(len(businesses) * 7) // 60} minutes")
-    
-    confirm = input("\n❓ Proceed? (yes/no): ").strip().lower()
-    
-    if confirm != "yes":
-        print("\n❌ Cancelled - no tasks queued")
-        return
+    if not args.yes:
+        print("\n⚠️  READY TO QUEUE VALIDATION TASKS")
+        print("\nThis will:")
+        print(f"  • Queue {len(businesses)} businesses for Playwright validation")
+        print(f"  • Update their validation status and results in the database")
+        print(f"  • Each validation takes ~5-10 seconds")
+        print(f"  • Total estimated time: ~{(len(businesses) * 7) // 60} minutes")
+        
+        confirm = input("\n❓ Proceed? (yes/no): ").strip().lower()
+        
+        if confirm != "yes":
+            print("\n❌ Cancelled - no tasks queued")
+            return
     
     # Queue validations
     print(f"\n🚀 Queuing validation tasks...")
