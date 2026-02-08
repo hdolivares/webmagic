@@ -177,7 +177,7 @@ class ValidationOrchestrator:
             result["stages"]["playwright"] = playwright_result
             
             # Check if Playwright extraction failed
-            if not playwright_result.get("success", False):
+            if not playwright_result.get("is_valid", False):
                 result["verdict"] = "invalid"
                 result["confidence"] = 0.8
                 result["reasoning"] = f"Website failed to load: {playwright_result.get('error', 'Unknown error')}"
