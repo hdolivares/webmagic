@@ -85,7 +85,7 @@ class Settings(BaseSettings):
     VALIDATION_TIMEOUT_MS: int = 30000  # 30 seconds per website
     
     # LLM Configuration for Website Validation
-    LLM_MODEL: str = "claude-sonnet-4"  # Claude model for validation (can be overridden from system settings)
+    LLM_MODEL: str = "claude-3-haiku-20240307"  # Fallback validation model (overridden by database settings)
     
     class Config:
         env_file = ".env"
