@@ -5,6 +5,7 @@ Uses subprocess to call celery send-task directly.
 import os
 import sys
 import subprocess
+import json
 sys.path.insert(0, '/var/www/webmagic/backend')
 
 import psycopg2
@@ -67,12 +68,14 @@ for i in range(0, len(business_ids), batch_size):
     batch = business_ids[i:i + batch_size]
     
     # Use celery send-task command (doesn't require importing the task!)
+    # Format: celery -A app call task.name --args='[["list", "of", "args"]]'
+    args_json = json.dumps([batch])  # Wrap batch in another list (positional args)
     cmd = [
         celery_bin,
         '-A', 'celery_app',
         'call',
         'tasks.validation_tasks.batch_validate_websites',
-        '--args', f'[{batch}]'
+        '--args', args_json
     ]
     
     try:
