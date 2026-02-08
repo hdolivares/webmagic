@@ -110,19 +110,19 @@ CROSS-REFERENCE RULES:
 
 VALIDATION DECISION:
 Respond ONLY with valid JSON in this exact format:
-{
+{{
   "verdict": "valid" | "invalid" | "missing",
   "confidence": 0.0-1.0,
   "reasoning": "Concise explanation of your decision (2-3 sentences)",
   "recommendation": "keep_url" | "clear_url_and_mark_missing" | "mark_invalid_keep_url",
-  "match_signals": {
+  "match_signals": {{
     "phone_match": true/false,
     "address_match": true/false,
     "name_match": true/false,
     "is_directory": true/false,
     "is_aggregator": true/false
-  }
-}
+  }}
+}}
 
 VERDICT DEFINITIONS:
 - "valid": This IS the business's actual website (even if low quality)
