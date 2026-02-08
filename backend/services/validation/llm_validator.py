@@ -153,21 +153,24 @@ Result: {{"verdict": "missing", "confidence": 0.90, "reasoning": "Website is for
 
 Now analyze the provided business and website information above and return your validation decision."""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         """
         Initialize LLM validator.
         
         Args:
             api_key: Anthropic API key (defaults to settings)
+            model: Claude model to use (defaults to settings.LLM_MODEL)
         """
         settings = get_settings()
         self.api_key = api_key or settings.ANTHROPIC_API_KEY
+        self.model = model or getattr(settings, 'LLM_MODEL', 'claude-sonnet-4')
         
         if not self.api_key:
             raise ValueError("ANTHROPIC_API_KEY not configured")
         
         self.client = AsyncAnthropic(api_key=self.api_key)
-        self.model = "claude-3-sonnet-20240229"  # Claude 3 Sonnet (fallback if 3.5 not available)
+        
+        logger.info(f"LLM Validator initialized with model: {self.model}")
     
     async def validate_website_match(
         self,
