@@ -83,10 +83,10 @@ class ValidationOrchestrator:
             except Exception as e:
                 logger.warning(f"Failed to load validation model from system settings: {e}")
         
-        # Priority 3: Config/environment
+        # Priority 3: Config/environment (fallback to Haiku, not invalid Sonnet-4)
         settings = get_settings()
-        self._model = getattr(settings, 'LLM_MODEL', 'claude-sonnet-4')
-        logger.info(f"Using model from config: {self._model}")
+        self._model = getattr(settings, 'LLM_MODEL', 'claude-3-haiku-20240307')
+        logger.info(f"Using model from config fallback: {self._model}")
         return self._model
     
     async def validate_business_website(
