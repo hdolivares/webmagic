@@ -12,7 +12,6 @@ import logging
 from sqlalchemy import select
 from core.database import AsyncSessionLocal
 from models.business import Business
-from tasks.validation_tasks import batch_validate_websites
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,6 +54,9 @@ async def queue_pending_validations(limit: int = 500, dry_run: bool = False, bat
         if dry_run:
             logger.info(f"\n[DRY RUN] Would queue {len(businesses)} businesses. Run without --dry-run to execute.")
             return
+
+        # Lazy import to avoid early Celery broker connection
+        from tasks.validation_tasks import batch_validate_websites
 
         # Queue in batches
         logger.info(f"\nQueuing {len(businesses)} businesses in batches of {batch_size}...")
