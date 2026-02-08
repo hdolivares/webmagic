@@ -158,76 +158,76 @@ async def run_playwright(limit: Optional[int] = None, dry_run: bool = False) -> 
     async with AsyncSessionLocal() as db:
         async with ValidationOrchestrator(db=db) as orchestrator:
             for idx, biz in enumerate(businesses, 1):
-            try:
-                # Prepare business context for LLM
-                business_context = {
-                    "name": biz.name,
-                    "phone": biz.phone,
-                    "email": biz.email,
-                    "address": biz.address,
-                    "city": biz.city,
-                    "state": biz.state,
-                    "country": biz.country or "US",
-                }
-                
-                # Run complete validation pipeline
-                result = await orchestrator.validate_business_website(
-                    business=business_context,
-                    url=biz.website_url,
-                    timeout=settings.VALIDATION_TIMEOUT_MS,
-                    capture_screenshot=settings.VALIDATION_CAPTURE_SCREENSHOTS,
-                )
-                
-                verdict = result.get("verdict", "error")
-                confidence = result.get("confidence", 0)
-                reasoning = result.get("reasoning", "")
-                
-                # Log result with reasoning
-                logger.info(
-                    f"  [{idx}/{len(businesses)}] {biz.name}: {verdict} "
-                    f"(conf={confidence:.2f}) - {reasoning[:100]}"
-                )
-                
-                # Count by verdict
-                if verdict == "valid":
-                    valid_count += 1
-                elif verdict == "invalid":
-                    invalid_count += 1
-                elif verdict == "missing":
-                    missing_count += 1
-                else:
-                    error_count += 1
+                try:
+                    # Prepare business context for LLM
+                    business_context = {
+                        "name": biz.name,
+                        "phone": biz.phone,
+                        "email": biz.email,
+                        "address": biz.address,
+                        "city": biz.city,
+                        "state": biz.state,
+                        "country": biz.country or "US",
+                    }
+                    
+                    # Run complete validation pipeline
+                    result = await orchestrator.validate_business_website(
+                        business=business_context,
+                        url=biz.website_url,
+                        timeout=settings.VALIDATION_TIMEOUT_MS,
+                        capture_screenshot=settings.VALIDATION_CAPTURE_SCREENSHOTS,
+                    )
+                    
+                    verdict = result.get("verdict", "error")
+                    confidence = result.get("confidence", 0)
+                    reasoning = result.get("reasoning", "")
+                    
+                    # Log result with reasoning
+                    logger.info(
+                        f"  [{idx}/{len(businesses)}] {biz.name}: {verdict} "
+                        f"(conf={confidence:.2f}) - {reasoning[:100]}"
+                    )
+                    
+                    # Count by verdict
+                    if verdict == "valid":
+                        valid_count += 1
+                    elif verdict == "invalid":
+                        invalid_count += 1
+                    elif verdict == "missing":
+                        missing_count += 1
+                    else:
+                        error_count += 1
 
-                # Update database
-                if not dry_run:
-                    async with AsyncSessionLocal() as db2:
-                        b = await db2.get(Business, biz.id)
-                        if b:
-                            # Map verdict to status
-                            b.website_validation_status = verdict
-                            b.website_validation_result = result
-                            b.website_validated_at = datetime.utcnow()
-                            
-                            # Clear URL if recommendation says so
-                            recommendation = result.get("recommendation", "")
-                            if "clear_url" in recommendation:
-                                logger.info(f"    -> Clearing URL (not business's actual website)")
-                                b.website_url = None
-                            
-                            await db2.commit()
-                            
-                
-            except Exception as e:
-                error_count += 1
-                logger.error(f"  [{idx}/{len(businesses)}] {biz.name}: {e}")
-                if not dry_run:
-                    async with AsyncSessionLocal() as db2:
-                        b = await db2.get(Business, biz.id)
-                        if b:
-                            b.website_validation_status = "error"
-                            b.website_validation_result = {"error": str(e), "verdict": "error"}
-                            b.website_validated_at = datetime.utcnow()
-                            await db2.commit()
+                    # Update database
+                    if not dry_run:
+                        async with AsyncSessionLocal() as db2:
+                            b = await db2.get(Business, biz.id)
+                            if b:
+                                # Map verdict to status
+                                b.website_validation_status = verdict
+                                b.website_validation_result = result
+                                b.website_validated_at = datetime.utcnow()
+                                
+                                # Clear URL if recommendation says so
+                                recommendation = result.get("recommendation", "")
+                                if "clear_url" in recommendation:
+                                    logger.info(f"    -> Clearing URL (not business's actual website)")
+                                    b.website_url = None
+                                
+                                await db2.commit()
+                                
+                    
+                except Exception as e:
+                    error_count += 1
+                    logger.error(f"  [{idx}/{len(businesses)}] {biz.name}: {e}")
+                    if not dry_run:
+                        async with AsyncSessionLocal() as db2:
+                            b = await db2.get(Business, biz.id)
+                            if b:
+                                b.website_validation_status = "error"
+                                b.website_validation_result = {"error": str(e), "verdict": "error"}
+                                b.website_validated_at = datetime.utcnow()
+                                await db2.commit()
 
     logger.info(
         f"LLM Validation complete: valid={valid_count}, invalid={invalid_count}, "
