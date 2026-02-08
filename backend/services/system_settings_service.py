@@ -142,6 +142,8 @@ class SystemSettingsService:
         """Get current AI configuration."""
         llm_provider = await SystemSettingsService.get_setting(db, "llm_provider", "anthropic")
         llm_model = await SystemSettingsService.get_setting(db, "llm_model", "claude-sonnet-4-5")
+        validation_provider = await SystemSettingsService.get_setting(db, "validation_provider", "anthropic")
+        validation_model = await SystemSettingsService.get_setting(db, "validation_model", "claude-3-haiku-20240307")
         image_provider = await SystemSettingsService.get_setting(db, "image_provider", "google")
         image_model = await SystemSettingsService.get_setting(db, "image_model", "imagen-3.0-generate-001")
         
@@ -150,6 +152,11 @@ class SystemSettingsService:
                 "provider": llm_provider,
                 "model": llm_model,
                 "provider_info": AI_PROVIDERS.get(llm_provider, {})
+            },
+            "validation": {
+                "provider": validation_provider,
+                "model": validation_model,
+                "provider_info": AI_PROVIDERS.get(validation_provider, {})
             },
             "image": {
                 "provider": image_provider,
@@ -175,8 +182,8 @@ class SystemSettingsService:
                 "value": "anthropic",
                 "value_type": "string",
                 "category": "ai",
-                "label": "LLM Provider",
-                "description": "Primary AI provider for text generation (agents)",
+                "label": "Website Generation Provider",
+                "description": "AI provider for website generation (agents: Analyst, Concept, Art Director, Architect)",
                 "options": [
                     {"value": "anthropic", "label": "Anthropic (Claude)"},
                     {"value": "google", "label": "Google (Gemini)"},
@@ -188,8 +195,30 @@ class SystemSettingsService:
                 "value": "claude-sonnet-4-5",
                 "value_type": "string",
                 "category": "ai",
-                "label": "LLM Model",
-                "description": "Specific model to use for agents (Analyst, Concept, Art Director, Architect)",
+                "label": "Website Generation Model",
+                "description": "Model for generating websites (Analyst, Concept, Art Director, Architect)",
+                "options": []  # Populated dynamically based on provider
+            },
+            {
+                "key": "validation_provider",
+                "value": "anthropic",
+                "value_type": "string",
+                "category": "ai",
+                "label": "Website Validation Provider",
+                "description": "AI provider for website validation (fast, cheap verification tasks)",
+                "options": [
+                    {"value": "anthropic", "label": "Anthropic (Claude)"},
+                    {"value": "google", "label": "Google (Gemini)"},
+                    {"value": "openai", "label": "OpenAI (GPT)"}
+                ]
+            },
+            {
+                "key": "validation_model",
+                "value": "claude-3-haiku-20240307",
+                "value_type": "string",
+                "category": "ai",
+                "label": "Website Validation Model",
+                "description": "Model for validating websites (fast, cost-effective verification)",
                 "options": []  # Populated dynamically based on provider
             },
             {
