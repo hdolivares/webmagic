@@ -456,6 +456,47 @@ class WebsiteGenerationQueueService:
         )
         
         return list(businesses)
+
+    async def get_triple_verified_businesses_needing_generation(
+        self,
+        limit: int = 100,
+        min_qualification_score: int = 50
+    ) -> List[Business]:
+        """
+        Get businesses TRIPLE-VERIFIED to have no website.
+        Only these should be queued to avoid wasting credits.
+
+        Criteria:
+        - website_validation_status = 'missing' (confirmed no website)
+        - website_validated_at IS NOT NULL (verification completed)
+        - No website_url
+        - Not already queued or generated
+        - Qualification score above minimum
+        """
+        result = await self.db.execute(
+            select(Business)
+            .where(
+                and_(
+                    Business.website_validation_status == 'missing',
+                    Business.website_validated_at.isnot(None),
+                    or_(
+                        Business.website_url.is_(None),
+                        Business.website_url == ""
+                    ),
+                    Business.website_status.in_(['none', 'pending']),
+                    Business.generation_queued_at.is_(None),
+                    Business.qualification_score >= min_qualification_score,
+                    Business.generation_attempts < self.MAX_GENERATION_ATTEMPTS
+                )
+            )
+            .order_by(Business.qualification_score.desc())
+            .limit(limit)
+        )
+        businesses = result.scalars().all()
+        logger.info(
+            f"Found {len(businesses)} TRIPLE-VERIFIED businesses needing generation"
+        )
+        return list(businesses)
     
     async def auto_queue_eligible_businesses(
         self,
