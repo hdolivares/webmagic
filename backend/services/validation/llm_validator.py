@@ -167,7 +167,7 @@ Now analyze the provided business and website information above and return your 
             raise ValueError("ANTHROPIC_API_KEY not configured")
         
         self.client = AsyncAnthropic(api_key=self.api_key)
-        self.model = "claude-3-5-sonnet-20241022"
+        self.model = "claude-3-5-sonnet-20240620"
     
     async def validate_website_match(
         self,
