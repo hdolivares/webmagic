@@ -109,8 +109,21 @@ class LLMDiscoveryService:
             country=country
         )
         
-        if not search_results or not search_results.get("organic_results"):
-            logger.info(f"❌ No search results found for {business_name}")
+        if not search_results:
+            logger.warning(f"❌ ScrapingDog API returned no data for {business_name}")
+            return {
+                "url": None,
+                "found": False,
+                "confidence": 0.95,
+                "reasoning": "ScrapingDog API error or returned no data",
+                "search_results": None,
+                "query": self._build_query(business_name, city, state),
+                "llm_analysis": None,
+                "llm_model": await self._get_llm_model()
+            }
+        
+        if not search_results.get("organic_results"):
+            logger.info(f"❌ No organic search results found for {business_name}")
             return {
                 "url": None,
                 "found": False,
@@ -118,7 +131,8 @@ class LLMDiscoveryService:
                 "reasoning": "No Google search results found",
                 "search_results": search_results,
                 "query": self._build_query(business_name, city, state),
-                "llm_analysis": None
+                "llm_analysis": None,
+                "llm_model": await self._get_llm_model()
             }
         
         # Step 2: Use LLM to analyze results

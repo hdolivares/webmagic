@@ -269,8 +269,16 @@ def discover_missing_websites(self, business_id: str):
                     state=business.state,
                     country=business.country or "US"
                 ))
+            except Exception as discovery_error:
+                # Handle discovery service errors gracefully
+                logger.error(f"Discovery service error for {business_id}: {discovery_error}")
+                result = None
             finally:
                 loop.close()  # Ensure proper cleanup
+            
+            # Safety check: if result is None, mark as error and retry
+            if result is None:
+                raise Exception("Discovery service returned None - likely API error")
             
             found_url = result.get("url")
             

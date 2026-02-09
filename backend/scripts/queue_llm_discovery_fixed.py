@@ -15,7 +15,7 @@ from core.database import get_db_session_sync
 from models.business import Business
 from sqlalchemy import func, cast
 from sqlalchemy.dialects.postgresql import JSONB
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 def main():
     with get_db_session_sync() as db:
@@ -38,7 +38,7 @@ def main():
             return
             
         # Queue them with proper ETA and explicit queue routing
-        base_time = datetime.utcnow()
+        base_time = datetime.now(timezone.utc)
         for idx, biz in enumerate(businesses):
             task_name = 'tasks.validation.discover_missing_websites'
             eta = base_time + timedelta(seconds=idx * 1)  # 1 second apart
