@@ -79,7 +79,10 @@ class CampaignStats(BaseModel):
 class BulkCampaignCreate(BaseModel):
     """Create campaigns for multiple businesses."""
     business_ids: List[UUID] = Field(..., min_items=1, max_items=100)
-    variant: str = Field(default="default", pattern="^(default|direct|story|value)$")
+    channel: str = Field(default="auto", pattern="^(auto|email|sms)$")
+    variant: str = Field(default="friendly", pattern="^(friendly|professional|urgent)$")
+    send_immediately: bool = Field(default=False, description="Send campaigns immediately after creation")
+    scheduled_for: Optional[datetime] = Field(None, description="Schedule campaigns for specific time")
 
 
 class EmailTestRequest(BaseModel):
@@ -96,3 +99,68 @@ class TrackingEvent(BaseModel):
     ip_address: Optional[str] = None
     user_agent: Optional[str] = None
     link_id: Optional[str] = None
+
+
+# ============================================================================
+# NEW SCHEMAS FOR CAMPAIGN CREATION UI
+# ============================================================================
+
+class ReadyBusinessResponse(BaseModel):
+    """Business ready for campaign with generated site."""
+    id: UUID
+    name: str
+    category: Optional[str]
+    city: Optional[str]
+    state: Optional[str]
+    phone: Optional[str]
+    email: Optional[str]
+    rating: Optional[float]
+    review_count: Optional[int]
+    qualification_score: Optional[int]
+    site_id: UUID
+    site_subdomain: str
+    site_url: str
+    site_created_at: datetime
+    available_channels: List[str] = Field(description="Available contact channels: email, sms")
+    recommended_channel: str = Field(description="Recommended channel based on available contact info")
+    
+    class Config:
+        from_attributes = True
+
+
+class ReadyBusinessesListResponse(BaseModel):
+    """List of businesses ready for campaigns."""
+    businesses: List[ReadyBusinessResponse]
+    total: int
+    with_email: int
+    with_phone: int
+    sms_only: int
+    email_only: int
+
+
+class SMSPreviewRequest(BaseModel):
+    """Request SMS message preview."""
+    business_id: UUID
+    variant: str = Field(default="friendly", pattern="^(friendly|professional|urgent)$")
+
+
+class SMSPreviewResponse(BaseModel):
+    """SMS message preview."""
+    business_id: UUID
+    business_name: str
+    sms_body: str
+    character_count: int
+    segment_count: int
+    estimated_cost: float
+    site_url: str
+    variant: str
+
+
+class BulkCampaignCreateResponse(BaseModel):
+    """Response for bulk campaign creation."""
+    status: str
+    message: str
+    total_queued: int
+    by_channel: dict = Field(description="Count by channel (email, sms)")
+    estimated_sms_cost: float = Field(description="Total estimated SMS cost")
+    campaigns_created: List[UUID] = Field(default_factory=list, description="IDs of created campaigns")
