@@ -1,10 +1,13 @@
 """
-Campaigns API endpoints - email outreach management.
+Campaigns API endpoints - multi-channel outreach management (Email + SMS).
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from uuid import UUID
+import logging
+
+logger = logging.getLogger(__name__)
 
 from core.database import get_db
 from api.deps import get_current_user
@@ -15,12 +18,21 @@ from api.schemas.campaign import (
     CampaignListResponse,
     CampaignStats,
     BulkCampaignCreate,
-    EmailTestRequest
+    EmailTestRequest,
+    ReadyBusinessResponse,
+    ReadyBusinessesListResponse,
+    SMSPreviewRequest,
+    SMSPreviewResponse,
+    BulkCampaignCreateResponse
 )
 from services.pitcher.campaign_service import CampaignService
 from services.pitcher.email_sender import EmailSender
 from services.pitcher.tracking import EmailTracker
+from services.sms import SMSGenerator
 from models.user import AdminUser
+from models.business import Business
+from models.site import GeneratedSite
+from sqlalchemy import select, and_
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
@@ -46,31 +58,69 @@ async def create_campaign(
     return CampaignResponse.model_validate(campaign)
 
 
-@router.post("/bulk", response_model=dict)
+@router.post("/bulk", response_model=BulkCampaignCreateResponse)
 async def create_bulk_campaigns(
     bulk_data: BulkCampaignCreate,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_user)
 ):
-    """Create campaigns for multiple businesses in background."""
+    """
+    Create campaigns for multiple businesses.
+    
+    Supports both email and SMS campaigns with intelligent channel selection.
+    Optionally send immediately or schedule for later.
+    """
     service = CampaignService(db)
     
-    # Create campaigns in background
-    async def create_task():
-        campaigns = await service.bulk_create_campaigns(
-            business_ids=bulk_data.business_ids,
-            variant=bulk_data.variant
-        )
-        await db.commit()
+    campaigns = []
+    by_channel = {"email": 0, "sms": 0}
+    total_sms_cost = 0.0
     
-    background_tasks.add_task(create_task)
+    # Create campaigns for each business
+    for business_id in bulk_data.business_ids:
+        try:
+            campaign = await service.create_campaign(
+                business_id=business_id,
+                channel=bulk_data.channel,
+                variant=bulk_data.variant,
+                scheduled_for=bulk_data.scheduled_for
+            )
+            campaigns.append(campaign.id)
+            
+            # Track channel usage
+            by_channel[campaign.channel] = by_channel.get(campaign.channel, 0) + 1
+            
+            # Calculate SMS cost
+            if campaign.channel == "sms" and campaign.sms_body:
+                segments = len(campaign.sms_body) // 160 + (1 if len(campaign.sms_body) % 160 else 0)
+                total_sms_cost += segments * 0.0079  # Twilio US rate
+                
+        except Exception as e:
+            logger.warning(f"Failed to create campaign for {business_id}: {e}")
+            continue
     
-    return {
-        "status": "processing",
-        "message": f"Creating {len(bulk_data.business_ids)} campaigns",
-        "business_count": len(bulk_data.business_ids)
-    }
+    await db.commit()
+    
+    # Send immediately if requested
+    if bulk_data.send_immediately:
+        async def send_task():
+            for campaign_id in campaigns:
+                try:
+                    await service.send_campaign(campaign_id)
+                except Exception as e:
+                    logger.error(f"Failed to send campaign {campaign_id}: {e}")
+        
+        background_tasks.add_task(send_task)
+    
+    return BulkCampaignCreateResponse(
+        status="success" if campaigns else "partial",
+        message=f"Created {len(campaigns)}/{len(bulk_data.business_ids)} campaigns",
+        total_queued=len(campaigns),
+        by_channel=by_channel,
+        estimated_sms_cost=round(total_sms_cost, 4),
+        campaigns_created=campaigns
+    )
 
 
 @router.get("/", response_model=CampaignListResponse)
@@ -235,3 +285,178 @@ async def track_email_click(
         return RedirectResponse(url=redirect_url)
     
     return {"status": "tracked"}
+
+
+# ============================================================================
+# NEW ENDPOINTS FOR CAMPAIGN CREATION UI
+# ============================================================================
+
+@router.get("/ready-businesses", response_model=ReadyBusinessesListResponse)
+async def get_ready_businesses(
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Get businesses with completed generated sites ready for campaigns.
+    
+    Returns businesses that:
+    - Have a completed generated site
+    - Don't already have an existing website
+    - Meet qualification criteria (score >= 70)
+    - Have at least one contact method (email or phone)
+    """
+    # Query businesses with completed sites
+    result = await db.execute(
+        select(Business, GeneratedSite)
+        .join(GeneratedSite, GeneratedSite.business_id == Business.id)
+        .where(
+            and_(
+                Business.website_validation_status == 'triple_verified',
+                Business.website_url.is_(None),
+                Business.qualification_score >= 70,
+                GeneratedSite.status == 'completed'
+            )
+        )
+        .order_by(GeneratedSite.created_at.desc())
+    )
+    
+    businesses_with_sites = result.all()
+    
+    # Build response list
+    ready_businesses = []
+    with_email = 0
+    with_phone = 0
+    sms_only = 0
+    email_only = 0
+    
+    for business, site in businesses_with_sites:
+        has_email = bool(business.email)
+        has_phone = bool(business.phone)
+        
+        if not has_email and not has_phone:
+            continue  # Skip if no contact method
+        
+        # Determine available channels
+        available_channels = []
+        if has_email:
+            available_channels.append("email")
+            with_email += 1
+        if has_phone:
+            available_channels.append("sms")
+            with_phone += 1
+        
+        # Track exclusives
+        if has_email and not has_phone:
+            email_only += 1
+        elif has_phone and not has_email:
+            sms_only += 1
+        
+        # Recommended channel (prefer email - it's free)
+        recommended_channel = "email" if has_email else "sms"
+        
+        # Build site URL
+        site_url = f"https://sites.lavish.solutions/{site.subdomain}"
+        
+        ready_businesses.append(ReadyBusinessResponse(
+            id=business.id,
+            name=business.name,
+            category=business.category,
+            city=business.city,
+            state=business.state,
+            phone=business.phone,
+            email=business.email,
+            rating=float(business.rating) if business.rating else None,
+            review_count=business.review_count,
+            qualification_score=business.qualification_score,
+            site_id=site.id,
+            site_subdomain=site.subdomain,
+            site_url=site_url,
+            site_created_at=site.created_at,
+            available_channels=available_channels,
+            recommended_channel=recommended_channel
+        ))
+    
+    return ReadyBusinessesListResponse(
+        businesses=ready_businesses,
+        total=len(ready_businesses),
+        with_email=with_email,
+        with_phone=with_phone,
+        sms_only=sms_only,
+        email_only=email_only
+    )
+
+
+@router.post("/preview-sms", response_model=SMSPreviewResponse)
+async def preview_sms_message(
+    preview_request: SMSPreviewRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Preview SMS message for a business before sending.
+    
+    Uses AI to generate the SMS with the specified tone variant,
+    and returns character count, segment count, and estimated cost.
+    """
+    # Get business and site
+    result = await db.execute(
+        select(Business, GeneratedSite)
+        .join(GeneratedSite, GeneratedSite.business_id == Business.id)
+        .where(
+            and_(
+                Business.id == preview_request.business_id,
+                GeneratedSite.status == 'completed'
+            )
+        )
+    )
+    
+    row = result.first()
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="Business not found or site not completed"
+        )
+    
+    business, site = row
+    
+    if not business.phone:
+        raise HTTPException(
+            status_code=400,
+            detail="Business has no phone number for SMS"
+        )
+    
+    # Build site URL
+    site_url = f"https://sites.lavish.solutions/{site.subdomain}"
+    
+    # Prepare business data
+    business_data = {
+        "name": business.name,
+        "category": business.category,
+        "city": business.city,
+        "state": business.state,
+        "rating": float(business.rating) if business.rating else 0
+    }
+    
+    # Generate SMS message
+    generator = SMSGenerator()
+    sms_body = await generator.generate_sms(
+        business_data=business_data,
+        site_url=site_url,
+        variant=preview_request.variant
+    )
+    
+    # Calculate metrics
+    char_count = len(sms_body)
+    segment_count = SMSGenerator.estimate_segments(sms_body)
+    estimated_cost = SMSGenerator.estimate_cost(sms_body)
+    
+    return SMSPreviewResponse(
+        business_id=business.id,
+        business_name=business.name,
+        sms_body=sms_body,
+        character_count=char_count,
+        segment_count=segment_count,
+        estimated_cost=estimated_cost,
+        site_url=site_url,
+        variant=preview_request.variant
+    )

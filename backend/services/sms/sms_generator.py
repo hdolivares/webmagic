@@ -35,8 +35,8 @@ class SMSGenerator:
     
     # Message variants
     VARIANTS = {
+        "friendly": "warm, conversational, and helpful (RECOMMENDED for cold outreach)",
         "professional": "formal and professional business tone",
-        "friendly": "warm, approachable, and conversational",
         "urgent": "direct and action-oriented for emergency services"
     }
     
@@ -56,7 +56,7 @@ class SMSGenerator:
         self,
         business_data: Dict[str, Any],
         site_url: Optional[str] = None,
-        variant: str = "professional",
+        variant: str = "friendly",
         max_length: int = RECOMMENDED_LIMIT
     ) -> str:
         """
@@ -154,7 +154,7 @@ class SMSGenerator:
         location = f"{city}, {state}" if city and state else city or state or "your area"
         rating_str = f"{rating}⭐" if rating > 0 else ""
         
-        prompt = f"""Generate a concise SMS message for business outreach.
+        prompt = f"""Generate a cold outreach SMS for a business we created a website for.
 
 Business: {business_name}
 Category: {category}
@@ -162,22 +162,28 @@ Location: {location}
 Rating: {rating_str}
 Website: {site_url or "[creating...]"}
 
-REQUIREMENTS:
-1. Maximum {max_length} characters (STRICT LIMIT)
+COLD SMS BEST PRACTICES (research-backed for 15-45% response rate):
+1. Maximum {max_length} characters (STRICT - fits 1 SMS segment)
 2. Tone: {tone}
-3. Mention we built them a professional website they can preview
-4. Include call-to-action (view site or reply)
-5. Include "Reply STOP to opt out" (compliance required)
-6. Be direct and valuable
-7. Do NOT say "free website" - the preview is free, claim is $495
-7. No emojis unless tone is "friendly"
-8. Use proper grammar and punctuation
+3. START with personalization: "Hi [BusinessName]" or "[BusinessName] in [City]"
+4. Lead with SPECIFIC VALUE, not sales: "We created a preview website for your [category] business"
+5. Make it about THEM: "for your business" not "we want to help you"
+6. Conversational CTA: "Take a look" or "Check it out" (not "Click here NOW!")
+7. Invite reply: "Text back with questions" or "Reply YES if interested"
+8. End with compliance: "Reply STOP to opt out"
+9. NO pushy language: avoid "limited time", "act now", "free", "buy", "click here"
+10. NO emojis (looks unprofessional in cold outreach)
+11. Proper grammar and punctuation
 
-AVOID:
-- Spam language ("limited time", "act now", "free money")
-- All caps or excessive punctuation
-- Misleading claims
-- Personal information requests
+WINNING FORMULA:
+"Hi [Business] in [City] - We created a preview website for your [category] business. [URL]. [Friendly CTA]. Reply STOP to opt out."
+
+AVOID SPAM TRIGGERS:
+- Generic greetings ("Hey!", "Hello there!")
+- Immediate sales pitch
+- All caps or excessive punctuation (!!! or ???)
+- Vague sender identity
+- Multiple CTAs or links
 
 Return ONLY the SMS message text, no quotes or explanations."""
 
