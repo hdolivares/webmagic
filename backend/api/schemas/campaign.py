@@ -109,23 +109,20 @@ class ReadyBusinessResponse(BaseModel):
     """Business ready for campaign with generated site."""
     id: UUID
     name: str
-    category: Optional[str]
-    city: Optional[str]
-    state: Optional[str]
-    phone: Optional[str]
-    email: Optional[str]
-    rating: Optional[float]
-    review_count: Optional[int]
-    qualification_score: Optional[int]
+    category: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    rating: Optional[float] = None
+    review_count: Optional[int] = None
+    qualification_score: Optional[int] = None
     site_id: UUID
     site_subdomain: str
     site_url: str
     site_created_at: datetime
-    available_channels: List[str] = Field(description="Available contact channels: email, sms")
+    available_channels: List[str] = Field(default_factory=list, description="Available contact channels: email, sms")
     recommended_channel: str = Field(description="Recommended channel based on available contact info")
-    
-    class Config:
-        from_attributes = True
 
 
 class ReadyBusinessesListResponse(BaseModel):
