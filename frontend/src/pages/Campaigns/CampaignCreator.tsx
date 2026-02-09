@@ -5,7 +5,7 @@
  * Orchestrates ToneSelector, MessagePreview, and bulk actions
  * Following best practices: Single responsibility, controlled components, error handling
  */
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { api } from '@/services/api'
 import type { ReadyBusiness, SMSPreviewResponse, BulkCampaignCreateRequest } from '@/types'

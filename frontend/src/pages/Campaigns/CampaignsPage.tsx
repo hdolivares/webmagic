@@ -109,7 +109,7 @@ export const CampaignsPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--campaigns-spacing-sm)' }}>
             <Mail size={20} style={{ color: 'var(--campaigns-channel-email)' }} />
             <div>
-              <div className="campaigns-stat__value">{stats?.total_sent || 0}</div>
+              <div className="campaigns-stat__value">{stats?.sent || 0}</div>
               <div className="campaigns-stat__label">Campaigns Sent</div>
             </div>
           </div>
@@ -143,10 +143,8 @@ export const CampaignsPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--campaigns-spacing-sm)' }}>
             <MessageSquare size={20} style={{ color: 'var(--campaigns-channel-sms)' }} />
             <div>
-              <div className="campaigns-stat__value">
-                {stats?.reply_rate ? `${(stats.reply_rate).toFixed(1)}%` : '0%'}
-              </div>
-              <div className="campaigns-stat__label">Reply Rate</div>
+              <div className="campaigns-stat__value">{stats?.clicked || 0}</div>
+              <div className="campaigns-stat__label">Clicked</div>
             </div>
           </div>
         </div>
