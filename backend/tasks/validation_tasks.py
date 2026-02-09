@@ -252,9 +252,14 @@ def discover_missing_websites(self, business_id: str):
                     "reason": "already_has_url"
                 }
             
-            # Run Google Search
-            result = asyncio.run(_run_google_search(
+            # Run LLM-powered Google Search discovery
+            from services.discovery.llm_discovery_service import LLMDiscoveryService
+            
+            discovery_service = LLMDiscoveryService()
+            result = asyncio.run(discovery_service.discover_website(
                 business_name=business.name,
+                phone=business.phone,
+                address=business.address,
                 city=business.city,
                 state=business.state,
                 country=business.country or "US"
@@ -264,10 +269,29 @@ def discover_missing_websites(self, business_id: str):
             
             if found_url:
                 # Website found! Update and queue for validation
-                logger.info(f"✅ Found website for {business.name}: {found_url}")
+                logger.info(f"✅ Found website for {business.name}: {found_url} (confidence: {result.get('confidence', 0)})")
                 business.website_url = found_url
                 business.website_validation_status = "pending"
                 business.website_validated_at = None
+                
+                # Save full discovery result in validation_result
+                business.website_validation_result = {
+                    "stages": {
+                        "google_search": {
+                            "searched": True,
+                            "found": True,
+                            "url": found_url,
+                            "query": result.get("query", ""),
+                            "confidence": result.get("confidence", 0),
+                            "reasoning": result.get("reasoning", ""),
+                            "match_signals": result.get("llm_analysis", {}).get("match_signals", {}),
+                            "llm_model": result.get("llm_model", ""),
+                            "search_results_count": len(result.get("search_results", {}).get("organic_results", [])),
+                            # Save ALL ScrapingDog data for debugging
+                            "scrapingdog_response": result.get("search_results", {})
+                        }
+                    }
+                }
                 
                 # Queue for validation
                 validate_business_website.delay(str(business.id))
@@ -276,6 +300,7 @@ def discover_missing_websites(self, business_id: str):
                     "business_id": business_id,
                     "status": "found",
                     "url": found_url,
+                    "confidence": result.get("confidence", 0),
                     "queued_for_validation": True
                 }
             else:
@@ -288,11 +313,17 @@ def discover_missing_websites(self, business_id: str):
                         "google_search": {
                             "searched": True,
                             "found": False,
-                            "query": f'"{business.name}" {business.city} {business.state} website'
+                            "query": result.get("query", ""),
+                            "confidence": result.get("confidence", 0),
+                            "reasoning": result.get("reasoning", "No valid website found"),
+                            "llm_model": result.get("llm_model", ""),
+                            "search_results_count": len(result.get("search_results", {}).get("organic_results", [])),
+                            # Save ALL ScrapingDog data for debugging
+                            "scrapingdog_response": result.get("search_results", {})
                         }
                     },
                     "reasoning": "No website found via Outscraper, raw_data check, or Google Search",
-                    "confidence": 0.95
+                    "confidence": result.get("confidence", 0.95)
                 }
                 business.website_validated_at = datetime.utcnow()
                 
@@ -458,48 +489,10 @@ def validate_all_pending():
         }
 
 
-async def _run_google_search(
-    business_name: str,
-    city: str,
-    state: str,
-    country: str = "US"
-) -> dict:
-    """
-    Async wrapper for Google Search service.
-    
-    Args:
-        business_name: Name of the business
-        city: City location
-        state: State location
-        country: Country code
-        
-    Returns:
-        Dict with 'url' key if found, None otherwise
-        
-    Best Practices:
-        - Async for better performance
-        - Properly handles service initialization
-        - Clean error handling
-    """
-    from services.hunter.google_search_service import GoogleSearchService
-    
-    service = GoogleSearchService()
-    
-    if not service.api_key:
-        logger.warning("SCRAPINGDOG_API_KEY not configured - skipping search")
-        return {"url": None, "error": "API key not configured"}
-    
-    try:
-        url = await service.search_business_website(
-            business_name=business_name,
-            city=city,
-            state=state,
-            country=country
-        )
-        
-        return {"url": url}
-        
-    except Exception as e:
-        logger.error(f"Google search error for {business_name}: {e}")
-        return {"url": None, "error": str(e)}
+# Removed: _run_google_search - replaced by LLMDiscoveryService
+# The new LLM-powered discovery provides:
+# - Intelligent cross-referencing (phone, address, name)
+# - Better accuracy through context understanding
+# - Full data persistence (ScrapingDog responses saved)
+# - No hardcoded regex patterns
 
