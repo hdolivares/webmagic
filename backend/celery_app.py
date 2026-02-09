@@ -26,9 +26,10 @@ celery_app.conf.update(
     task_time_limit=3600,  # 1 hour max per task
     task_soft_time_limit=3300,  # 55 minutes soft limit
     worker_prefetch_multiplier=1,
-    worker_max_tasks_per_child=1000,
+    worker_max_tasks_per_child=100,  # Reduced from 1000 to prevent memory buildup
     task_acks_late=True,
     task_reject_on_worker_lost=True,
+    result_expires=3600,  # Keep results for 1 hour
 )
 
 # Auto-discover tasks
