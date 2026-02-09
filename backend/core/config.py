@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     # Frontend URL
     FRONTEND_URL: str = "https://web.lavish.solutions"
     
+    # API URL (for generated site claim buttons)
+    API_URL: str = "https://web.lavish.solutions"
+    
     # Site Serving
     SITES_DOMAIN: str = "sites.lavish.solutions"
     SITES_BASE_URL: str = "https://sites.lavish.solutions"
