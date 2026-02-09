@@ -51,7 +51,7 @@ class LLMDiscoveryService:
             from core.database import get_db_session_sync
             
             with get_db_session_sync() as db:
-                from models.system_setting import SystemSetting
+                from models.system_settings import SystemSetting
                 
                 validation_model_setting = db.query(SystemSetting).filter(
                     SystemSetting.key == "llm_validation_model"
