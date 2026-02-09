@@ -177,6 +177,71 @@ export interface CampaignListResponse {
 }
 
 // ============================================
+// NEW: SMS CAMPAIGN TYPES
+// ============================================
+
+export interface ReadyBusiness {
+  id: string
+  name: string
+  category?: string
+  city?: string
+  state?: string
+  phone?: string
+  email?: string
+  rating?: number
+  review_count?: number
+  qualification_score?: number
+  site_id: string
+  site_subdomain: string
+  site_url: string
+  site_created_at: string
+  available_channels: string[]
+  recommended_channel: string
+}
+
+export interface ReadyBusinessesResponse {
+  businesses: ReadyBusiness[]
+  total: number
+  with_email: number
+  with_phone: number
+  sms_only: number
+  email_only: number
+}
+
+export interface SMSPreviewRequest {
+  business_id: string
+  variant: 'friendly' | 'professional' | 'urgent'
+}
+
+export interface SMSPreviewResponse {
+  business_id: string
+  business_name: string
+  sms_body: string
+  character_count: number
+  segment_count: number
+  estimated_cost: number
+  site_url: string
+  variant: string
+}
+
+export interface BulkCampaignCreateRequest {
+  business_ids: string[]
+  channel: 'auto' | 'email' | 'sms'
+  variant: 'friendly' | 'professional' | 'urgent'
+  send_immediately: boolean
+  scheduled_for?: string
+}
+
+export interface BulkCampaignCreateResponse {
+  status: string
+  message: string
+  total_queued: number
+  by_channel: Record<string, number>
+  estimated_sms_cost: number
+  campaigns_created: string[]
+}
+
+// ============================================
 // PAYMENT TYPES
 // ============================================
 

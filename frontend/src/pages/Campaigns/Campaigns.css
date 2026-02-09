@@ -1,0 +1,420 @@
+/**
+ * Campaigns Module - Semantic CSS Variables & Styles
+ * Design tokens for reusability and maintainability
+ */
+
+/* ============================================
+   SEMANTIC DESIGN TOKENS
+   ============================================ */
+
+:root {
+  /* Spacing Scale */
+  --campaigns-spacing-xs: 0.5rem;
+  --campaigns-spacing-sm: 0.75rem;
+  --campaigns-spacing-md: 1rem;
+  --campaigns-spacing-lg: 1.5rem;
+  --campaigns-spacing-xl: 2rem;
+  --campaigns-spacing-2xl: 3rem;
+
+  /* Border Radius */
+  --campaigns-radius-sm: 0.375rem;
+  --campaigns-radius-md: 0.5rem;
+  --campaigns-radius-lg: 0.75rem;
+  --campaigns-radius-full: 9999px;
+
+  /* Shadows */
+  --campaigns-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --campaigns-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --campaigns-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+  /* Channel Colors (for badges) */
+  --campaigns-channel-email: #3b82f6;
+  --campaigns-channel-sms: #10b981;
+  --campaigns-channel-auto: #8b5cf6;
+
+  /* Status Colors */
+  --campaigns-status-pending: #f59e0b;
+  --campaigns-status-sent: #10b981;
+  --campaigns-status-failed: #ef4444;
+  --campaigns-status-draft: #6b7280;
+
+  /* Tone Colors */
+  --campaigns-tone-friendly: #22c55e;
+  --campaigns-tone-professional: #3b82f6;
+  --campaigns-tone-urgent: #f59e0b;
+
+  /* Interactive States */
+  --campaigns-hover-bg: rgba(59, 130, 246, 0.05);
+  --campaigns-selected-bg: rgba(59, 130, 246, 0.1);
+  --campaigns-selected-border: #3b82f6;
+
+  /* Typography */
+  --campaigns-font-weight-normal: 400;
+  --campaigns-font-weight-medium: 500;
+  --campaigns-font-weight-semibold: 600;
+  --campaigns-font-weight-bold: 700;
+}
+
+/* ============================================
+   LAYOUT COMPONENTS
+   ============================================ */
+
+.campaigns-page {
+  padding: var(--campaigns-spacing-xl);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.campaigns-grid {
+  display: grid;
+  gap: var(--campaigns-spacing-lg);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 1024px) {
+  .campaigns-grid {
+    grid-template-columns: 1.5fr 1fr;
+  }
+}
+
+/* ============================================
+   CARD COMPONENTS
+   ============================================ */
+
+.campaigns-card {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--campaigns-radius-lg);
+  box-shadow: var(--campaigns-shadow-sm);
+  overflow: hidden;
+}
+
+.campaigns-card__header {
+  padding: var(--campaigns-spacing-lg);
+  border-bottom: 1px solid var(--color-border-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.campaigns-card__title {
+  font-size: 1.125rem;
+  font-weight: var(--campaigns-font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.campaigns-card__body {
+  padding: var(--campaigns-spacing-lg);
+}
+
+.campaigns-card__footer {
+  padding: var(--campaigns-spacing-lg);
+  border-top: 1px solid var(--color-border-primary);
+  background: var(--color-bg-secondary);
+}
+
+/* ============================================
+   CHANNEL & TONE SELECTORS
+   ============================================ */
+
+.selector-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--campaigns-spacing-sm);
+}
+
+.selector-label {
+  font-size: 0.875rem;
+  font-weight: var(--campaigns-font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.selector-options {
+  display: grid;
+  gap: var(--campaigns-spacing-sm);
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.selector-option {
+  padding: var(--campaigns-spacing-md);
+  border: 2px solid var(--color-border-primary);
+  border-radius: var(--campaigns-radius-md);
+  background: var(--color-bg-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: var(--campaigns-font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.selector-option:hover {
+  background: var(--campaigns-hover-bg);
+  border-color: var(--campaigns-selected-border);
+}
+
+.selector-option--selected {
+  background: var(--campaigns-selected-bg);
+  border-color: var(--campaigns-selected-border);
+  color: var(--campaigns-selected-border);
+}
+
+.selector-option__icon {
+  font-size: 1.5rem;
+  margin-bottom: var(--campaigns-spacing-xs);
+  display: block;
+}
+
+/* ============================================
+   BUSINESS LIST
+   ============================================ */
+
+.business-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--campaigns-spacing-sm);
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: var(--campaigns-spacing-xs);
+}
+
+.business-item {
+  padding: var(--campaigns-spacing-md);
+  border: 2px solid var(--color-border-primary);
+  border-radius: var(--campaigns-radius-md);
+  background: var(--color-bg-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: var(--campaigns-spacing-md);
+}
+
+.business-item:hover {
+  background: var(--campaigns-hover-bg);
+  border-color: var(--campaigns-selected-border);
+}
+
+.business-item--selected {
+  background: var(--campaigns-selected-bg);
+  border-color: var(--campaigns-selected-border);
+}
+
+.business-item__checkbox {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--campaigns-radius-sm);
+  border: 2px solid var(--color-border-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.business-item--selected .business-item__checkbox {
+  background: var(--campaigns-selected-border);
+  border-color: var(--campaigns-selected-border);
+  color: white;
+}
+
+.business-item__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.business-item__name {
+  font-weight: var(--campaigns-font-weight-medium);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--campaigns-spacing-xs) 0;
+  font-size: 0.875rem;
+}
+
+.business-item__meta {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  display: flex;
+  gap: var(--campaigns-spacing-sm);
+  flex-wrap: wrap;
+}
+
+.business-item__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--campaigns-spacing-xs);
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--campaigns-radius-full);
+  font-size: 0.75rem;
+  font-weight: var(--campaigns-font-weight-medium);
+}
+
+.business-item__badge--sms {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--campaigns-channel-sms);
+}
+
+.business-item__badge--email {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--campaigns-channel-email);
+}
+
+/* ============================================
+   MESSAGE PREVIEW
+   ============================================ */
+
+.message-preview {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--campaigns-radius-md);
+  padding: var(--campaigns-spacing-lg);
+}
+
+.message-preview__label {
+  font-size: 0.875rem;
+  font-weight: var(--campaigns-font-weight-medium);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--campaigns-spacing-sm);
+}
+
+.message-preview__content {
+  background: white;
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--campaigns-radius-sm);
+  padding: var(--campaigns-spacing-md);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #1f2937;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.message-preview__meta {
+  margin-top: var(--campaigns-spacing-md);
+  display: flex;
+  gap: var(--campaigns-spacing-lg);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.message-preview__meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.message-preview__meta-label {
+  font-weight: var(--campaigns-font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.message-preview__meta-value {
+  font-weight: var(--campaigns-font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+/* ============================================
+   BUTTONS & ACTIONS
+   ============================================ */
+
+.campaigns-button {
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--campaigns-radius-md);
+  font-size: 0.875rem;
+  font-weight: var(--campaigns-font-weight-medium);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--campaigns-spacing-sm);
+}
+
+.campaigns-button--primary {
+  background: var(--color-primary-600);
+  color: white;
+}
+
+.campaigns-button--primary:hover:not(:disabled) {
+  background: var(--color-primary-700);
+}
+
+.campaigns-button--secondary {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-primary);
+}
+
+.campaigns-button--secondary:hover:not(:disabled) {
+  background: var(--campaigns-hover-bg);
+}
+
+.campaigns-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============================================
+   STATS PANEL
+   ============================================ */
+
+.campaigns-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--campaigns-spacing-md);
+}
+
+.campaigns-stat {
+  padding: var(--campaigns-spacing-lg);
+  background: var(--color-bg-secondary);
+  border-radius: var(--campaigns-radius-md);
+  border: 1px solid var(--color-border-primary);
+}
+
+.campaigns-stat__value {
+  font-size: 2rem;
+  font-weight: var(--campaigns-font-weight-bold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--campaigns-spacing-xs) 0;
+}
+
+.campaigns-stat__label {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+/* ============================================
+   LOADING & EMPTY STATES
+   ============================================ */
+
+.campaigns-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--campaigns-spacing-2xl);
+  color: var(--color-text-secondary);
+}
+
+.campaigns-empty {
+  text-align: center;
+  padding: var(--campaigns-spacing-2xl);
+  color: var(--color-text-secondary);
+}
+
+.campaigns-empty__icon {
+  font-size: 3rem;
+  margin-bottom: var(--campaigns-spacing-md);
+  opacity: 0.5;
+}
+
+.campaigns-empty__title {
+  font-size: 1.125rem;
+  font-weight: var(--campaigns-font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--campaigns-spacing-sm);
+}
+
+.campaigns-empty__description {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}

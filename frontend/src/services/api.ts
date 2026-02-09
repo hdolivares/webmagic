@@ -23,6 +23,12 @@ import type {
   CustomerStats,
   Payment,
   Subscription,
+  ReadyBusiness,
+  ReadyBusinessesResponse,
+  SMSPreviewRequest,
+  SMSPreviewResponse,
+  BulkCampaignCreateRequest,
+  BulkCampaignCreateResponse,
 } from '@/types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1'
@@ -434,6 +440,34 @@ class ApiClient {
     click_rate: number
   }> {
     const response = await this.client.get('/campaigns/stats')
+    return response.data
+  }
+
+  // ============================================
+  // NEW: SMS CAMPAIGN METHODS
+  // ============================================
+
+  /**
+   * Get businesses ready for campaigns (with completed sites)
+   */
+  async getReadyBusinesses(): Promise<ReadyBusinessesResponse> {
+    const response = await this.client.get<ReadyBusinessesResponse>('/campaigns/ready-businesses')
+    return response.data
+  }
+
+  /**
+   * Preview SMS message for a business
+   */
+  async previewSMSMessage(request: SMSPreviewRequest): Promise<SMSPreviewResponse> {
+    const response = await this.client.post<SMSPreviewResponse>('/campaigns/preview-sms', request)
+    return response.data
+  }
+
+  /**
+   * Create campaigns for multiple businesses (bulk)
+   */
+  async createBulkCampaigns(request: BulkCampaignCreateRequest): Promise<BulkCampaignCreateResponse> {
+    const response = await this.client.post<BulkCampaignCreateResponse>('/campaigns/bulk', request)
     return response.data
   }
 
