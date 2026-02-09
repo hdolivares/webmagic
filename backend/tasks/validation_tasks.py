@@ -206,8 +206,8 @@ async def _run_validation(business_context: dict, url: str) -> dict:
     name="tasks.validation.discover_missing_websites",
     max_retries=2,
     default_retry_delay=60,  # 1 minute
-    time_limit=180,  # 3 minutes
-    soft_time_limit=150
+    time_limit=300,  # 5 minutes (increased from 3 to prevent timeouts)
+    soft_time_limit=270  # 4.5 minutes soft limit
 )
 def discover_missing_websites(self, business_id: str):
     """
@@ -256,14 +256,21 @@ def discover_missing_websites(self, business_id: str):
             from services.discovery.llm_discovery_service import LLMDiscoveryService
             
             discovery_service = LLMDiscoveryService()
-            result = asyncio.run(discovery_service.discover_website(
-                business_name=business.name,
-                phone=business.phone,
-                address=business.address,
-                city=business.city,
-                state=business.state,
-                country=business.country or "US"
-            ))
+            
+            # Proper async event loop management to prevent "Event loop is closed" errors
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(discovery_service.discover_website(
+                    business_name=business.name,
+                    phone=business.phone,
+                    address=business.address,
+                    city=business.city,
+                    state=business.state,
+                    country=business.country or "US"
+                ))
+            finally:
+                loop.close()  # Ensure proper cleanup
             
             found_url = result.get("url")
             
