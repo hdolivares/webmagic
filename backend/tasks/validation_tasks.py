@@ -358,11 +358,24 @@ def discover_all_missing(limit: int = 100, delay_seconds: float = 1.0):
     
     with get_db_session_sync() as db:
         from models.business import Business
+        from sqlalchemy import or_, func, cast
+        from sqlalchemy.dialects.postgresql import JSONB
         
-        # Find businesses without URLs that aren't already being processed
+        # Find businesses without URLs that need Google Search discovery
+        # Include both:
+        # 1. New businesses (pending/None status)
+        # 2. Businesses marked as 'missing' but haven't been searched via Google yet
         businesses = db.query(Business).filter(
             Business.website_url.is_(None),
-            Business.website_validation_status.in_(['pending', None])  # Not already validated
+            or_(
+                Business.website_validation_status.in_(['pending', None]),
+                # Include 'missing' businesses that haven't been searched via Google
+                (Business.website_validation_status == 'missing') & 
+                ~func.jsonb_exists(
+                    cast(Business.website_validation_result['stages'], JSONB),
+                    'google_search'
+                )
+            )
         ).order_by(
             Business.qualification_score.desc()  # Prioritize high-quality leads
         ).limit(limit).all()
