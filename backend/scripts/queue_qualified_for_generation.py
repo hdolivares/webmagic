@@ -27,7 +27,7 @@ def main():
             Business.website_url.is_(None),
             Business.website_validation_status == 'triple_verified',
             Business.qualification_score >= 70,
-            Business.site_generation_status.in_(['pending', None])
+            Business.website_status.in_(['none', 'pending', None])
         ).order_by(
             Business.qualification_score.desc()
         ).all()
@@ -65,7 +65,8 @@ def main():
             )
             
             # Update status
-            business.site_generation_status = 'pending'
+            business.website_status = 'queued'
+            business.generation_queued_at = datetime.utcnow()
             
             if (idx + 1) % 5 == 0:
                 print(f"   Queued {idx + 1}/{len(businesses)}...")
