@@ -48,13 +48,19 @@ class LLMDiscoveryService:
         
         try:
             # Try to get from database settings first
-            system_settings = SystemSettingsService()
-            validation_model_setting = await system_settings.get_setting("llm_validation_model")
+            from core.database import get_db_session_sync
             
-            if validation_model_setting and validation_model_setting.value:
-                self._model = validation_model_setting.value
-                logger.info(f"Using validation model from database: {self._model}")
-                return self._model
+            with get_db_session_sync() as db:
+                from models.system_setting import SystemSetting
+                
+                validation_model_setting = db.query(SystemSetting).filter(
+                    SystemSetting.key == "llm_validation_model"
+                ).first()
+                
+                if validation_model_setting and validation_model_setting.value:
+                    self._model = validation_model_setting.value
+                    logger.info(f"Using validation model from database: {self._model}")
+                    return self._model
         except Exception as e:
             logger.warning(f"Could not load validation model from database: {e}")
         
