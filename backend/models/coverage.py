@@ -20,7 +20,7 @@ class CoverageGrid(BaseModel):
     country = Column(String(50), default="US", nullable=False)
     
     # Geo-Grid Zone (for subdivided cities)
-    zone_id = Column(String(20), nullable=True, index=True)  # e.g., "2x3" for row 2, col 3
+    zone_id = Column(String(50), nullable=True, index=True)  # Increased from 20 to 50 for metro areas
     zone_lat = Column(String(20), nullable=True)  # Center latitude of zone
     zone_lon = Column(String(20), nullable=True)  # Center longitude of zone
     zone_radius_km = Column(String(10), nullable=True)  # Search radius for this zone
