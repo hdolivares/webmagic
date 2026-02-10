@@ -18,6 +18,8 @@ interface CampaignCreatorProps {
   /** Business clicked in list for message preview (show SMS preview) */
   previewBusiness?: ReadyBusiness | null
   onPreviewClear?: () => void
+  /** Add the previewed business to the campaign selection */
+  onAddToCampaign?: (business: ReadyBusiness) => void
   onSuccess?: () => void
   onClear?: () => void
 }
@@ -29,6 +31,7 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({
   selectedBusinesses,
   previewBusiness = null,
   onPreviewClear,
+  onAddToCampaign,
   onSuccess,
   onClear,
 }) => {
@@ -156,9 +159,20 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({
             isLoading={previewMutation.isPending}
             error={previewMutation.isError ? 'Failed to generate preview' : null}
           />
-          <p className="campaigns-empty__description" style={{ marginTop: 'var(--campaigns-spacing-lg)', fontSize: '0.875rem' }}>
-            Select businesses on the left to add them to your campaign and create or send.
-          </p>
+          <div style={{ marginTop: 'var(--campaigns-spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--campaigns-spacing-md)' }}>
+            {onAddToCampaign && previewBusiness && (
+              <button
+                type="button"
+                className="campaigns-button campaigns-button--primary"
+                onClick={() => onAddToCampaign(previewBusiness)}
+              >
+                Add to campaign
+              </button>
+            )}
+            <p className="campaigns-empty__description" style={{ fontSize: '0.875rem' }}>
+              Or select multiple businesses on the left, then create or send your campaign.
+            </p>
+          </div>
         </div>
       </div>
     )

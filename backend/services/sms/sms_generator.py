@@ -52,12 +52,16 @@ class SMSGenerator:
         self.model = "claude-3-5-sonnet-20241022"
         logger.info("SMS generator initialized")
     
+    # Template variables available for custom messages (Settings > Messaging)
+    TEMPLATE_VARIABLES = ("business_name", "category", "site_url", "city", "state")
+
     async def generate_sms(
         self,
         business_data: Dict[str, Any],
         site_url: Optional[str] = None,
         variant: str = "friendly",
-        max_length: int = RECOMMENDED_LIMIT
+        max_length: int = RECOMMENDED_LIMIT,
+        custom_template: Optional[str] = None,
     ) -> str:
         """
         Generate SMS content for business outreach.
@@ -67,22 +71,17 @@ class SMSGenerator:
             site_url: Optional generated site URL
             variant: Message tone (professional, friendly, urgent)
             max_length: Maximum SMS length (default: 140 chars)
+            custom_template: If set, use this template with variable substitution instead of AI.
+                             Variables: {{business_name}}, {{category}}, {{site_url}}, {{city}}, {{state}}
         
         Returns:
             SMS body text optimized for single segment
-        
-        Example:
-            >>> business_data = {
-            ...     "name": "ABC Plumbing",
-            ...     "category": "plumber",
-            ...     "city": "Chicago",
-            ...     "state": "IL",
-            ...     "rating": 4.8
-            ... }
-            >>> sms = await generator.generate_sms(business_data)
-            >>> print(sms)
-            "ABC Plumbing - We built you a website! Preview: [URL]. Reply STOP to opt out."
         """
+        if custom_template and custom_template.strip():
+            body = self._substitute_template(custom_template.strip(), business_data, site_url)
+            body = self._ensure_compliance_footer(body)
+            return body
+
         # Get variant description
         tone = self.VARIANTS.get(variant, self.VARIANTS["professional"])
         
@@ -215,6 +214,30 @@ Return ONLY the SMS message text, no quotes or explanations."""
         
         return sms_body + footer
     
+    def _substitute_template(
+        self,
+        template: str,
+        business_data: Dict[str, Any],
+        site_url: Optional[str],
+    ) -> str:
+        """
+        Replace {{variable}} placeholders in a template.
+        Available: {{business_name}}, {{category}}, {{site_url}}, {{city}}, {{state}}
+        """
+        business_name = (business_data.get("name") or "Your business").strip()
+        category = (business_data.get("category") or "business").strip()
+        city = (business_data.get("city") or "").strip()
+        state = (business_data.get("state") or "").strip()
+        url = (site_url or "").strip() or "[creating...]"
+
+        return (
+            template.replace("{{business_name}}", business_name)
+            .replace("{{category}}", category)
+            .replace("{{site_url}}", url)
+            .replace("{{city}}", city)
+            .replace("{{state}}", state)
+        )
+
     def _get_fallback_template(
         self,
         business_data: Dict[str, Any],

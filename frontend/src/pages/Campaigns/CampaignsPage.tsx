@@ -71,6 +71,12 @@ export const CampaignsPage: React.FC = () => {
     setPreviewBusiness(business)
   }
 
+  // Add previewed business to campaign selection (from "Add to campaign" button)
+  const handleAddToCampaign = (business: ReadyBusiness) => {
+    setSelectedBusinessIds(prev => (prev.includes(business.id) ? prev : [...prev, business.id]))
+    setPreviewBusiness(null)
+  }
+
   // Get status badge styling
   const getStatusBadge = (status: string) => {
     const variants: Record<string, any> = {
@@ -169,6 +175,7 @@ export const CampaignsPage: React.FC = () => {
           selectedBusinesses={selectedBusinesses}
           previewBusiness={previewBusiness}
           onPreviewClear={() => setPreviewBusiness(null)}
+          onAddToCampaign={handleAddToCampaign}
           onSuccess={handleCampaignSuccess}
           onClear={() => setSelectedBusinessIds([])}
         />

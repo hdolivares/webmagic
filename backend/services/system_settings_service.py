@@ -45,6 +45,23 @@ AI_PROVIDERS = {
     }
 }
 
+# Default SMS message templates (used when no custom template is set)
+MESSAGING_TEMPLATE_KEYS = ("messaging_sms_template_friendly", "messaging_sms_template_professional", "messaging_sms_template_urgent")
+MESSAGING_DEFAULT_TEMPLATES = {
+    "messaging_sms_template_friendly": (
+        "{{business_name}} - We built you a {{category}} website! "
+        "Preview: {{site_url}} Reply STOP to opt out."
+    ),
+    "messaging_sms_template_professional": (
+        "{{business_name}}: Your professional {{category}} website is ready. "
+        "View: {{site_url}} Reply STOP to opt out."
+    ),
+    "messaging_sms_template_urgent": (
+        "{{business_name}} - Your {{category}} site is ready. "
+        "Preview now: {{site_url}} Reply STOP to opt out."
+    ),
+}
+
 IMAGE_PROVIDERS = {
     "google": {
         "name": "Google (Imagen / Nano Banana)",
@@ -165,6 +182,19 @@ class SystemSettingsService:
             }
         }
     
+    @staticmethod
+    async def get_messaging_templates(db: AsyncSession) -> Dict[str, Optional[str]]:
+        """Get SMS message templates for each tone. Returns None for keys not set (so SMS generator uses AI)."""
+        result = {}
+        for key in MESSAGING_TEMPLATE_KEYS:
+            result[key] = await SystemSettingsService.get_setting(db, key, default=None)
+        return result
+
+    @staticmethod
+    def get_messaging_default_templates() -> Dict[str, str]:
+        """Return default template text for Settings UI when user has not saved yet."""
+        return dict(MESSAGING_DEFAULT_TEMPLATES)
+
     @staticmethod
     async def get_available_providers() -> Dict[str, Any]:
         """Get list of available AI providers and their models."""
