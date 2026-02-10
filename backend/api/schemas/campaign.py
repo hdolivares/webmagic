@@ -1,7 +1,7 @@
 """
 Campaign schemas for API validation.
 """
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
@@ -107,6 +107,8 @@ class TrackingEvent(BaseModel):
 
 class ReadyBusinessResponse(BaseModel):
     """Business ready for campaign with generated site."""
+    model_config = ConfigDict(from_attributes=True, json_encoders={datetime: lambda v: v.isoformat()})
+    
     id: UUID
     name: str
     category: Optional[str] = None
