@@ -15,6 +15,9 @@ import './Campaigns.css'
 
 interface CampaignCreatorProps {
   selectedBusinesses: ReadyBusiness[]
+  /** Business clicked in list for message preview (show SMS preview) */
+  previewBusiness?: ReadyBusiness | null
+  onPreviewClear?: () => void
   onSuccess?: () => void
   onClear?: () => void
 }
@@ -24,6 +27,8 @@ interface CampaignCreatorProps {
  */
 export const CampaignCreator: React.FC<CampaignCreatorProps> = ({
   selectedBusinesses,
+  previewBusiness = null,
+  onPreviewClear,
   onSuccess,
   onClear,
 }) => {
@@ -31,9 +36,8 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({
   const [channel, setChannel] = useState<'auto' | 'email' | 'sms'>('auto')
   const [tone, setTone] = useState<'friendly' | 'professional' | 'urgent'>('friendly')
   const [preview, setPreview] = useState<SMSPreviewResponse | null>(null)
-  const [previewBusinessId, setPreviewBusinessId] = useState<string | null>(null)
 
-  // Preview mutation
+  // Preview mutation: fetch SMS preview for a business
   const previewMutation = useMutation({
     mutationFn: (businessId: string) =>
       api.previewSMSMessage({
@@ -71,16 +75,30 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({
     },
   })
 
-  // Auto-preview first selected business when tone changes
+  // When user clicks a business in the list, fetch and show its SMS preview
   useEffect(() => {
-    if (selectedBusinesses.length > 0 && selectedBusinesses[0].phone) {
-      const firstBiz = selectedBusinesses[0]
-      if (previewBusinessId !== firstBiz.id || !preview) {
-        setPreviewBusinessId(firstBiz.id)
-        previewMutation.mutate(firstBiz.id)
-      }
+    if (previewBusiness?.id && previewBusiness?.phone) {
+      previewMutation.mutate(previewBusiness.id)
+      return
     }
-  }, [tone, selectedBusinesses])
+    setPreview(null)
+  }, [previewBusiness?.id])
+
+  // When tone changes, refetch preview for current preview target (clicked business or first selected)
+  useEffect(() => {
+    if (previewBusiness?.id && previewBusiness?.phone) {
+      previewMutation.mutate(previewBusiness.id)
+    } else if (selectedBusinesses.length > 0 && selectedBusinesses[0].phone) {
+      previewMutation.mutate(selectedBusinesses[0].id)
+    }
+  }, [tone])
+
+  // When no preview business but we have selected businesses, preview first selected (with phone)
+  useEffect(() => {
+    if (!previewBusiness && selectedBusinesses.length > 0 && selectedBusinesses[0].phone) {
+      previewMutation.mutate(selectedBusinesses[0].id)
+    }
+  }, [previewBusiness, selectedBusinesses])
 
   // Calculate stats
   const totalCost = useMemo(() => {
@@ -112,7 +130,41 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({
     return { email, sms }
   }, [selectedBusinesses, channel])
 
-  // Empty state
+  // Preview-only state: user clicked a business but none selected for campaign
+  if (selectedBusinesses.length === 0 && previewBusiness) {
+    return (
+      <div className="campaigns-card">
+        <div className="campaigns-card__header">
+          <h3 className="campaigns-card__title">Message preview: {previewBusiness.name}</h3>
+          {onPreviewClear && (
+            <button
+              type="button"
+              className="campaigns-button campaigns-button--secondary"
+              onClick={onPreviewClear}
+              style={{ padding: '0.375rem 0.75rem', fontSize: '0.75rem' }}
+            >
+              Clear preview
+            </button>
+          )}
+        </div>
+        <div className="campaigns-card__body">
+          <div className="selector-group" style={{ marginBottom: 'var(--campaigns-spacing-lg)' }}>
+            <ToneSelector value={tone} onChange={setTone} />
+          </div>
+          <MessagePreview
+            preview={preview}
+            isLoading={previewMutation.isPending}
+            error={previewMutation.isError ? 'Failed to generate preview' : null}
+          />
+          <p className="campaigns-empty__description" style={{ marginTop: 'var(--campaigns-spacing-lg)', fontSize: '0.875rem' }}>
+            Select businesses on the left to add them to your campaign and create or send.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // No selection and no preview
   if (selectedBusinesses.length === 0) {
     return (
       <div className="campaigns-card">
@@ -124,7 +176,7 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({
             <div className="campaigns-empty__icon">✉️</div>
             <h4 className="campaigns-empty__title">No Businesses Selected</h4>
             <p className="campaigns-empty__description">
-              Select one or more businesses from the list to create campaigns
+              Click a business to preview the message, or select one or more to create campaigns
             </p>
           </div>
         </div>

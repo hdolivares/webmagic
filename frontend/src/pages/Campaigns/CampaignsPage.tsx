@@ -25,6 +25,8 @@ export const CampaignsPage: React.FC = () => {
 
   // Selected business IDs for campaign creation
   const [selectedBusinessIds, setSelectedBusinessIds] = useState<string[]>([])
+  // Business clicked for message preview (show SMS preview in right panel)
+  const [previewBusiness, setPreviewBusiness] = useState<ReadyBusiness | null>(null)
 
   // Fetch ready businesses (with completed sites)
   const {
@@ -64,10 +66,9 @@ export const CampaignsPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['campaigns-ready-businesses'] })
   }
 
-  // Handle business click (for preview)
+  // Handle business click: show SMS preview in right panel
   const handleBusinessClick = (business: ReadyBusiness) => {
-    // Auto-trigger preview for this business
-    console.log('Preview business:', business.name)
+    setPreviewBusiness(business)
   }
 
   // Get status badge styling
@@ -156,14 +157,18 @@ export const CampaignsPage: React.FC = () => {
         <ReadyBusinessesPanel
           businesses={readyData?.businesses || []}
           selectedIds={selectedBusinessIds}
+          previewBusinessId={previewBusiness?.id ?? null}
           onSelectionChange={setSelectedBusinessIds}
           onBusinessClick={handleBusinessClick}
           isLoading={isLoadingReady}
         />
 
-        {/* Right: Campaign Creator */}
+        {/* Right: Campaign Creator + Message Preview (2/3 width) */}
         <CampaignCreator
+          key={previewBusiness?.id ?? 'no-preview'}
           selectedBusinesses={selectedBusinesses}
+          previewBusiness={previewBusiness}
+          onPreviewClear={() => setPreviewBusiness(null)}
           onSuccess={handleCampaignSuccess}
           onClear={() => setSelectedBusinessIds([])}
         />
