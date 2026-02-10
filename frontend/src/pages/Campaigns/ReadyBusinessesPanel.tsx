@@ -12,6 +12,8 @@ import './Campaigns.css'
 interface ReadyBusinessesPanelProps {
   businesses: ReadyBusiness[]
   selectedIds: string[]
+  /** ID of business currently being previewed (highlight in list) */
+  previewBusinessId?: string | null
   onSelectionChange: (selectedIds: string[]) => void
   onBusinessClick?: (business: ReadyBusiness) => void
   isLoading: boolean
@@ -25,6 +27,7 @@ type FilterType = 'all' | 'sms_only' | 'email_only' | 'both'
 export const ReadyBusinessesPanel: React.FC<ReadyBusinessesPanelProps> = ({
   businesses,
   selectedIds,
+  previewBusinessId = null,
   onSelectionChange,
   onBusinessClick,
   isLoading,
@@ -213,6 +216,7 @@ export const ReadyBusinessesPanel: React.FC<ReadyBusinessesPanelProps> = ({
                 key={business.id}
                 business={business}
                 isSelected={selectedIds.includes(business.id)}
+                isPreviewing={previewBusinessId === business.id}
                 onToggle={() => handleBusinessToggle(business.id)}
                 onClick={() => onBusinessClick?.(business)}
               />
@@ -285,11 +289,12 @@ const FilterButton: React.FC<FilterButtonProps> = ({ active, onClick, count, ico
 interface BusinessItemProps {
   business: ReadyBusiness
   isSelected: boolean
+  isPreviewing?: boolean
   onToggle: () => void
   onClick: () => void
 }
 
-const BusinessItem: React.FC<BusinessItemProps> = ({ business, isSelected, onToggle, onClick }) => {
+const BusinessItem: React.FC<BusinessItemProps> = ({ business, isSelected, isPreviewing, onToggle, onClick }) => {
   const handleClick = (e: React.MouseEvent) => {
     // If clicking the checkbox area, toggle selection
     if ((e.target as HTMLElement).closest('.business-item__checkbox')) {
@@ -302,7 +307,7 @@ const BusinessItem: React.FC<BusinessItemProps> = ({ business, isSelected, onTog
 
   return (
     <div
-      className={`business-item ${isSelected ? 'business-item--selected' : ''}`}
+      className={`business-item ${isSelected ? 'business-item--selected' : ''} ${isPreviewing ? 'business-item--previewing' : ''}`}
       onClick={handleClick}
       role="button"
       tabIndex={0}

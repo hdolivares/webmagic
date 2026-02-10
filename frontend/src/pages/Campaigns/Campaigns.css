@@ -73,7 +73,8 @@
 
 @media (min-width: 1024px) {
   .campaigns-grid {
-    grid-template-columns: 1.5fr 1fr;
+    /* List 1/3, Preview/Campaign 2/3 */
+    grid-template-columns: 1fr 2fr;
   }
 }
 
@@ -199,6 +200,11 @@
 .business-item--selected {
   background: var(--campaigns-selected-bg);
   border-color: var(--campaigns-selected-border);
+}
+
+.business-item--previewing {
+  border-left: 3px solid var(--campaigns-channel-sms);
+  background: var(--campaigns-hover-bg);
 }
 
 .business-item__checkbox {
