@@ -21,6 +21,7 @@ from services.pitcher.email_sender import EmailSender
 from services.pitcher.tracking import EmailTracker
 from services.pitcher.sms_campaign_helper import SMSCampaignHelper
 from services.sms import SMSGenerator, SMSSender, PhoneValidator, SMSComplianceService
+from services.system_settings_service import SystemSettingsService
 from services.crm import BusinessLifecycleService
 from core.exceptions import DatabaseException, ValidationException
 from core.config import get_settings
@@ -314,11 +315,17 @@ class CampaignService:
             "rating": float(business.rating) if business.rating else 0
         }
         
+        # Use custom template from Settings > Messaging if set
+        templates = await SystemSettingsService.get_messaging_templates(self.db)
+        template_key = f"messaging_sms_template_{variant}"
+        custom_template = (templates or {}).get(template_key, "").strip() or None
+        
         # Generate SMS content
         sms_body = await self.sms_generator.generate_sms(
             business_data=business_data,
             site_url=site_url,
-            variant=variant
+            variant=variant,
+            custom_template=custom_template,
         )
         
         # Create campaign

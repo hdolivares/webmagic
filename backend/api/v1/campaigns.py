@@ -29,6 +29,7 @@ from services.pitcher.campaign_service import CampaignService
 from services.pitcher.email_sender import EmailSender
 from services.pitcher.tracking import EmailTracker
 from services.sms import SMSGenerator
+from services.system_settings_service import SystemSettingsService
 from models.user import AdminUser
 from models.business import Business
 from models.site import GeneratedSite
@@ -428,12 +429,17 @@ async def preview_sms_message(
         "rating": float(business.rating) if business.rating else 0
     }
     
-    # Generate SMS message
+    # Use custom template from Settings > Messaging if set
+    templates = await SystemSettingsService.get_messaging_templates(db)
+    template_key = f"messaging_sms_template_{preview_request.variant}"
+    custom_template = (templates or {}).get(template_key, "").strip() or None
+
     generator = SMSGenerator()
     sms_body = await generator.generate_sms(
         business_data=business_data,
         site_url=site_url,
-        variant=preview_request.variant
+        variant=preview_request.variant,
+        custom_template=custom_template,
     )
     
     # Calculate metrics

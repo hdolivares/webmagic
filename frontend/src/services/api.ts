@@ -570,6 +570,16 @@ class ApiClient {
     return response.data
   }
 
+  async getMessagingTemplates(): Promise<{
+    friendly: string
+    professional: string
+    urgent: string
+    defaults: { friendly: string; professional: string; urgent: string }
+  }> {
+    const response = await this.client.get('/system/messaging-templates')
+    return response.data
+  }
+
   // ============================================
   // EDIT REQUESTS METHODS (Phase 4)
   // ============================================

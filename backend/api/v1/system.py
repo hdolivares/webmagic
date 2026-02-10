@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from api.deps import get_db, get_current_user
 from models.user import AdminUser
-from services.system_settings_service import SystemSettingsService
+from services.system_settings_service import SystemSettingsService, MESSAGING_DEFAULT_TEMPLATES
 
 router = APIRouter(prefix="/system", tags=["System Settings"])
 
@@ -76,6 +76,8 @@ async def update_setting(
         
         if request.key.startswith("llm_") or request.key.startswith("image_"):
             category = "ai"
+        elif request.key.startswith("messaging_"):
+            category = "messaging"
         
         setting = await SystemSettingsService.set_setting(
             db=db,
@@ -97,6 +99,31 @@ async def update_setting(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update setting: {str(e)}")
+
+
+@router.get("/messaging-templates")
+async def get_messaging_templates(
+    current_user: AdminUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get SMS message templates for Friendly, Professional, and Urgent tones.
+    Used by Settings > Messaging and by campaign preview/generation.
+    """
+    try:
+        raw = await SystemSettingsService.get_messaging_templates(db)
+        return {
+            "friendly": raw.get("messaging_sms_template_friendly") or "",
+            "professional": raw.get("messaging_sms_template_professional") or "",
+            "urgent": raw.get("messaging_sms_template_urgent") or "",
+            "defaults": {
+                "friendly": MESSAGING_DEFAULT_TEMPLATES.get("messaging_sms_template_friendly", ""),
+                "professional": MESSAGING_DEFAULT_TEMPLATES.get("messaging_sms_template_professional", ""),
+                "urgent": MESSAGING_DEFAULT_TEMPLATES.get("messaging_sms_template_urgent", ""),
+            },
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/settings/{category}")

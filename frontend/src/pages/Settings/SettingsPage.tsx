@@ -8,12 +8,13 @@
  */
 import { useState } from 'react'
 import { Card } from '@/components/ui'
-import { User, Key, Bot } from 'lucide-react'
+import { User, Key, Bot, MessageSquare } from 'lucide-react'
 import { AccountSettings } from './AccountSettings'
 import { AISettingsTab } from './AISettingsTab'
 import { PromptsSettings } from './PromptsSettings'
+import { MessagingSettings } from './MessagingSettings'
 
-type SettingsTab = 'account' | 'ai' | 'prompts'
+type SettingsTab = 'account' | 'ai' | 'prompts' | 'messaging'
 
 export const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('account')
@@ -30,6 +31,12 @@ export const SettingsPage = () => {
       label: 'AI Models',
       icon: Bot,
       description: 'Configure AI providers and models',
+    },
+    {
+      id: 'messaging' as SettingsTab,
+      label: 'Messaging',
+      icon: MessageSquare,
+      description: 'Configure SMS templates (Friendly, Professional, Urgent)',
     },
     {
       id: 'prompts' as SettingsTab,
@@ -72,6 +79,7 @@ export const SettingsPage = () => {
       <div className="page-content">
         {activeTab === 'account' && <AccountSettings />}
         {activeTab === 'ai' && <AISettingsTab />}
+        {activeTab === 'messaging' && <MessagingSettings />}
         {activeTab === 'prompts' && <PromptsSettings />}
       </div>
     </div>
