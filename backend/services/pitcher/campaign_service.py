@@ -318,7 +318,8 @@ class CampaignService:
         # Use custom template from Settings > Messaging if set
         templates = await SystemSettingsService.get_messaging_templates(self.db)
         template_key = f"messaging_sms_template_{variant}"
-        custom_template = (templates or {}).get(template_key, "").strip() or None
+        raw = (templates or {}).get(template_key)
+        custom_template = (raw.strip() if raw else "") or None
         
         # Generate SMS content
         sms_body = await self.sms_generator.generate_sms(

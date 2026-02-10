@@ -432,7 +432,8 @@ async def preview_sms_message(
     # Use custom template from Settings > Messaging if set
     templates = await SystemSettingsService.get_messaging_templates(db)
     template_key = f"messaging_sms_template_{preview_request.variant}"
-    custom_template = (templates or {}).get(template_key, "").strip() or None
+    raw = (templates or {}).get(template_key)
+    custom_template = (raw.strip() if raw else "") or None
 
     generator = SMSGenerator()
     sms_body = await generator.generate_sms(
