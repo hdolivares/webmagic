@@ -1,10 +1,17 @@
 /**
  * Messaging Settings - Semantic variables and layout
+ * Borders use semantic tokens so sections and inputs are clearly visible.
  */
 .messaging-settings {
   --messaging-spacing: 1rem;
   --messaging-spacing-lg: 1.5rem;
   --messaging-radius: 0.5rem;
+  /* Section and input borders - visible, theme-aware */
+  --messaging-section-border: var(--color-border-dark, #d1d5db);
+  --messaging-input-border: var(--color-border-dark, #d1d5db);
+  --messaging-input-border-focus: var(--color-primary-500, #8b5cf6);
+  --messaging-bg-surface: var(--color-background, #ffffff);
+  --messaging-bg-secondary: var(--color-background-secondary, #f9fafb);
 }
 
 .messaging-settings-loading {
@@ -31,8 +38,8 @@
 
 .messaging-settings__variables {
   padding: var(--messaging-spacing);
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border-primary);
+  background: var(--messaging-bg-secondary);
+  border: 1px solid var(--messaging-section-border);
   border-radius: var(--messaging-radius);
   margin-bottom: var(--messaging-spacing-lg);
 }
@@ -66,11 +73,12 @@
 }
 
 .messaging-settings__variables-list code {
-  background: var(--color-bg-primary);
+  background: var(--messaging-bg-surface);
   padding: 0.2rem 0.5rem;
   border-radius: 0.25rem;
   font-size: 0.8125rem;
   color: var(--color-primary-600);
+  border: 1px solid var(--messaging-section-border);
 }
 
 .messaging-settings__variables-list span {
@@ -79,6 +87,10 @@
 
 .messaging-settings__template {
   margin-bottom: var(--messaging-spacing-lg);
+  padding: var(--messaging-spacing-lg);
+  background: var(--messaging-bg-secondary);
+  border: 1px solid var(--messaging-section-border);
+  border-radius: var(--messaging-radius);
 }
 
 .messaging-settings__template:last-of-type {
@@ -100,10 +112,21 @@
   font-size: 0.875rem;
   font-family: inherit;
   color: var(--color-text-primary);
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border-primary);
+  background: var(--messaging-bg-surface);
+  border: 2px solid var(--messaging-input-border);
   border-radius: var(--messaging-radius);
   resize: vertical;
+  transition: border-color var(--transition-base, 0.2s ease), box-shadow var(--transition-base, 0.2s ease);
+}
+
+.messaging-settings__textarea:hover {
+  border-color: var(--messaging-input-border);
+}
+
+.messaging-settings__textarea:focus {
+  outline: none;
+  border-color: var(--messaging-input-border-focus);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
 }
 
 .messaging-settings__textarea::placeholder {

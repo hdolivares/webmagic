@@ -22,6 +22,13 @@
   --campaigns-radius-lg: 0.75rem;
   --campaigns-radius-full: 9999px;
 
+  /* Section borders - visible, theme-aware (overrides subtle borders) */
+  --campaigns-section-border: var(--color-border-dark, #d1d5db);
+  --campaigns-card-border-width: 1px;
+  --color-border-primary: var(--campaigns-section-border);
+  --color-bg-primary: var(--color-background, #ffffff);
+  --color-bg-secondary: var(--color-background-secondary, #f9fafb);
+
   /* Shadows */
   --campaigns-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --campaigns-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -84,7 +91,7 @@
 
 .campaigns-card {
   background: var(--color-bg-primary);
-  border: 1px solid var(--color-border-primary);
+  border: var(--campaigns-card-border-width) solid var(--campaigns-section-border);
   border-radius: var(--campaigns-radius-lg);
   box-shadow: var(--campaigns-shadow-sm);
   overflow: hidden;
@@ -92,7 +99,7 @@
 
 .campaigns-card__header {
   padding: var(--campaigns-spacing-lg);
-  border-bottom: 1px solid var(--color-border-primary);
+  border-bottom: var(--campaigns-card-border-width) solid var(--campaigns-section-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -111,7 +118,7 @@
 
 .campaigns-card__footer {
   padding: var(--campaigns-spacing-lg);
-  border-top: 1px solid var(--color-border-primary);
+  border-top: var(--campaigns-card-border-width) solid var(--campaigns-section-border);
   background: var(--color-bg-secondary);
 }
 
@@ -139,7 +146,7 @@
 
 .selector-option {
   padding: var(--campaigns-spacing-md);
-  border: 2px solid var(--color-border-primary);
+  border: 2px solid var(--campaigns-section-border);
   border-radius: var(--campaigns-radius-md);
   background: var(--color-bg-primary);
   cursor: pointer;
@@ -182,7 +189,7 @@
 
 .business-item {
   padding: var(--campaigns-spacing-md);
-  border: 2px solid var(--color-border-primary);
+  border: 2px solid var(--campaigns-section-border);
   border-radius: var(--campaigns-radius-md);
   background: var(--color-bg-primary);
   cursor: pointer;
@@ -212,7 +219,7 @@
   width: 18px;
   height: 18px;
   border-radius: var(--campaigns-radius-sm);
-  border: 2px solid var(--color-border-primary);
+  border: 2px solid var(--campaigns-section-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -270,7 +277,7 @@
 
 .message-preview {
   background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border-primary);
+  border: var(--campaigns-card-border-width) solid var(--campaigns-section-border);
   border-radius: var(--campaigns-radius-md);
   padding: var(--campaigns-spacing-lg);
 }
@@ -283,14 +290,14 @@
 }
 
 .message-preview__content {
-  background: white;
-  border: 1px solid var(--color-border-primary);
+  background: var(--color-bg-primary);
+  border: 2px solid var(--campaigns-section-border);
   border-radius: var(--campaigns-radius-sm);
   padding: var(--campaigns-spacing-md);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 0.875rem;
   line-height: 1.5;
-  color: #1f2937;
+  color: var(--color-text-primary);
   white-space: pre-wrap;
   word-wrap: break-word;
 }
@@ -348,7 +355,7 @@
 .campaigns-button--secondary {
   background: var(--color-bg-secondary);
   color: var(--color-text-primary);
-  border: 1px solid var(--color-border-primary);
+  border: var(--campaigns-card-border-width) solid var(--campaigns-section-border);
 }
 
 .campaigns-button--secondary:hover:not(:disabled) {
@@ -374,7 +381,7 @@
   padding: var(--campaigns-spacing-lg);
   background: var(--color-bg-secondary);
   border-radius: var(--campaigns-radius-md);
-  border: 1px solid var(--color-border-primary);
+  border: var(--campaigns-card-border-width) solid var(--campaigns-section-border);
 }
 
 .campaigns-stat__value {
