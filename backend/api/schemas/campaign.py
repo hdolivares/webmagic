@@ -78,7 +78,7 @@ class CampaignStats(BaseModel):
 
 class BulkCampaignCreate(BaseModel):
     """Create campaigns for multiple businesses."""
-    business_ids: List[UUID] = Field(..., min_items=1, max_items=100)
+    business_ids: List[UUID] = Field(..., min_length=1, max_length=100)
     channel: str = Field(default="auto", pattern="^(auto|email|sms)$")
     variant: str = Field(default="friendly", pattern="^(friendly|professional|urgent)$")
     send_immediately: bool = Field(default=False, description="Send campaigns immediately after creation")
@@ -106,8 +106,8 @@ class TrackingEvent(BaseModel):
 # ============================================================================
 
 class ReadyBusinessResponse(BaseModel):
-    """Business ready for campaign with generated site."""
-    model_config = ConfigDict(from_attributes=True, json_encoders={datetime: lambda v: v.isoformat()})
+    """Business ready for campaign with generated site (used internally; /ready-businesses returns plain JSON)."""
+    model_config = ConfigDict(from_attributes=True)
     
     id: UUID
     name: str

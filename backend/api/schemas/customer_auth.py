@@ -113,7 +113,7 @@ class VerifyEmailRequest(BaseModel):
     )
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "token": "abc123def456..."
             }
@@ -176,7 +176,7 @@ class ResetPasswordRequest(BaseModel):
         return v
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "token": "abc123def456...",
                 "new_password": "NewSecurePass123!"
@@ -230,7 +230,7 @@ class UpdateProfileRequest(BaseModel):
     )
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "full_name": "John Smith",
                 "phone": "+1-555-999-8888"
@@ -294,7 +294,7 @@ class CustomerLoginResponse(BaseModel):
     )
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                 "token_type": "bearer",
