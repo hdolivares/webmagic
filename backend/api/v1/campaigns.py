@@ -165,6 +165,108 @@ async def get_campaign_stats(
     return CampaignStats(**stats)
 
 
+# Static paths MUST be declared before /{campaign_id} or "ready-businesses" is matched as campaign_id (422)
+@router.get("/ready-businesses")
+async def get_ready_businesses(
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Get businesses with completed generated sites ready for campaigns.
+    
+    Returns businesses that:
+    - Have a completed generated site
+    - Don't already have an existing website
+    - Meet qualification criteria (score >= 70)
+    - Have at least one contact method (email or phone)
+    
+    Returns plain JSON (no response_model) to avoid Pydantic V2 response validation issues.
+    """
+    from fastapi.responses import JSONResponse
+    
+    result = await db.execute(
+        select(Business, GeneratedSite)
+        .join(GeneratedSite, GeneratedSite.business_id == Business.id)
+        .where(
+            and_(
+                Business.website_validation_status == 'triple_verified',
+                Business.website_url.is_(None),
+                Business.qualification_score >= 70,
+                GeneratedSite.status == 'completed'
+            )
+        )
+        .order_by(GeneratedSite.created_at.desc())
+    )
+    
+    businesses_with_sites = result.all()
+    ready_businesses = []
+    with_email = 0
+    with_phone = 0
+    sms_only = 0
+    email_only = 0
+    
+    for business, site in businesses_with_sites:
+        has_email = bool(business.email)
+        has_phone = bool(business.phone)
+        if not has_email and not has_phone:
+            continue
+        available_channels = []
+        if has_email:
+            available_channels.append("email")
+            with_email += 1
+        if has_phone:
+            available_channels.append("sms")
+            with_phone += 1
+        if has_email and not has_phone:
+            email_only += 1
+        elif has_phone and not has_email:
+            sms_only += 1
+        recommended_channel = "email" if has_email else "sms"
+        site_url = f"https://sites.lavish.solutions/{site.subdomain}"
+        ready_businesses.append({
+            "id": str(business.id),
+            "name": business.name or "",
+            "category": business.category,
+            "city": business.city,
+            "state": business.state,
+            "phone": business.phone,
+            "email": business.email,
+            "rating": float(business.rating) if business.rating is not None else None,
+            "review_count": business.review_count,
+            "qualification_score": business.qualification_score,
+            "site_id": str(site.id),
+            "site_subdomain": site.subdomain,
+            "site_url": site_url,
+            "site_created_at": site.created_at.isoformat() if site.created_at else None,
+            "available_channels": available_channels,
+            "recommended_channel": recommended_channel,
+        })
+    
+    return JSONResponse(content={
+        "businesses": ready_businesses,
+        "total": len(ready_businesses),
+        "with_email": with_email,
+        "with_phone": with_phone,
+        "sms_only": sms_only,
+        "email_only": email_only,
+    })
+
+
+@router.get("/pending/list")
+async def list_pending_campaigns(
+    limit: int = Query(10, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """Get pending campaigns ready to be sent."""
+    service = CampaignService(db)
+    campaigns = await service.get_pending_campaigns(limit=limit)
+    return {
+        "count": len(campaigns),
+        "campaigns": [CampaignResponse.model_validate(c) for c in campaigns]
+    }
+
+
 @router.get("/{campaign_id}", response_model=CampaignDetailResponse)
 async def get_campaign(
     campaign_id: UUID,
@@ -199,22 +301,6 @@ async def send_campaign(
         "status": "sent",
         "campaign_id": str(campaign_id),
         "message": "Campaign sent successfully"
-    }
-
-
-@router.get("/pending/list")
-async def list_pending_campaigns(
-    limit: int = Query(10, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
-    current_user: AdminUser = Depends(get_current_user)
-):
-    """Get pending campaigns ready to be sent."""
-    service = CampaignService(db)
-    campaigns = await service.get_pending_campaigns(limit=limit)
-    
-    return {
-        "count": len(campaigns),
-        "campaigns": [CampaignResponse.model_validate(c) for c in campaigns]
     }
 
 
@@ -288,104 +374,8 @@ async def track_email_click(
 
 
 # ============================================================================
-# NEW ENDPOINTS FOR CAMPAIGN CREATION UI
+# CAMPAIGN CREATION UI (preview-sms; ready-businesses is above, before /{campaign_id})
 # ============================================================================
-
-@router.get("/ready-businesses")
-async def get_ready_businesses(
-    db: AsyncSession = Depends(get_db),
-    current_user: AdminUser = Depends(get_current_user)
-):
-    """
-    Get businesses with completed generated sites ready for campaigns.
-    
-    Returns businesses that:
-    - Have a completed generated site
-    - Don't already have an existing website
-    - Meet qualification criteria (score >= 70)
-    - Have at least one contact method (email or phone)
-    
-    Returns plain JSON (no response_model) to avoid Pydantic V2 response validation issues.
-    """
-    from fastapi.responses import JSONResponse
-    
-    # Query businesses with completed sites
-    result = await db.execute(
-        select(Business, GeneratedSite)
-        .join(GeneratedSite, GeneratedSite.business_id == Business.id)
-        .where(
-            and_(
-                Business.website_validation_status == 'triple_verified',
-                Business.website_url.is_(None),
-                Business.qualification_score >= 70,
-                GeneratedSite.status == 'completed'
-            )
-        )
-        .order_by(GeneratedSite.created_at.desc())
-    )
-    
-    businesses_with_sites = result.all()
-    
-    # Build response as plain dicts (JSON-serializable, no Pydantic validation)
-    ready_businesses = []
-    with_email = 0
-    with_phone = 0
-    sms_only = 0
-    email_only = 0
-    
-    for business, site in businesses_with_sites:
-        has_email = bool(business.email)
-        has_phone = bool(business.phone)
-        
-        if not has_email and not has_phone:
-            continue  # Skip if no contact method
-        
-        available_channels = []
-        if has_email:
-            available_channels.append("email")
-            with_email += 1
-        if has_phone:
-            available_channels.append("sms")
-            with_phone += 1
-        
-        if has_email and not has_phone:
-            email_only += 1
-        elif has_phone and not has_email:
-            sms_only += 1
-        
-        recommended_channel = "email" if has_email else "sms"
-        site_url = f"https://sites.lavish.solutions/{site.subdomain}"
-        
-        # Plain dict: all values JSON-serializable (str, int, float, list; datetime -> ISO string)
-        ready_businesses.append({
-            "id": str(business.id),
-            "name": business.name or "",
-            "category": business.category,
-            "city": business.city,
-            "state": business.state,
-            "phone": business.phone,
-            "email": business.email,
-            "rating": float(business.rating) if business.rating is not None else None,
-            "review_count": business.review_count,
-            "qualification_score": business.qualification_score,
-            "site_id": str(site.id),
-            "site_subdomain": site.subdomain,
-            "site_url": site_url,
-            "site_created_at": site.created_at.isoformat() if site.created_at else None,
-            "available_channels": available_channels,
-            "recommended_channel": recommended_channel,
-        })
-    
-    payload = {
-        "businesses": ready_businesses,
-        "total": len(ready_businesses),
-        "with_email": with_email,
-        "with_phone": with_phone,
-        "sms_only": sms_only,
-        "email_only": email_only,
-    }
-    return JSONResponse(content=payload)
-
 
 @router.post("/preview-sms", response_model=SMSPreviewResponse)
 async def preview_sms_message(
