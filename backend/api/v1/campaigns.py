@@ -291,7 +291,7 @@ async def track_email_click(
 # NEW ENDPOINTS FOR CAMPAIGN CREATION UI
 # ============================================================================
 
-@router.get("/ready-businesses", response_model=ReadyBusinessesListResponse)
+@router.get("/ready-businesses")
 async def get_ready_businesses(
     db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_user)
@@ -304,7 +304,11 @@ async def get_ready_businesses(
     - Don't already have an existing website
     - Meet qualification criteria (score >= 70)
     - Have at least one contact method (email or phone)
+    
+    Returns plain JSON (no response_model) to avoid Pydantic V2 response validation issues.
     """
+    from fastapi.responses import JSONResponse
+    
     # Query businesses with completed sites
     result = await db.execute(
         select(Business, GeneratedSite)
@@ -322,7 +326,7 @@ async def get_ready_businesses(
     
     businesses_with_sites = result.all()
     
-    # Build response list
+    # Build response as plain dicts (JSON-serializable, no Pydantic validation)
     ready_businesses = []
     with_email = 0
     with_phone = 0
@@ -336,7 +340,6 @@ async def get_ready_businesses(
         if not has_email and not has_phone:
             continue  # Skip if no contact method
         
-        # Determine available channels
         available_channels = []
         if has_email:
             available_channels.append("email")
@@ -345,45 +348,43 @@ async def get_ready_businesses(
             available_channels.append("sms")
             with_phone += 1
         
-        # Track exclusives
         if has_email and not has_phone:
             email_only += 1
         elif has_phone and not has_email:
             sms_only += 1
         
-        # Recommended channel (prefer email - it's free)
         recommended_channel = "email" if has_email else "sms"
-        
-        # Build site URL
         site_url = f"https://sites.lavish.solutions/{site.subdomain}"
         
-        ready_businesses.append(ReadyBusinessResponse(
-            id=business.id,
-            name=business.name,
-            category=business.category,
-            city=business.city,
-            state=business.state,
-            phone=business.phone,
-            email=business.email,
-            rating=float(business.rating) if business.rating else None,
-            review_count=business.review_count,
-            qualification_score=business.qualification_score,
-            site_id=site.id,
-            site_subdomain=site.subdomain,
-            site_url=site_url,
-            site_created_at=site.created_at,
-            available_channels=available_channels,
-            recommended_channel=recommended_channel
-        ))
+        # Plain dict: all values JSON-serializable (str, int, float, list; datetime -> ISO string)
+        ready_businesses.append({
+            "id": str(business.id),
+            "name": business.name or "",
+            "category": business.category,
+            "city": business.city,
+            "state": business.state,
+            "phone": business.phone,
+            "email": business.email,
+            "rating": float(business.rating) if business.rating is not None else None,
+            "review_count": business.review_count,
+            "qualification_score": business.qualification_score,
+            "site_id": str(site.id),
+            "site_subdomain": site.subdomain,
+            "site_url": site_url,
+            "site_created_at": site.created_at.isoformat() if site.created_at else None,
+            "available_channels": available_channels,
+            "recommended_channel": recommended_channel,
+        })
     
-    return ReadyBusinessesListResponse(
-        businesses=ready_businesses,
-        total=len(ready_businesses),
-        with_email=with_email,
-        with_phone=with_phone,
-        sms_only=sms_only,
-        email_only=email_only
-    )
+    payload = {
+        "businesses": ready_businesses,
+        "total": len(ready_businesses),
+        "with_email": with_email,
+        "with_phone": with_phone,
+        "sms_only": sms_only,
+        "email_only": email_only,
+    }
+    return JSONResponse(content=payload)
 
 
 @router.post("/preview-sms", response_model=SMSPreviewResponse)
