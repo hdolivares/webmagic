@@ -20,7 +20,8 @@ import re
 logger = logging.getLogger(__name__)
 
 # Timeout for HTTP requests (seconds)
-REQUEST_TIMEOUT = 10
+# Increased to 30s to accommodate slow-loading legitimate business websites
+REQUEST_TIMEOUT = 30
 
 # Non-website domains (social media, directories, etc.)
 NON_WEBSITE_DOMAINS = {

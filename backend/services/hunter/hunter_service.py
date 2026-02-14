@@ -17,8 +17,11 @@ from services.hunter.data_quality_service import DataQualityService
 # Simple HTTP-based validation for initial filtering
 from services.hunter.website_validator import WebsiteValidator
 from services.hunter.website_generation_queue_service import WebsiteGenerationQueueService
+# Deep verification with ScrapingDog + LLM
+from services.discovery.llm_discovery_service import LLMDiscoveryService
 from core.exceptions import ExternalAPIException
 from core.config import get_settings
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -181,11 +184,18 @@ class HunterService:
             new_businesses = 0
             businesses_with_valid_websites = 0
             businesses_needing_websites = 0
+            businesses_verified_by_llm = 0
             businesses_needing_generation = []
             businesses_to_validate = []  # For async Playwright validation
             
             # Initialize data quality service for enhanced processing
             data_quality_service = DataQualityService()
+            
+            # Initialize deep verification service (ScrapingDog + LLM)
+            llm_discovery = LLMDiscoveryService()
+            
+            # Rate limiting for ScrapingDog (1 request per second to avoid throttling)
+            scrapingdog_delay = 1.0  # seconds between ScrapingDog requests
             
             # Simple HTTP validator for initial filtering
             async with WebsiteValidator() as website_validator:
@@ -237,34 +247,103 @@ class HunterService:
                             biz_data["operational"] = True
                             quality_analysis = {"score": 0.0, "verified": False, "operational": True}
                         
-                        # 4. Simple HTTP validation for websites
+                        # 4. HTTP validation for websites (quick check only)
                         logger.debug(f"  ├─ Checking website URL...")
                         website_url = website_detection.get("website_url") or biz_data.get("website_url")
                         logger.debug(f"  │  └─ URL from detection: {website_detection.get('website_url')}, from biz_data: {biz_data.get('website_url')}")
                         
                         if website_url:
-                            logger.info(f"  ├─ 🌐 Validating URL: {website_url}")
+                            logger.info(f"  ├─ 🌐 Quick HTTP check: {website_url}")
                             try:
                                 simple_validation = await website_validator.validate_url(website_url)
-                                logger.debug(f"  │  └─ Validation result: valid={simple_validation.is_valid}, accessible={simple_validation.is_accessible}, real_website={simple_validation.is_real_website}, status={simple_validation.status_code}, error={simple_validation.error_message}")
+                                logger.debug(f"  │  └─ HTTP result: valid={simple_validation.is_valid}, accessible={simple_validation.is_accessible}, real_website={simple_validation.is_real_website}, status={simple_validation.status_code}")
                                 
-                                if not simple_validation.is_valid and not simple_validation.is_real_website:
-                                    biz_data["website_validation_status"] = "invalid"
-                                    biz_data["website_url"] = None  # Clear invalid URL
-                                    logger.info(f"  │  └─ ❌ INVALID: {simple_validation.error_message}")
-                                else:
-                                    biz_data["website_validation_status"] = "pending"  # Queue for Playwright
+                                if simple_validation.is_valid or simple_validation.is_real_website:
+                                    # HTTP check passed - keep URL and queue for Playwright
+                                    biz_data["website_validation_status"] = "pending"
                                     biz_data["website_url"] = website_url
-                                    logger.info(f"  │  └─ ✅ VALID (pending deep validation)")
+                                    logger.info(f"  │  └─ ✅ HTTP PASS → Will validate with Playwright")
+                                else:
+                                    # HTTP check failed - DON'T clear URL, mark for deep verification
+                                    biz_data["website_validation_status"] = "needs_verification"
+                                    biz_data["website_url"] = website_url  # Keep URL for ScrapingDog+LLM check
+                                    logger.info(f"  │  └─ ⚠️ HTTP FAIL → Will verify with ScrapingDog+LLM")
                             except Exception as e:
-                                logger.error(f"  │  └─ ❌ Validation ERROR: {e}", exc_info=True)
-                                biz_data["website_validation_status"] = "invalid"
-                                biz_data["website_url"] = None
+                                logger.error(f"  │  └─ ❌ HTTP check ERROR: {e}")
+                                biz_data["website_validation_status"] = "needs_verification"
+                                biz_data["website_url"] = website_url  # Keep URL
                         else:
+                            # No URL found - will search with ScrapingDog
                             biz_data["website_validation_status"] = "missing"
-                            logger.info(f"  ├─ 🚫 No website URL found")
+                            logger.info(f"  ├─ 🚫 No website URL → Will search with ScrapingDog")
                         
-                        # 5. Lead qualification
+                        # 5. DEEP VERIFICATION with ScrapingDog + LLM (CRITICAL FIX)
+                        # Run for: missing URLs OR failed HTTP validation
+                        if biz_data["website_validation_status"] in ["missing", "needs_verification"]:
+                            logger.info(f"  ├─ 🔍 Running DEEP VERIFICATION (ScrapingDog + LLM)...")
+                            
+                            try:
+                                from services.discovery.llm_discovery_service import LLMDiscoveryService
+                                
+                                llm_discovery = LLMDiscoveryService()
+                                discovery_result = await llm_discovery.discover_website(
+                                    business_name=biz_data["name"],
+                                    phone=biz_data.get("phone"),
+                                    address=biz_data.get("address"),
+                                    city=city,
+                                    state=state,
+                                    country=country
+                                )
+                                
+                                if discovery_result.get("found") and discovery_result.get("url"):
+                                    verified_url = discovery_result["url"]
+                                    confidence = discovery_result.get("confidence", 0)
+                                    
+                                    logger.info(
+                                        f"  │  └─ ✅ LLM VERIFIED: {verified_url} "
+                                        f"(confidence: {confidence:.0%})"
+                                    )
+                                    
+                                    # Update business data with verified website
+                                    biz_data["website_url"] = verified_url
+                                    biz_data["website_validation_status"] = "pending"  # Queue for Playwright
+                                    biz_data["verified"] = True
+                                    biz_data["discovered_urls"] = [verified_url]
+                                    
+                                    # Store discovery metadata
+                                    if not biz_data.get("raw_data"):
+                                        biz_data["raw_data"] = {}
+                                    biz_data["raw_data"]["llm_discovery"] = {
+                                        "url": verified_url,
+                                        "confidence": confidence,
+                                        "reasoning": discovery_result.get("reasoning"),
+                                        "verified_at": datetime.utcnow().isoformat(),
+                                        "method": "scrapingdog_llm"
+                                    }
+                                else:
+                                    logger.info(
+                                        f"  │  └─ ❌ LLM: No website found - "
+                                        f"{discovery_result.get('reasoning', 'Unknown')}"
+                                    )
+                                    
+                                    # Confirmed no website by deep search
+                                    biz_data["website_url"] = None
+                                    biz_data["website_validation_status"] = "confirmed_missing"
+                                    biz_data["verified"] = True  # Verified as having NO website
+                                    
+                            except Exception as e:
+                                logger.error(f"  │  └─ ❌ Deep verification ERROR: {e}", exc_info=True)
+                                # If deep verification fails, fall back to original status
+                                if biz_data["website_validation_status"] == "needs_verification":
+                                    # Keep the Outscraper URL but mark as unverified
+                                    biz_data["website_validation_status"] = "pending"
+                                    biz_data["verified"] = False
+                                else:
+                                    # No URL and verification failed
+                                    biz_data["website_validation_status"] = "missing"
+                                    biz_data["verified"] = False
+                        
+                        # 6. Lead qualification
                         logger.debug(f"  ├─ Running lead qualification...")
                         qualification_result = self.qualifier.qualify(biz_data)
                         score = qualification_result["score"]
@@ -294,17 +373,29 @@ class HunterService:
                             # Track website metrics
                             if business.website_validation_status == "pending":
                                 businesses_to_validate.append(str(business.id))
-                                logger.info(f"  └─ 💾 SAVED - Has website (pending validation)")
-                            elif business.website_validation_status == "missing":
+                                businesses_with_valid_websites += 1
+                                if biz_data.get("verified"):
+                                    businesses_verified_by_llm += 1
+                                    logger.info(f"  └─ 💾 SAVED - LLM verified website → Playwright queue")
+                                else:
+                                    logger.info(f"  └─ 💾 SAVED - Has website → Playwright queue")
+                            elif business.website_validation_status in ["missing", "confirmed_missing"]:
                                 businesses_needing_websites += 1
-                                # **CRITICAL FIX: Queue ALL businesses without websites, regardless of quality score**
-                                businesses_needing_generation.append(business.id)
-                                logger.info(f"  └─ 💾 SAVED - No website → QUEUED FOR GENERATION ✨")
+                                if business.website_validation_status == "confirmed_missing":
+                                    businesses_verified_by_llm += 1
+                                    logger.info(f"  └─ 💾 SAVED - LLM confirmed: No website exists ✓")
+                                else:
+                                    logger.info(f"  └─ 💾 SAVED - No website found")
                             else:
                                 businesses_with_valid_websites += 1
-                                logger.info(f"  └─ 💾 SAVED - Has valid website")
+                                logger.info(f"  └─ 💾 SAVED - Website status: {business.website_validation_status}")
                         else:
                             logger.warning(f"  └─ ⚠️  Failed to save business")
+                        
+                        # Rate limiting for ScrapingDog (if we ran deep verification)
+                        if biz_data.get("verified") or biz_data["website_validation_status"] == "confirmed_missing":
+                            logger.debug(f"  └─ ⏱️  Rate limit: waiting {scrapingdog_delay}s...")
+                            await asyncio.sleep(scrapingdog_delay)
                         
                     except Exception as e:
                         logger.error(f"  └─ ❌ CRITICAL ERROR processing {business_name}: {e}", exc_info=True)
@@ -333,7 +424,7 @@ class HunterService:
                 )
             
             # **FIX: Coverage was already created at the start, just update it now**
-            # **NEW Phase 2: Store detailed scrape metrics**
+            # **NEW Phase 2 & 3: Store detailed scrape metrics**
             last_scrape_details = {
                 "zone_id": zone_id,
                 "raw_businesses": len(raw_businesses),
@@ -342,7 +433,9 @@ class HunterService:
                 "existing_businesses": total_saved - new_businesses,
                 "with_valid_websites": businesses_with_valid_websites,
                 "needing_websites": businesses_needing_websites,
-                "queued_for_generation": len(businesses_needing_generation),
+                "verified_by_llm": businesses_verified_by_llm,
+                "queued_for_playwright": len(businesses_to_validate),
+                "verification_rate": f"{(businesses_verified_by_llm / total_saved * 100):.1f}%" if total_saved > 0 else "0%",
                 "timestamp": datetime.utcnow().isoformat()
             }
             
@@ -416,9 +509,11 @@ class HunterService:
                     "raw_businesses": len(raw_businesses),
                     "total_saved": total_saved,
                     "new_businesses": new_businesses,
-                    # **NEW Phase 2: Website metrics**
+                    # **NEW Phase 2 & 3: Website & Verification metrics**
                     "with_valid_websites": businesses_with_valid_websites,
                     "needing_websites": businesses_needing_websites,
+                    "verified_by_llm": businesses_verified_by_llm,
+                    "queued_for_playwright": len(businesses_to_validate),
                     "queued_for_generation": len(businesses_needing_generation)
                 },
                 "progress": {

@@ -178,8 +178,36 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
         onCampaignUpdate()
       }
     } catch (err: any) {
+      const status = err.response?.status
       const errorMessage = err.response?.data?.detail || err.message || 'Failed to scrape zone'
-      setError(errorMessage)
+      
+      // Check if this is a timeout error where the operation might have completed
+      if (status === 504 || err.code === 'ECONNABORTED' || errorMessage.includes('timeout')) {
+        setError(
+          '⚠️ The request timed out, but the scraping may have completed successfully in the background. ' +
+          'Please refresh the page in a moment to check if businesses were found.'
+        )
+        
+        // Auto-refresh strategy after 5 seconds to check results
+        setTimeout(async () => {
+          try {
+            const strategyResponse = await api.getIntelligentStrategy(strategy.strategy_id)
+            setStrategy(strategyResponse)
+            if (strategyResponse.businesses_found > strategy.businesses_found) {
+              setError(null)
+              console.log('✅ Scrape completed in background! Found new businesses.')
+              if (onCampaignUpdate) {
+                onCampaignUpdate()
+              }
+            }
+          } catch (e) {
+            console.error('Failed to refresh strategy:', e)
+          }
+        }, 5000)
+      } else {
+        setError(errorMessage)
+      }
+      
       console.error('❌ Scrape error:', err)
       console.error('Error details:', {
         status: err.response?.status,
@@ -423,7 +451,7 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
                     disabled={loading}
                     className="scrape-btn primary"
                   >
-                    {loading ? '⏳ Scraping...' : '🎯 Start Scraping This Zone'}
+                    {loading ? '⏳ Scraping... (may take 1-2 minutes)' : '🎯 Start Scraping This Zone'}
                   </button>
                   
                   <button
@@ -434,6 +462,17 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
                     {loading ? '⏳ Starting...' : '⚡ Batch Scrape (5 zones)'}
                   </button>
                 </div>
+                
+                {loading && (
+                  <div className="scraping-progress-info">
+                    <div className="progress-steps">
+                      <p>🔍 Searching Google Maps for businesses...</p>
+                      <p>📋 Processing and validating results...</p>
+                      <p>💾 Saving qualified leads to database...</p>
+                      <p className="text-secondary">This operation typically takes 60-90 seconds. Please wait...</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
