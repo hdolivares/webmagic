@@ -40,7 +40,8 @@ class OutscraperClient:
         zone_lat: Optional[float] = None,  # DEPRECATED: Outscraper ignores coordinates
         zone_lon: Optional[float] = None,  # DEPRECATED: Outscraper ignores coordinates
         zone_id: Optional[str] = None,
-        target_city: Optional[str] = None  # NEW: Target specific city for multi-city metro areas
+        target_city: Optional[str] = None,  # NEW: Target specific city for multi-city metro areas
+        region: Optional[str] = None  # NEW: Region/country for Outscraper API
     ) -> Dict[str, Any]:
         """
         Search for businesses on Google Maps.
@@ -67,15 +68,26 @@ class OutscraperClient:
             ExternalAPIException: If the API request fails
         """
         try:
-            # Build search query
-            # ALWAYS use city-based search (Outscraper ignores "near X,Y" coordinates!)
+            # Build search query in Outscraper's recommended format
+            # Format: "query, city, state, country" (comma-separated, NOT "query in location")
+            # CRITICAL: Use "USA" not "US" for better geo-targeting
             # If target_city provided, use that instead of main city (for metro areas)
             search_city = target_city if target_city else city
-            location = f"{search_city}, {state}, {country}"
-            search_query = f"{query} in {location}"
+            
+            # Map country codes to Outscraper's preferred format
+            country_map = {
+                "US": "USA",
+                "CA": "Canada",
+                "GB": "UK",
+                "AU": "Australia"
+            }
+            outscraper_country = country_map.get(country, country)
+            
+            # Outscraper format: comma-separated query with location
+            search_query = f"{query}, {search_city}, {state}, {outscraper_country}"
             
             zone_str = f" [City: {search_city}]" if target_city else ""
-            logger.info(f"City-search: {search_query}{zone_str} (limit: {limit})")
+            logger.info(f"Outscraper query: {search_query}{zone_str} (limit: {limit})")
             
             # ANTI-DUPLICATE: Check if this exact search is already running
             search_key = f"{query}|{search_city}|{state}|{limit}"
@@ -92,13 +104,16 @@ class OutscraperClient:
             logger.info(f"🔒 Search locked: {search_key}")
             
             # Run synchronous API call in thread pool
+            # Pass region parameter (defaults to country code)
+            api_region = region if region else country
             loop = asyncio.get_event_loop()
             results = await loop.run_in_executor(
                 None,
                 self._search_sync,
                 search_query,
                 limit,
-                language
+                language,
+                api_region
             )
             
             # Normalize results
@@ -140,18 +155,27 @@ class OutscraperClient:
         self,
         query: str,
         limit: int,
-        language: str
+        language: str,
+        region: str = "US"
     ) -> List[Dict[str, Any]]:
         """
         Synchronous search call to Outscraper.
         This runs in a thread pool to avoid blocking.
+        
+        Args:
+            query: Search query (already formatted with location)
+            limit: Max results to return
+            language: Language code (e.g., "en")
+            region: Country code for geo-targeting (e.g., "US", "CA", "GB")
         """
         try:
+            logger.info(f"Outscraper API call: region={region}, language={language}")
+            
             results = self.client.google_maps_search(
                 query=[query],
                 limit=limit,
                 language=language,
-                region=None,
+                region=region,  # ✅ NOW SPECIFIED!
                 drop_duplicates=True
             )
             
