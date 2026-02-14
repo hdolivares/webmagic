@@ -283,9 +283,7 @@ class HunterService:
                             logger.info(f"  ├─ 🔍 Running DEEP VERIFICATION (ScrapingDog + LLM)...")
                             
                             try:
-                                from services.discovery.llm_discovery_service import LLMDiscoveryService
-                                
-                                llm_discovery = LLMDiscoveryService()
+                                # Use the llm_discovery service already initialized above
                                 discovery_result = await llm_discovery.discover_website(
                                     business_name=biz_data["name"],
                                     phone=biz_data.get("phone"),
