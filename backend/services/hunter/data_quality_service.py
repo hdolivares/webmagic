@@ -64,7 +64,7 @@ class DataQualityService:
         CRITICAL: Prevents getting UK results when searching for US businesses.
         
         Args:
-            business: Raw Outscraper business data
+            business: Normalized business data (from scraper)
             target_country: Target country code (e.g., "US")
             target_state: Target state code (e.g., "TX")
             target_city: Target city name (e.g., "Houston")
@@ -75,60 +75,119 @@ class DataQualityService:
         raw_data = business.get("raw_data", {})
         reasons = []
         
-        # Check country code (most reliable)
-        country_code = raw_data.get("country_code")
-        state_code = raw_data.get("state_code")
+        # Try normalized fields first (from scraper.py), then fall back to raw_data
+        # This handles cases where Outscraper field names vary
+        country_code = business.get("country") or raw_data.get("country_code") or raw_data.get("country")
         
-        # **CRITICAL FIX**: If country_code is missing, fall back to state validation
-        # Many Outscraper results don't have country_code but DO have state_code
-        if country_code is None:
-            logger.debug(f"⚠️  country_code is None, falling back to state validation")
+        # For state, check both normalized "state" field and raw_data variants
+        state_from_normalized = business.get("state", "")
+        state_code = raw_data.get("state_code")
+        state_name = raw_data.get("state")
+        
+        # Extract state code from state name if needed (e.g., "California" -> "CA")
+        if not state_code and state_from_normalized:
+            # Map full state names to codes
+            state_name_to_code = {
+                "california": "CA", "texas": "TX", "new york": "NY", 
+                "florida": "FL", "illinois": "IL", "pennsylvania": "PA",
+                "ohio": "OH", "georgia": "GA", "north carolina": "NC",
+                "michigan": "MI", "new jersey": "NJ", "virginia": "VA",
+                "washington": "WA", "arizona": "AZ", "massachusetts": "MA",
+                "tennessee": "TN", "indiana": "IN", "missouri": "MO",
+                "maryland": "MD", "wisconsin": "WI", "colorado": "CO",
+                "minnesota": "MN", "south carolina": "SC", "alabama": "AL",
+                "louisiana": "LA", "kentucky": "KY", "oregon": "OR",
+                "oklahoma": "OK", "connecticut": "CT", "utah": "UT",
+                "iowa": "IA", "nevada": "NV", "arkansas": "AR",
+                "mississippi": "MS", "kansas": "KS", "new mexico": "NM",
+                "nebraska": "NE", "west virginia": "WV", "idaho": "ID",
+                "hawaii": "HI", "new hampshire": "NH", "maine": "ME",
+                "montana": "MT", "rhode island": "RI", "delaware": "DE",
+                "south dakota": "SD", "north dakota": "ND", "alaska": "AK",
+                "vermont": "VT", "wyoming": "WY"
+            }
+            state_code = state_name_to_code.get(state_from_normalized.lower())
+        
+        # **ENHANCED**: If country_code is missing, use state validation
+        if country_code is None or country_code == "":
+            logger.debug(f"⚠️  country_code is None/empty, falling back to state validation")
+            
             # If we have a target state and the state matches, assume it's the right country
-            if target_state and state_code == target_state:
-                logger.debug(f"✅ State matches ({state_code} == {target_state}), assuming country is correct")
-                return True, ["Geo-targeting validated via state match"]
-            # If state doesn't match or is missing, check the state name field
-            elif target_state:
-                state_name = (raw_data.get("state") or "").lower()
-                # Map state codes to names for fallback
+            if target_state and state_code:
+                if state_code.upper() == target_state.upper():
+                    logger.debug(f"✅ State code matches ({state_code} == {target_state})")
+                    return True, ["Geo-targeting validated via state code match"]
+            
+            # If state_code didn't match, try state name matching
+            if target_state and state_from_normalized:
+                # Map target state code to possible names
                 state_name_map = {
                     "CA": ["california", "ca"],
                     "TX": ["texas", "tx"],
                     "NY": ["new york", "ny"],
                     "FL": ["florida", "fl"],
-                    # Add more as needed
+                    # More states handled above in state_name_to_code
                 }
-                target_state_names = state_name_map.get(target_state, [target_state.lower()])
-                if any(name in state_name for name in target_state_names):
-                    logger.debug(f"✅ State name matches ({state_name}), assuming country is correct")
+                target_state_names = state_name_map.get(target_state.upper(), [target_state.lower()])
+                state_normalized = state_from_normalized.lower()
+                
+                # Check if state name matches target
+                if state_normalized in target_state_names or any(name in state_normalized for name in target_state_names):
+                    logger.debug(f"✅ State name matches ({state_from_normalized})")
                     return True, ["Geo-targeting validated via state name match"]
-                else:
-                    reasons.append(f"Country code missing and state mismatch: {state_code} != {target_state}")
-                    return False, reasons
-            else:
-                # No target state to validate against, can't determine if correct country
-                reasons.append(f"Country code missing and no state to validate against")
-                return False, reasons
-        
-        # Normal validation: country_code is present
-        if country_code != target_country:
-            reasons.append(f"Country mismatch: {country_code} != {target_country}")
+                
+                # Also check if target state name is in the state field
+                if target_state.lower() in state_normalized:
+                    logger.debug(f"✅ Target state found in state field")
+                    return True, ["Geo-targeting validated via state substring match"]
+            
+            # If nothing matched, reject
+            reasons.append(f"Country missing and state mismatch: state_code={state_code}, state_name={state_from_normalized}, target={target_state}")
+            logger.warning(f"❌ Geo-validation failed: {reasons[0]}")
             return False, reasons
         
+        # Normal validation: country_code is present
+        # Normalize country codes (handle "US" vs "USA" vs "United States")
+        country_normalized = country_code.upper() if country_code else ""
+        target_country_normalized = target_country.upper() if target_country else ""
+        
+        # Map variations
+        country_code_map = {
+            "US": ["US", "USA", "UNITED STATES"],
+            "CA": ["CA", "CAN", "CANADA"],
+            "GB": ["GB", "UK", "UNITED KINGDOM"],
+            "AU": ["AU", "AUS", "AUSTRALIA"]
+        }
+        
+        target_variants = country_code_map.get(target_country_normalized, [target_country_normalized])
+        
+        if country_normalized not in target_variants:
+            reasons.append(f"Country mismatch: {country_code} != {target_country}")
+            logger.warning(f"❌ Country mismatch: {country_code} != {target_country}")
+            return False, reasons
+        
+        logger.debug(f"✅ Country validated: {country_code}")
+        
         # Check state code (if provided)
-        if target_state:
-            if state_code != target_state:
+        if target_state and state_code:
+            if state_code.upper() != target_state.upper():
                 reasons.append(f"State mismatch: {state_code} != {target_state}")
+                logger.debug(f"⚠️  State mismatch: {state_code} != {target_state}")
                 if self.strict_geo_filter:
                     return False, reasons
         
         # Check city (less reliable due to spelling variations)
         if target_city:
-            city = raw_data.get("city", "").lower()
-            if target_city.lower() not in city and city not in target_city.lower():
-                reasons.append(f"City mismatch: {city} != {target_city}")
+            city_from_data = business.get("city") or raw_data.get("city", "")
+            city_normalized = city_from_data.lower() if city_from_data else ""
+            target_city_normalized = target_city.lower()
+            
+            if target_city_normalized not in city_normalized and city_normalized not in target_city_normalized:
+                reasons.append(f"City mismatch: {city_from_data} != {target_city}")
+                logger.debug(f"⚠️  City mismatch: {city_from_data} != {target_city}")
                 # Don't fail on city mismatch (metro areas have many cities)
         
+        logger.debug(f"✅ Geo-targeting fully validated")
         return True, ["Geo-targeting validated"]
     
     def detect_website(self, business: Dict[str, Any]) -> Dict[str, Any]:
