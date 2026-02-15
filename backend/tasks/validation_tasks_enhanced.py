@@ -101,7 +101,7 @@ def validate_business_website_v2(self, business_id: str) -> Dict[str, Any]:
             # ================================================================
             # CASE 4: Run validation
             # ================================================================
-            return await _run_website_validation(db, business, metadata_service)
+            return asyncio.run(_run_website_validation(db, business, metadata_service))
             
     except Exception as e:
         logger.error(f"Validation task failed for {business_id}: {e}", exc_info=True)
