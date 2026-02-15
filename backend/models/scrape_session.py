@@ -152,7 +152,8 @@ class ScrapeSession(Base):
     # METADATA
     # =========================================================================
     
-    metadata = Column(
+    meta = Column(
+        "metadata",  # DB column name - using 'meta' in Python to avoid SQLAlchemy reserved name
         JSONB,
         default=dict,
         comment="Flexible metadata for future extensions"
