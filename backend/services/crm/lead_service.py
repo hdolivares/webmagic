@@ -219,6 +219,19 @@ class LeadService:
             qualification_score = self._calculate_qualification_score(business_data)
             
             # Prepare business data with CRM defaults
+            from core.validation_enums import URLSource
+            
+            website_url = business_data.get("website_url")
+            
+            # Initialize V2 validation metadata
+            website_metadata = {
+                "source": URLSource.OUTSCRAPER.value if website_url else URLSource.NONE.value,
+                "source_timestamp": datetime.utcnow().isoformat(),
+                "validation_history": [],
+                "discovery_attempts": {},
+                "notes": None
+            }
+            
             business_fields = {
                 "name": business_data.get("name"),
                 "slug": slug,
@@ -226,7 +239,9 @@ class LeadService:
                 "gmb_place_id": business_data.get("gmb_place_id"),
                 "email": business_data.get("email"),
                 "phone": business_data.get("phone"),
-                "website_url": business_data.get("website_url"),
+                "website_url": website_url,
+                "website_metadata": website_metadata,  # V2 metadata initialization
+                "website_validation_status": "pending" if website_url else None,
                 "address": business_data.get("address"),
                 "city": business_data.get("city"),
                 "state": business_data.get("state"),

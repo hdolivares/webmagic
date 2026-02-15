@@ -435,12 +435,12 @@ class HunterService:
             if businesses_to_validate:
                 settings = get_settings()
                 if settings.ENABLE_AUTO_VALIDATION:
-                    logger.info(f"Queuing {len(businesses_to_validate)} businesses for Playwright validation")
+                    logger.info(f"Queuing {len(businesses_to_validate)} businesses for V2 validation pipeline")
                     try:
-                        from tasks.validation_tasks import batch_validate_websites
-                        batch_validate_websites.delay(businesses_to_validate)
+                        from tasks.validation_tasks_enhanced import batch_validate_websites_v2
+                        batch_validate_websites_v2.delay(businesses_to_validate)
                     except Exception as e:
-                        logger.error(f"Failed to queue validation tasks: {e}")
+                        logger.error(f"Failed to queue V2 validation tasks: {e}")
             
             # **Queue businesses for website generation**
             if businesses_needing_generation:
@@ -778,20 +778,20 @@ class HunterService:
         
         # Queue deep Playwright validation for businesses with websites
         if settings.ENABLE_AUTO_VALIDATION and businesses_to_validate:
-            logger.info(f"Queuing {len(businesses_to_validate)} businesses for deep validation")
+            logger.info(f"Queuing {len(businesses_to_validate)} businesses for V2 validation pipeline")
             try:
                 # Import here to avoid circular dependency
-                from tasks.validation_tasks import batch_validate_websites
+                from tasks.validation_tasks_enhanced import batch_validate_websites_v2
                 
                 # Queue in batches to avoid overwhelming the validation queue
                 batch_size = settings.VALIDATION_BATCH_SIZE
                 for i in range(0, len(businesses_to_validate), batch_size):
                     batch = businesses_to_validate[i:i + batch_size]
-                    batch_validate_websites.delay(batch)
-                    logger.debug(f"Queued validation batch {i//batch_size + 1}: {len(batch)} businesses")
+                    batch_validate_websites_v2.delay(batch)
+                    logger.debug(f"Queued V2 validation batch {i//batch_size + 1}: {len(batch)} businesses")
                     
             except Exception as e:
-                logger.error(f"Failed to queue validation tasks: {e}", exc_info=True)
+                logger.error(f"Failed to queue V2 validation tasks: {e}", exc_info=True)
                 # Don't fail scraping if validation queueing fails
         
         # Update coverage
