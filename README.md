@@ -779,4 +779,72 @@ async def get_business(business_id: str):
     ...
 ```
 
+### Critical Website Validation Bug (Fixed Feb 15, 2026)
+
+**CRITICAL BUG DISCOVERED:** The LLM was receiving EMPTY contact data, causing 154+ valid websites to be rejected.
+
+#### The Bug
+In `backend/services/validation/validation_orchestrator.py`, the `_prepare_website_data_for_llm()` method incorrectly attempted to extract Playwright data from a nested `"content"` key:
+
+```python
+# BUGGY CODE (line 250):
+content_info = playwright_result.get("content", {})  # <- "content" key doesn't exist!
+return {
+    "phones": content_info.get("phones", []),  # <- Always returns []
+    "emails": content_info.get("emails", []),  # <- Always returns []
+    "title": content_info.get("title", ""),    # <- Always returns ""
+    # ... all other fields also empty
+}
+```
+
+**Reality:** `PlaywrightValidationService` returns a **FLAT** structure:
+```python
+{
+    "phones": ["323-433-4363"],
+    "emails": ["info@example.com"],
+    "title": "Business Name",
+    # ... all fields at root level
+}
+```
+
+#### The Impact
+- The LLM received empty arrays for ALL contact information
+- 154+ businesses with valid websites were marked as "missing"
+- ScrapingDog discovery wasn't triggered (because URLs existed, just rejected)
+- The LLM prompt was perfect - it just had no data to work with!
+
+#### The Fix
+Extract data directly from the flat `playwright_result`:
+
+```python
+# FIXED CODE:
+return {
+    "phones": playwright_result.get("phones", []),      # Now gets real data
+    "emails": playwright_result.get("emails", []),      # Now gets real data
+    "title": playwright_result.get("title", ""),        # Now gets real data
+    "content_preview": playwright_result.get("content_preview", "")[:500],
+    # ... all fields extracted correctly
+}
+```
+
+#### Verification
+Used `curl` to test the LLM with correct data:
+
+**Before Fix:**
+- Input: Empty phones[], empty emails[], empty content
+- LLM Verdict: "missing" (correct decision based on empty data!)
+
+**After Fix:**
+- Input: phones=["323-433-4363"], emails=["info@orenhenea.com"], full content
+- LLM Verdict: "valid", confidence=0.9, phone_match=true ✅
+
+**Key Lesson:** The LLM prompt was excellent! Always verify your data extraction pipeline before blaming the AI.
+
+#### Testing LLM Validation
+Use `test_llm_validation.sh` to verify LLM decisions with real data:
+
+```bash
+cd /var/www/webmagic && bash test_llm_validation.sh
+```
+
 ---
