@@ -40,7 +40,9 @@ celery_app.autodiscover_tasks([
     "tasks.monitoring_sync",  # Synchronous monitoring tasks (replaces monitoring)
     "tasks.sms_sync",  # Synchronous SMS tasks (replaces sms_campaign_tasks)
     "tasks.campaigns",
-    "tasks.validation_tasks",  # Playwright website validation
+    "tasks.validation_tasks",  # Playwright website validation (old system)
+    "tasks.validation_tasks_enhanced",  # Enhanced V2 validation with metadata
+    "tasks.discovery_tasks",  # Website discovery pipeline (ScrapingDog)
 ])
 
 # Periodic task schedule (using SYNC tasks only)
