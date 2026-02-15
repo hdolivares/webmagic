@@ -43,13 +43,12 @@ async def test_validation():
         logger.info(f"Testing validation for: {business.name}")
         logger.info(f"Website URL: {business.website_url}")
         
-        # Initialize services
-        prescreener = URLPrescreener()
+        # Initialize services (orchestrator creates prescreener internally)
         playwright_service = PlaywrightValidationService()
         llm_validator = LLMWebsiteValidator(settings.ANTHROPIC_API_KEY)
         
         orchestrator = ValidationOrchestrator(
-            prescreener=prescreener,
+            db=db,
             playwright_service=playwright_service,
             llm_validator=llm_validator
         )
