@@ -159,19 +159,17 @@
   --badge-border-radius: var(--radius-full);
 }
 
-/* Dark mode overrides (optional) */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-surface-primary: #1f2937;
-    --color-surface-secondary: #111827;
-    --color-surface-tertiary: #374151;
-    
-    --color-text-primary: #f9fafb;
-    --color-text-secondary: #d1d5db;
-    --color-text-tertiary: #9ca3af;
-    
-    --color-border-default: #374151;
-    
-    --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3);
-  }
+/* Dark mode overrides - Triggered by .dark class on <html> element */
+.dark {
+  --color-surface-primary: #1f2937;
+  --color-surface-secondary: #111827;
+  --color-surface-tertiary: #374151;
+  
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #d1d5db;
+  --color-text-tertiary: #9ca3af;
+  
+  --color-border-default: #374151;
+  
+  --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3);
 }
