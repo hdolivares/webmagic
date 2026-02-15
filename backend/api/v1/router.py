@@ -61,5 +61,6 @@ api_router.include_router(payments.router)
 api_router.include_router(validation.router)  # Website validation
 api_router.include_router(scrapes.router)  # Phase 2: Async scraping with SSE progress
 
-# CRITICAL: This MUST be last - it has a catch-all /{subdomain} route
-api_router.include_router(generated_preview.router, prefix="")  # PUBLIC: Serves generated site HTML
+# NOTE: generated_preview.router removed from API router - it has a catch-all /{subdomain}
+# route that was causing 502 errors by matching all /api/v1/* paths.
+# TODO: Register generated_preview separately if needed for sites.lavish.solutions subdomain
