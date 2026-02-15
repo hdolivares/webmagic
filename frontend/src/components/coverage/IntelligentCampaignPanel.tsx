@@ -79,6 +79,8 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
   const [city, setCity] = useState('Los Angeles')
   const [category, setCategory] = useState('plumbers')
   const [draftMode, setDraftMode] = useState(true) // Default to draft mode for safety
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null) // For manual zone selection
+  const [forceRescrape, setForceRescrape] = useState(false) // Allow re-scraping zones
   
   // Data state
   const [availableCities, setAvailableCities] = useState<string[]>([])
@@ -149,9 +151,14 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
     setScrapeResult(null) // Clear previous results
     
     try {
-      console.log('🔵 Starting zone scrape...')
+      console.log('🔵 Starting zone scrape...', { 
+        zone_id: selectedZoneId || 'auto (next)',
+        force_rescrape: forceRescrape 
+      })
       const response = await api.scrapeIntelligentZone({
         strategy_id: strategy.strategy_id,
+        zone_id: selectedZoneId || undefined,
+        force_rescrape: forceRescrape,
         limit_per_zone: 50,
         draft_mode: draftMode
       })
@@ -433,8 +440,40 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
             {/* Action Buttons */}
             {strategy.status === 'active' && strategy.next_zone && (
               <div className="action-section">
+                {/* Zone Selector */}
+                <div className="zone-selector-section">
+                  <div className="form-field">
+                    <label>Select Zone to Scrape</label>
+                    <select
+                      className="form-input"
+                      value={selectedZoneId || ''}
+                      onChange={(e) => setSelectedZoneId(e.target.value || null)}
+                    >
+                      <option value="">Auto (Next Unscraped Zone)</option>
+                      {strategy.zones.map((zone) => (
+                        <option key={zone.zone_id} value={zone.zone_id}>
+                          {zone.zone_id} - {zone.city || zone.target_city || zone.area_description} ({zone.priority})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <label className="checkbox-label" style={{ marginTop: '10px' }}>
+                    <input
+                      type="checkbox"
+                      checked={forceRescrape}
+                      onChange={(e) => setForceRescrape(e.target.checked)}
+                    />
+                    <span>Force Rescrape (allow re-scraping already-scraped zones)</span>
+                  </label>
+                </div>
+
                 <div className="next-zone-info">
-                  <h4>Next Zone: {strategy.next_zone.zone_id}</h4>
+                  <h4>
+                    {selectedZoneId 
+                      ? `Selected Zone: ${selectedZoneId}` 
+                      : `Next Zone: ${strategy.next_zone.zone_id}`}
+                  </h4>
                   <p>
                     <strong>Priority:</strong> {strategy.next_zone.priority} | 
                     <strong> Location:</strong> {strategy.next_zone.lat.toFixed(4)}, {strategy.next_zone.lon.toFixed(4)} | 
@@ -451,7 +490,13 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
                     disabled={loading}
                     className="scrape-btn primary"
                   >
-                    {loading ? '⏳ Scraping... (may take 1-2 minutes)' : '🎯 Start Scraping This Zone'}
+                    {loading 
+                      ? '⏳ Scraping... (may take 1-2 minutes)' 
+                      : forceRescrape 
+                        ? '🔄 Rescrape This Zone' 
+                        : selectedZoneId 
+                          ? '🎯 Scrape Selected Zone'
+                          : '🎯 Start Scraping Next Zone'}
                   </button>
                   
                   <button

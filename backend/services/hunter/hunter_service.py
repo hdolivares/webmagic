@@ -71,7 +71,8 @@ class HunterService:
         population: Optional[int] = None,
         center_lat: Optional[float] = None,
         center_lon: Optional[float] = None,
-        force_new_strategy: bool = False
+        force_new_strategy: bool = False,
+        zone_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Scrape a city using Claude-generated intelligent zone placement strategy.
@@ -90,6 +91,7 @@ class HunterService:
             center_lat: City center latitude (will geocode if not provided)
             center_lon: City center longitude (will geocode if not provided)
             force_new_strategy: Generate new strategy even if one exists
+            zone_id: Specific zone to scrape (if None, scrapes next unscraped zone)
             
         Returns:
             Dictionary with results:
@@ -123,20 +125,28 @@ class HunterService:
             f"{strategy.zones_completed} already completed"
         )
         
-        # Get next zone to scrape
-        next_zone = strategy.get_next_zone()
-        if not next_zone:
-            logger.info(f"Strategy {strategy.id} is complete - all zones scraped")
-            return {
-                "strategy_id": str(strategy.id),
-                "status": "completed",
-                "message": "All zones in this strategy have been scraped",
-                "total_zones": strategy.total_zones,
-                "zones_completed": strategy.zones_completed,
-                "total_businesses_found": strategy.businesses_found
-            }
-        
-        zone_id = next_zone["zone_id"]
+        # Get zone to scrape (specific zone or next available)
+        if zone_id:
+            # Find specific zone by ID
+            next_zone = next((z for z in strategy.zones if z["zone_id"] == zone_id), None)
+            if not next_zone:
+                logger.error(f"Zone {zone_id} not found in strategy {strategy.id}")
+                raise ValueError(f"Zone {zone_id} not found in strategy")
+            logger.info(f"Using specified zone: {zone_id}")
+        else:
+            # Get next unscraped zone
+            next_zone = strategy.get_next_zone()
+            if not next_zone:
+                logger.info(f"Strategy {strategy.id} is complete - all zones scraped")
+                return {
+                    "strategy_id": str(strategy.id),
+                    "status": "completed",
+                    "message": "All zones in this strategy have been scraped",
+                    "total_zones": strategy.total_zones,
+                    "zones_completed": strategy.zones_completed,
+                    "total_businesses_found": strategy.businesses_found
+                }
+            zone_id = next_zone["zone_id"]
         target_city = next_zone.get("city") or next_zone.get("target_city")
         zone_lat = next_zone.get("lat")  # Keep for backwards compatibility
         zone_lon = next_zone.get("lon")  # Keep for backwards compatibility
