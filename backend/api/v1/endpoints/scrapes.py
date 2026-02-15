@@ -25,7 +25,7 @@ from sqlalchemy import select
 from pydantic import BaseModel, Field
 
 from core.database import get_db
-from core.auth import get_current_user
+from api.deps import get_current_user
 from models.user import User
 from models.scrape_session import ScrapeSession
 from services.progress.redis_service import RedisService
