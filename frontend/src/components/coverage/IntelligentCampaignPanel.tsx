@@ -37,6 +37,7 @@ interface Strategy {
   business_distribution_analysis?: string
   zones: Zone[]
   next_zone?: Zone
+  scraped_zone_ids?: string[]
 }
 
 interface ScrapeResult {
@@ -452,11 +453,16 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
                       onChange={(e) => setSelectedZoneId(e.target.value || null)}
                     >
                       <option value="">Auto (Next Unscraped Zone)</option>
-                      {strategy.zones.map((zone) => (
-                        <option key={zone.zone_id} value={zone.zone_id}>
-                          {zone.zone_id} - {zone.city || zone.target_city || zone.area_description} ({zone.priority})
-                        </option>
-                      ))}
+                      {strategy.zones.map((zone) => {
+                        const isScraped = strategy.scraped_zone_ids?.includes(zone.zone_id) || false
+                        const prefix = isScraped ? '✓ SCRAPED: ' : ''
+                        const label = `${prefix}${zone.zone_id} - ${zone.city || zone.target_city || zone.area_description} (${zone.priority})`
+                        return (
+                          <option key={zone.zone_id} value={zone.zone_id}>
+                            {label}
+                          </option>
+                        )
+                      })}
                     </select>
                   </div>
                   
