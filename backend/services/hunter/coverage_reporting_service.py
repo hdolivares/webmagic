@@ -70,10 +70,14 @@ class CoverageReportingService:
             }
         """
         # Get coverage entry
+        # NOTE: Using .scalars().first() instead of .scalar_one_or_none() to handle 
+        # legacy duplicate zone_ids (before category was added to zone_id generation)
         result = await self.db.execute(
-            select(CoverageGrid).where(CoverageGrid.zone_id == zone_id)
+            select(CoverageGrid)
+            .where(CoverageGrid.zone_id == zone_id)
+            .order_by(CoverageGrid.created_at.desc())  # Get most recent if duplicates exist
         )
-        coverage = result.scalar_one_or_none()
+        coverage = result.scalars().first()
         
         if not coverage:
             logger.warning(f"Zone not found: {zone_id}")

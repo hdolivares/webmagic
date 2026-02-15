@@ -254,8 +254,8 @@ class ApiClient {
     limit?: number
     status?: string
   }): Promise<{ sites: any[]; total: number }> {
-    // Call the admin endpoint for deployed CUSTOMER sites (sites table)
-    const response = await this.client.get('/admin/sites', { params })
+    // Call the sites endpoint for deployed CUSTOMER sites (sites table)
+    const response = await this.client.get('/sites/', { params })
     return response.data
   }
 
