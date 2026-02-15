@@ -187,6 +187,21 @@ def _handle_url_found(
     """
     confidence = discovery_result.get("confidence", 0)
     
+    # Check if ScrapingDog returned the SAME URL that was just rejected
+    # This prevents infinite validation loops
+    validation_history = business.website_metadata.get("validation_history", [])
+    if validation_history:
+        last_validation = validation_history[-1]
+        last_rejected_url = last_validation.get("url", "")
+        
+        if last_rejected_url and found_url == last_rejected_url:
+            logger.warning(
+                f"⚠️ ScrapingDog returned the SAME rejected URL ({found_url}). "
+                f"Marking as confirmed_no_website to prevent loop."
+            )
+            # Treat as "no URL found" - this business truly has no website
+            return _handle_no_url_found(db, business, discovery_result, metadata_service)
+    
     logger.info(
         f"✅ ScrapingDog found URL for {business.name}: {found_url} "
         f"(confidence: {confidence:.2f})"
@@ -213,23 +228,21 @@ def _handle_url_found(
         notes=f"Found via ScrapingDog with {confidence:.1%} confidence"
     )
     
-    # Save complete ScrapingDog response
-    business.website_validation_result = {
-        "stages": {
-            "google_search": {
-                "searched": True,
-                "found": True,
-                "url": found_url,
-                "query": discovery_result.get("query", ""),
-                "confidence": confidence,
-                "reasoning": discovery_result.get("reasoning", ""),
-                "match_signals": discovery_result.get("llm_analysis", {}).get("match_signals", {}),
-                "llm_model": discovery_result.get("llm_model", ""),
-                "search_results_count": len(discovery_result.get("search_results", {}).get("organic_results", [])),
-                "scrapingdog_response": discovery_result.get("search_results", {})
-            }
-        }
+    # Save complete ScrapingDog response to raw_data (like Outscraper does)
+    # This preserves all search results for debugging and analysis
+    current_raw_data = business.raw_data or {}
+    current_raw_data["scrapingdog_discovery"] = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "query": discovery_result.get("query", ""),
+        "url_found": found_url,
+        "confidence": confidence,
+        "reasoning": discovery_result.get("reasoning", ""),
+        "llm_model": discovery_result.get("llm_model", ""),
+        "llm_analysis": discovery_result.get("llm_analysis", {}),
+        "search_results": discovery_result.get("search_results", {}),  # Full raw response
+        "organic_results_count": len(discovery_result.get("search_results", {}).get("organic_results", [])),
     }
+    business.raw_data = current_raw_data
     
     db.commit()
     
@@ -281,6 +294,21 @@ def _handle_no_url_found(
         found_url=False,
         notes="ScrapingDog found no valid website"
     )
+    
+    # Save complete ScrapingDog response to raw_data (even when no URL found)
+    current_raw_data = business.raw_data or {}
+    current_raw_data["scrapingdog_discovery"] = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "query": discovery_result.get("query", ""),
+        "url_found": None,
+        "confidence": confidence,
+        "reasoning": discovery_result.get("reasoning", ""),
+        "llm_model": discovery_result.get("llm_model", ""),
+        "llm_analysis": discovery_result.get("llm_analysis", {}),
+        "search_results": discovery_result.get("search_results", {}),  # Full raw response
+        "organic_results_count": len(discovery_result.get("search_results", {}).get("organic_results", [])),
+    }
+    business.raw_data = current_raw_data
     
     # Save complete result
     business.website_validation_result = {
