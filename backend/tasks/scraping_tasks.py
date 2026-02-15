@@ -20,7 +20,7 @@ from typing import Dict, Any, Optional
 from celery import shared_task
 from sqlalchemy import select
 
-from core.database import get_db_session_sync, get_db_async
+from core.database import get_db_session_sync, get_db
 from models.scrape_session import ScrapeSession
 from models.geo_strategy import GeoStrategy
 from services.hunter.hunter_service import HunterService
@@ -237,7 +237,7 @@ def _run_scraping(
         """Inner async function for scraping."""
         try:
             # Create async database session
-            async with get_db_async() as db:
+            async for db in get_db():
                 # Initialize HunterService
                 hunter = HunterService(db=db)
                 
