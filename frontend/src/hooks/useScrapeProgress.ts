@@ -97,7 +97,7 @@ export function useScrapeProgress(
   // Refs
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttemptsRef = useRef(0);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<number | null>(null);
   
   // Reconnect function
   const reconnect = useCallback(() => {
