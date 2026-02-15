@@ -19,6 +19,11 @@ from services.validation.playwright_service import PlaywrightValidationService
 from services.validation.llm_validator import LLMWebsiteValidator
 from services.system_settings_service import SystemSettingsService
 from core.config import get_settings
+from core.validation_enums import (
+    ValidationRecommendation,
+    InvalidURLReason,
+    categorize_url_domain
+)
 
 logger = logging.getLogger(__name__)
 
@@ -146,12 +151,15 @@ class ValidationOrchestrator:
             
             if not prescreen_result["should_validate"]:
                 # Failed prescreen - don't proceed to Playwright
-                result["verdict"] = "missing"
+                result["verdict"] = "invalid"
                 result["confidence"] = 0.95
                 result["reasoning"] = prescreen_result["skip_reason"]
-                result["recommendation"] = "clear_url_and_mark_missing"
+                result["recommendation"] = ValidationRecommendation.TRIGGER_SCRAPINGDOG.value
                 
-                logger.info(f"[Stage 1] Failed: {prescreen_result['skip_reason']}")
+                # Categorize the invalid reason
+                result["invalid_reason"] = categorize_url_domain(url) or InvalidURLReason.FILE.value
+                
+                logger.info(f"[Stage 1] Failed: {prescreen_result['skip_reason']}, reason: {result['invalid_reason']}")
                 return self._finalize_result(result, start_time)
             
             logger.info(f"[Stage 1] Passed")
@@ -181,9 +189,20 @@ class ValidationOrchestrator:
                 result["verdict"] = "invalid"
                 result["confidence"] = 0.8
                 result["reasoning"] = f"Website failed to load: {playwright_result.get('error', 'Unknown error')}"
-                result["recommendation"] = "mark_invalid_keep_url"
+                result["recommendation"] = ValidationRecommendation.RETRY_VALIDATION.value
                 
-                logger.warning(f"[Stage 2] Failed: {result['reasoning']}")
+                # Determine technical failure reason
+                error = playwright_result.get("error", "").lower()
+                if "404" in error or "not found" in error:
+                    result["invalid_reason"] = InvalidURLReason.NOT_FOUND.value
+                elif "timeout" in error:
+                    result["invalid_reason"] = InvalidURLReason.TIMEOUT.value
+                elif "ssl" in error or "certificate" in error:
+                    result["invalid_reason"] = InvalidURLReason.SSL_ERROR.value
+                else:
+                    result["invalid_reason"] = InvalidURLReason.SERVER_ERROR.value
+                
+                logger.warning(f"[Stage 2] Failed: {result['reasoning']}, reason: {result['invalid_reason']}")
                 return self._finalize_result(result, start_time)
             
             logger.info(f"[Stage 2] Success - extracted content")
@@ -211,7 +230,31 @@ class ValidationOrchestrator:
             result["verdict"] = llm_result["verdict"]
             result["confidence"] = llm_result["confidence"]
             result["reasoning"] = llm_result["reasoning"]
-            result["recommendation"] = llm_result["recommendation"]
+            
+            # Map LLM recommendation to new system
+            llm_recommendation = llm_result.get("recommendation", "")
+            if llm_recommendation == "clear_url_and_mark_missing":
+                result["recommendation"] = ValidationRecommendation.TRIGGER_SCRAPINGDOG.value
+            elif llm_recommendation == "keep_url":
+                result["recommendation"] = ValidationRecommendation.KEEP_URL.value
+            elif llm_recommendation == "mark_invalid_keep_url":
+                result["recommendation"] = ValidationRecommendation.RETRY_VALIDATION.value
+            else:
+                result["recommendation"] = llm_recommendation  # Use as-is if already new format
+            
+            # Extract invalid reason from LLM signals
+            if result["verdict"] != "valid":
+                match_signals = llm_result.get("match_signals", {})
+                if match_signals.get("is_directory"):
+                    result["invalid_reason"] = InvalidURLReason.DIRECTORY.value
+                elif match_signals.get("is_aggregator"):
+                    result["invalid_reason"] = InvalidURLReason.AGGREGATOR.value
+                elif not match_signals.get("name_match"):
+                    result["invalid_reason"] = InvalidURLReason.WRONG_BUSINESS.value
+                elif not match_signals.get("phone_match") and not match_signals.get("address_match"):
+                    result["invalid_reason"] = InvalidURLReason.NO_CONTACT.value
+                else:
+                    result["invalid_reason"] = categorize_url_domain(url)
             
             # Set is_valid based on verdict
             result["is_valid"] = (llm_result["verdict"] == "valid")
