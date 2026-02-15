@@ -34,7 +34,8 @@ celery_app.conf.update(
 
 # Auto-discover tasks
 celery_app.autodiscover_tasks([
-    "tasks.scraping",
+    "tasks.scraping",  # Legacy scraping tasks
+    "tasks.scraping_tasks",  # Phase 2: Async scraping with progress
     "tasks.generation",
     "tasks.generation_sync",  # Synchronous generation tasks
     "tasks.monitoring_sync",  # Synchronous monitoring tasks (replaces monitoring)
@@ -86,15 +87,30 @@ celery_app.conf.beat_schedule = {
 }
 
 # Task routes (route tasks to dedicated queues for isolation)
+# Phase 2: Separate queues for scraping → validation → discovery flow
 celery_app.conf.task_routes = {
-    "tasks.scraping.*": {"queue": "scraping"},
+    # Queue 1: Outscraper scraping (I/O bound, slow external API)
+    "tasks.scraping.*": {"queue": "scraping", "priority": 5},
+    "tasks.scraping_tasks.*": {"queue": "scraping", "priority": 7},  # Phase 2 async scraping (higher priority)
+    
+    # Queue 2: URL validation (CPU + I/O bound, Playwright + LLM)
+    "tasks.validation_tasks.*": {"queue": "validation", "priority": 6},
+    "tasks.validation_tasks_enhanced.*": {"queue": "validation", "priority": 8},  # V2 validation (higher priority)
+    
+    # Queue 3: Website discovery (I/O bound, ScrapingDog + LLM)
+    "tasks.discovery_tasks.*": {"queue": "discovery", "priority": 6},
+    
+    # Other queues (unchanged)
     "tasks.generation.*": {"queue": "generation"},
-    "tasks.generation_sync.*": {"queue": "generation"},  # Sync generation tasks
+    "tasks.generation_sync.*": {"queue": "generation"},
     "tasks.campaigns.*": {"queue": "campaigns"},
-    "tasks.sms_sync.*": {"queue": "campaigns"},  # Sync SMS uses campaigns queue
-    "tasks.monitoring_sync.*": {"queue": "monitoring"},  # Sync monitoring tasks
-    "tasks.validation.*": {"queue": "validation"},  # Website validation tasks
+    "tasks.sms_sync.*": {"queue": "campaigns"},
+    "tasks.monitoring_sync.*": {"queue": "monitoring"},
 }
+
+# Enable priority support (0-10, 10 = highest)
+celery_app.conf.task_queue_max_priority = 10
+celery_app.conf.task_default_priority = 5
 
 if __name__ == "__main__":
     celery_app.start()
