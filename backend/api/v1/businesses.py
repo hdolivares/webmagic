@@ -656,6 +656,123 @@ async def get_filter_stats(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/needs-generation")
+async def get_businesses_needing_generation(
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Get all businesses that need website generation.
+    
+    Returns businesses that:
+    - Have no website URL
+    - Have been validated as truly having no website (missing or confirmed_missing)
+    - Are not already queued/generated (not in generated_sites table)
+    
+    Useful for bulk queueing on the AI Generation page.
+    """
+    from sqlalchemy import select, and_, or_
+    from models.business import Business
+    from models.generated_site import GeneratedSite
+    
+    # Find businesses that need generation and aren't already queued
+    query = select(Business).outerjoin(
+        GeneratedSite,
+        Business.id == GeneratedSite.business_id
+    ).where(
+        and_(
+            Business.website_url.is_(None),
+            or_(
+                Business.website_validation_status == 'missing',
+                Business.website_validation_status == 'confirmed_missing'
+            ),
+            GeneratedSite.id.is_(None)  # Not already in generation queue
+        )
+    ).order_by(Business.created_at.desc())
+    
+    result = await db.execute(query)
+    businesses = result.scalars().all()
+    
+    # Format response
+    businesses_data = [
+        {
+            "id": str(b.id),
+            "name": b.name,
+            "category": b.category,
+            "city": b.city,
+            "state": b.state,
+            "country": b.country,
+            "phone": b.phone,
+            "email": b.email,
+            "rating": float(b.rating) if b.rating else None,
+            "review_count": b.review_count,
+            "website_validation_status": b.website_validation_status,
+            "created_at": b.created_at.isoformat() if b.created_at else None,
+        }
+        for b in businesses
+    ]
+    
+    return {
+        "total": len(businesses_data),
+        "businesses": businesses_data
+    }
+
+
+@router.post("/queue-for-generation")
+async def queue_businesses_for_generation(
+    business_ids: Optional[List[str]] = None,
+    queue_all: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Queue businesses for website generation.
+    
+    Args:
+        business_ids: Optional list of specific business IDs to queue
+        queue_all: If true, queues ALL businesses that need generation (ignores business_ids)
+    
+    Returns:
+        Statistics about queued businesses
+    """
+    from services.hunter.website_generation_queue_service import WebsiteGenerationQueueService
+    from uuid import UUID
+    
+    service = WebsiteGenerationQueueService(db)
+    
+    if queue_all:
+        # Get all businesses needing generation
+        businesses_response = await get_businesses_needing_generation(db, current_user)
+        ids_to_queue = [UUID(b["id"]) for b in businesses_response["businesses"]]
+    else:
+        if not business_ids:
+            raise HTTPException(status_code=400, detail="Either provide business_ids or set queue_all=true")
+        ids_to_queue = [UUID(id) for id in business_ids]
+    
+    if not ids_to_queue:
+        return {
+            "queued": 0,
+            "already_queued": 0,
+            "failed": 0,
+            "total": 0,
+            "message": "No businesses to queue"
+        }
+    
+    # Queue them all with high priority
+    result = await service.queue_multiple(
+        business_ids=ids_to_queue,
+        priority=8  # High priority for bulk manual queueing
+    )
+    
+    return {
+        "queued": result["queued"],
+        "already_queued": result["already_queued"],
+        "failed": result["failed"],
+        "total": len(ids_to_queue),
+        "message": f"Queued {result['queued']} businesses for website generation"
+    }
+
+
 @router.post("/filters/presets")
 async def save_filter_preset(
     request: SaveFilterPresetRequest,

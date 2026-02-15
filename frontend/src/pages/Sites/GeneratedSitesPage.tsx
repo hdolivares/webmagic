@@ -3,17 +3,19 @@
  * These are sites created by the system but not yet purchased by customers
  */
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
 import { Card, CardHeader, CardBody, CardTitle, Badge, Button } from '@/components/ui'
-import { Wand2, Search, ExternalLink, Eye, Calendar, TrendingUp, ChevronDown, ChevronUp, ExternalLink as LinkIcon } from 'lucide-react'
+import { Wand2, Search, ExternalLink, Eye, Calendar, TrendingUp, ChevronDown, ChevronUp, ExternalLink as LinkIcon, Play, AlertCircle } from 'lucide-react'
 
 export const GeneratedSitesPage = () => {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [expandedSites, setExpandedSites] = useState<Set<string>>(new Set())
+  const [showNeedingGeneration, setShowNeedingGeneration] = useState(false)
   
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['generated-sites', statusFilter],
@@ -22,6 +24,26 @@ export const GeneratedSitesPage = () => {
       status: statusFilter === 'all' ? undefined : statusFilter 
     }),
     refetchInterval: 10000, // Refresh every 10 seconds to see generation progress
+  })
+
+  // Get businesses that need generation
+  const { data: needingGeneration, isLoading: loadingNeeding, refetch: refetchNeeding } = useQuery({
+    queryKey: ['businesses-needing-generation'],
+    queryFn: () => api.getBusinessesNeedingGeneration(),
+    refetchInterval: 30000, // Refresh every 30 seconds
+  })
+
+  // Queue all businesses mutation
+  const queueAllMutation = useMutation({
+    mutationFn: () => api.queueBusinessesForGeneration({ queue_all: true }),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['businesses-needing-generation'] })
+      queryClient.invalidateQueries({ queryKey: ['generated-sites'] })
+      alert(`✅ Queued ${result.queued} businesses for website generation!`)
+    },
+    onError: (error: any) => {
+      alert(`❌ Failed to queue businesses: ${error.message}`)
+    }
   })
   
   // Sort sites by created_at descending (most recent first) and filter
@@ -142,6 +164,69 @@ export const GeneratedSitesPage = () => {
           </CardBody>
         </Card>
       </div>
+
+      {/* Businesses Needing Generation Alert */}
+      {needingGeneration && needingGeneration.total > 0 && (
+        <Card className="mb-lg border-l-4 border-l-warning-500 bg-warning-50">
+          <CardBody className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-4">
+                <AlertCircle className="w-6 h-6 text-warning-600 flex-shrink-0 mt-1" />
+                <div>
+                  <h3 className="text-lg font-semibold text-warning-900 mb-2">
+                    {needingGeneration.total} Business{needingGeneration.total !== 1 ? 'es' : ''} Need Website Generation
+                  </h3>
+                  <p className="text-sm text-warning-700 mb-3">
+                    These businesses have been validated as having no existing website and are ready for AI generation.
+                  </p>
+                  
+                  {showNeedingGeneration && (
+                    <div className="mt-4 max-h-60 overflow-y-auto bg-white rounded-lg p-4 space-y-2">
+                      {needingGeneration.businesses.slice(0, 20).map((biz) => (
+                        <div key={biz.id} className="flex items-center justify-between py-2 px-3 hover:bg-gray-50 rounded">
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{biz.name}</div>
+                            <div className="text-sm text-gray-600">
+                              {biz.category} • {biz.city}, {biz.state}
+                            </div>
+                          </div>
+                          <Badge variant="secondary" className="ml-2">
+                            {biz.website_validation_status}
+                          </Badge>
+                        </div>
+                      ))}
+                      {needingGeneration.total > 20 && (
+                        <div className="text-center text-sm text-gray-500 py-2">
+                          ... and {needingGeneration.total - 20} more
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex flex-col gap-2 ml-4">
+                <Button
+                  onClick={() => queueAllMutation.mutate()}
+                  disabled={queueAllMutation.isPending}
+                  className="flex items-center gap-2 bg-warning-600 hover:bg-warning-700 text-white"
+                >
+                  <Play className="w-4 h-4" />
+                  {queueAllMutation.isPending ? 'Queueing...' : `Queue All ${needingGeneration.total}`}
+                </Button>
+                
+                <Button
+                  onClick={() => setShowNeedingGeneration(!showNeedingGeneration)}
+                  variant="secondary"
+                  size="sm"
+                >
+                  {showNeedingGeneration ? 'Hide List' : 'Show List'}
+                </Button>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+      )}
       
       {/* Filters */}
       <div className="flex gap-4 mb-lg">
