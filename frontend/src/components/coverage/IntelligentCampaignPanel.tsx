@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui'
 import { api } from '@/services/api'
-import { scrapesAPI } from '@/api/scrapes'
 import { US_STATES } from '@/data/states'
 import { getCitiesForState } from '@/data/cities'
 import { CoverageBreakdownPanel } from './CoverageBreakdownPanel'
@@ -166,7 +165,7 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
       })
       
       // Phase 2: Use new async API with SSE progress
-      const response = await scrapesAPI.startScrape({
+      const response = await api.startScrape({
         zone_id: selectedZoneId || strategy.next_zone?.zone_id || '',
         city: city,
         state: state,
