@@ -26,6 +26,7 @@ from models.geo_strategy import GeoStrategy
 from services.hunter.hunter_service import HunterService
 from services.progress.progress_publisher import ProgressPublisher
 from services.progress.redis_service import RedisService
+from services.scrape_analytics import ScrapeAnalytics
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +158,29 @@ def scrape_zone_async(
                 "zone_id": scrape_result.get("zone_id", zone_id)
             }
         )
+        
+        # Log comprehensive analytics
+        try:
+            async def log_analytics():
+                async for db in get_db():
+                    analytics_service = ScrapeAnalytics(db)
+                    await analytics_service.log_scrape_complete(
+                        session_id=session_id,
+                        scrape_result=scrape_result
+                    )
+                    break
+            
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(log_analytics())
+            finally:
+                loop.close()
+                
+            logger.info(f"✅ Analytics logged for session {session_id}")
+        except Exception as e:
+            logger.error(f"⚠️ Failed to log analytics: {e}", exc_info=True)
+            # Don't fail the task if analytics fail
         
         logger.info(f"🎉 Scrape task completed successfully: {session_id}")
         
