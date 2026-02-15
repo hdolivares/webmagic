@@ -673,7 +673,7 @@ async def get_businesses_needing_generation(
     """
     from sqlalchemy import select, and_, or_
     from models.business import Business
-    from models.generated_site import GeneratedSite
+    from models.site import GeneratedSite
     
     # Find businesses that need generation and aren't already queued
     query = select(Business).outerjoin(
