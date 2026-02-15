@@ -188,8 +188,8 @@ async def _run_website_validation(
     async def run_validation():
         orchestrator = ValidationOrchestrator(db=db)
         return await orchestrator.validate_business_website(
-            url=url,
-            **business_context
+            business=business_context,
+            url=url
         )
     
     validation_result = await run_validation()
