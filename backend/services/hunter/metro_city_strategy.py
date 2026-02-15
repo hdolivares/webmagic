@@ -138,9 +138,10 @@ def generate_city_based_strategy(
     
     if not metro_def:
         # Fallback: single city strategy
-        # Generate short zone_id (max 20 chars)
-        city_abbr = metro_area.lower().replace(' ', '')[:15]
-        zone_id = f"{city_abbr}_main"[:20]
+        # Generate short zone_id (max 20 chars) - INCLUDE CATEGORY for uniqueness
+        city_abbr = metro_area.lower().replace(' ', '')[:8]
+        category_abbr = category.lower().replace(' ', '')[:8]
+        zone_id = f"{city_abbr}_{category_abbr}"[:20]
         
         return {
             "geographic_analysis": f"Single city strategy for {metro_area}, {state}",
@@ -189,10 +190,12 @@ def generate_city_based_strategy(
         total_estimated += estimated
         
         # Generate short zone_id (max 20 chars for DB constraint)
-        # Format: metro_abbreviation + city_abbreviation (e.g., "la_losangeles")
+        # Format: metro_abbreviation + city_abbreviation + category (e.g., "la_losang_pet")
+        # INCLUDE CATEGORY to prevent collisions when scraping different categories in same city
         metro_abbr = ''.join([w[0] for w in metro_area.split()]).lower()  # "LA" -> "la"
-        city_abbr = city_name.lower().replace(' ', '')[:12]  # Remove spaces, max 12 chars
-        zone_id = f"{metro_abbr}_{city_abbr}"[:20]  # Ensure max 20 chars
+        city_abbr = city_name.lower().replace(' ', '')[:8]  # Remove spaces, max 8 chars
+        category_abbr = category.lower().replace(' ', '')[:6]  # Max 6 chars for category
+        zone_id = f"{metro_abbr}_{city_abbr}_{category_abbr}"[:20]  # Ensure max 20 chars
         
         zone = {
             "zone_id": zone_id,
