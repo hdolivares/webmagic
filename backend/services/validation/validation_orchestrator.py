@@ -247,19 +247,21 @@ class ValidationOrchestrator:
         Returns:
             Formatted dict for LLM prompt
         """
-        content_info = playwright_result.get("content", {})
+        # CRITICAL FIX: Playwright returns FLAT structure, not nested under "content"
+        # The bug was: content_info = playwright_result.get("content", {}) <- "content" key doesn't exist!
+        # This caused all phones/emails/content to be empty arrays, making LLM reject valid websites
         
         return {
             "url": url,
             "final_url": playwright_result.get("final_url", url),
-            "title": content_info.get("title", ""),
-            "meta_description": content_info.get("meta_description", ""),
-            "phones": content_info.get("phones", []),
-            "emails": content_info.get("emails", []),
-            "has_address": content_info.get("has_address", False),
-            "has_hours": content_info.get("has_hours", False),
-            "content_preview": content_info.get("text_content", "")[:500],
-            "word_count": content_info.get("word_count", 0),
+            "title": playwright_result.get("title", ""),
+            "meta_description": playwright_result.get("meta_description", ""),
+            "phones": playwright_result.get("phones", []),
+            "emails": playwright_result.get("emails", []),
+            "has_address": playwright_result.get("has_address", False),
+            "has_hours": playwright_result.get("has_hours", False),
+            "content_preview": playwright_result.get("content_preview", "")[:500],
+            "word_count": playwright_result.get("word_count", 0),
         }
     
     def _finalize_result(
