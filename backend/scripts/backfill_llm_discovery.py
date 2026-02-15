@@ -108,12 +108,15 @@ async def backfill_missing_websites(
                 
                 logger.info(f"\n📦 Processing batch {batch_num}/{total_batches} ({len(batch)} businesses)...")
                 
-                # Process batch in parallel (with rate limiting handled by service)
-                tasks = []
+                # Process batch sequentially to avoid SQLAlchemy async issues
+                results = []
                 for biz in batch:
-                    tasks.append(process_business(db, llm_discovery, biz))
-                
-                results = await asyncio.gather(*tasks, return_exceptions=True)
+                    try:
+                        result = await process_business(db, llm_discovery, biz)
+                        results.append(result)
+                    except Exception as e:
+                        logger.error(f"❌ Error processing business: {e}")
+                        results.append(Exception(str(e)))
                 
                 # Count results
                 for result in results:
