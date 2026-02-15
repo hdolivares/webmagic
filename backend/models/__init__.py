@@ -31,6 +31,7 @@ from models.draft_campaign import DraftCampaign
 from models.system_settings import SystemSetting
 from models.website_validation import WebsiteValidation
 from models.business_filter_preset import BusinessFilterPreset
+from models.scrape_session import ScrapeSession
 
 __all__ = [
     "BaseModel",
@@ -69,4 +70,6 @@ __all__ = [
     # Website validation & filtering models
     "WebsiteValidation",
     "BusinessFilterPreset",
+    # Phase 2: Async scraping models
+    "ScrapeSession",
 ]
