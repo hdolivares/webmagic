@@ -63,7 +63,8 @@ def migrate_missing_businesses(dry_run: bool = True, limit: int = None):
             logger.info(f"Business: {business.name}")
             logger.info(f"  City/State: {business.city}, {business.state}")
             logger.info(f"  Current Status: {business.website_validation_status}")
-            logger.info(f"  Outscraper URL: {business.raw_data.get('outscraper', {}).get('website', 'None')}")
+            outscraper_url = (business.raw_data or {}).get('outscraper', {}).get('website', 'None')
+            logger.info(f"  Outscraper URL: {outscraper_url}")
             
             if dry_run:
                 logger.info(f"  → Would migrate to: {ValidationState.NEEDS_DISCOVERY.value}")
