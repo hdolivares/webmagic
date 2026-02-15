@@ -17,7 +17,7 @@ from typing import Optional
 from redis import Redis, ConnectionPool
 from redis.exceptions import ConnectionError, TimeoutError
 
-from core.config import settings
+from core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,7 @@ class RedisService:
         """
         try:
             # Create connection pool
+            settings = get_settings()
             cls._pool = ConnectionPool(
                 host=getattr(settings, 'REDIS_HOST', 'localhost'),
                 port=getattr(settings, 'REDIS_PORT', 6379),
