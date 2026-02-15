@@ -1,409 +1,140 @@
-# ScrapingDog Data Storage Fix & Analysis
+# ScrapingDog Data Storage Fix
 
-**Date:** February 15, 2026  
-**Status:** ✅ Fixed and Deployed
+## Issue Identified
 
----
+You were absolutely correct! We had **two critical problems** with how ScrapingDog discovery data was being handled:
 
-## Executive Summary
+### 1. ❌ Raw Data Not Being Saved Properly
+- **Problem**: ScrapingDog responses were being saved to `website_validation_result` field, which **overwrote** the validation data
+- **Impact**: Lost all the detailed search results from ScrapingDog (organic results, snippets, descriptions, etc.)
+- **Root Cause**: Wrong storage location - should use `raw_data` field like Outscraper does
 
-Discovered and fixed a critical gap in our ScrapingDog integration: **We were only saving 5 fields from ScrapingDog's rich data, missing all the valuable organic search results, LLM analysis details, and debugging information.**
+### 2. ❌ Infinite Validation Loops
+- **Problem**: When ScrapingDog returned the **same rejected URL**, the system would re-queue it for validation indefinitely
+- **Example**: MapQuest URL → LLM rejects → ScrapingDog triggers → Returns same MapQuest URL → Loop
+- **Impact**: Wasted API calls and never reached terminal state
 
-Additionally, **backfilled 12 businesses** where LLM had successfully discovered websites, but the URLs weren't being saved to the `website_url` field.
+## What Was Fixed
 
----
-
-## What Was Wrong
-
-### ❌ Problem 1: Incomplete Data Storage
-
-**What we were saving:**
-```json
-{
-  "llm_discovery": {
-    "url": "https://example.com",
-    "confidence": 0.95,
-    "reasoning": "Phone number matches...",
-    "verified_at": "2026-02-15T...",
-    "method": "scrapingdog_llm"
-  }
-}
-```
-
-**What ScrapingDog actually returns (MUCH MORE):**
-- **Full organic search results** (titles, URLs, snippets, positions)
-- **LLM analysis details** (match signals, confidence breakdown)
-- **Search query used**
-- **LLM model name**
-- **Complete result metadata** (10+ results per search)
-
-**Impact:** Lost valuable data for debugging, improving accuracy, and understanding why the LLM made certain decisions.
-
----
-
-### ❌ Problem 2: 12 Businesses Missing Website URLs
-
-**Symptoms:**
-- LLM successfully found websites (stored in `raw_data->llm_discovery->url`)
-- But `website_url` field was NULL
-- `website_validation_status` was 'missing' instead of 'pending'
-- `verified` was false instead of true
-
-**Affected Businesses:**
-1. Sepulveda Sanchez Accident Lawyers
-2. Law Office of Parag L. Amin, P.C.
-3. i Accident Lawyer
-4. SoCal Injury Lawyers
-5. Carbon Law Group, APLC
-6. The Law Offices of Nigel Burns
-7. Mollaei Law
-8. MKP Law Group, LLP
-9. DK Law
-10. Studio City Veterinary Services
-11. North Hollywood Animal Care
-12. Marks Allan DVM
-
-**Pattern Analysis:**
-- Happened at **07:32-07:33** timeframe (5 businesses at 07:33, 4 at 07:32)
-- Some businesses at 07:32 worked correctly (4 out of 8)
-- All businesses before 07:31 worked correctly (100% success)
-- All businesses at 07:31 and earlier worked correctly
-
-**Hypothesis:**
-Likely a transient issue (database connection, async timing, or exception handling) that occurred during that specific scrape batch. The code logic itself was correct, but something prevented the `biz_data` updates from persisting for those specific businesses.
-
----
-
-## What ScrapingDog Actually Returns
-
-### Full Response Structure:
-
-```json
-{
-  "organic_results": [
-    {
-      "position": 1,
-      "title": "Business Name - Official Website",
-      "link": "https://example.com",
-      "url": "https://example.com",
-      "snippet": "Contact us at (555) 123-4567. Located in Los Angeles, CA...",
-      "displayed_link": "example.com › contact",
-      "domain": "example.com"
-    },
-    {
-      "position": 2,
-      "title": "Business Name Reviews - Yelp",
-      "link": "https://yelp.com/biz/business-name",
-      "snippet": "Great service! Phone: (555) 123-4567...",
-      // ... more results
-    }
-    // ... up to 10 results
-  ],
-  "related_searches": [...],
-  "knowledge_graph": {...},
-  "search_parameters": {...}
-}
-```
-
-### LLM Analysis Response:
-
-```json
-{
-  "url": "https://example.com",
-  "confidence": 0.95,
-  "reasoning": "The phone number +1 555-123-4567 from the business data matches the snippet in Result #1, confirming this is the correct website.",
-  "match_signals": {
-    "phone_match": true,
-    "name_match": true,
-    "location_match": true,
-    "domain_quality": "high"
-  },
-  "rejected_urls": [
-    {
-      "url": "https://yelp.com/...",
-      "reason": "Directory site"
-    },
-    {
-      "url": "https://facebook.com/...",
-      "reason": "Social media"
-    }
-  ]
-}
-```
-
----
-
-## The Fix
-
-### Code Changes in `hunter_service.py`
-
-#### Before:
+### ✅ Proper Raw Data Storage
 ```python
-biz_data["raw_data"]["llm_discovery"] = {
-    "url": verified_url,
-    "confidence": confidence,
-    "reasoning": discovery_result.get("reasoning"),
-    "verified_at": datetime.utcnow().isoformat(),
-    "method": "scrapingdog_llm"
-}
-```
-
-#### After:
-```python
-biz_data["raw_data"]["llm_discovery"] = {
-    "url": verified_url,
-    "confidence": confidence,
-    "reasoning": discovery_result.get("reasoning"),
-    "verified_at": datetime.utcnow().isoformat(),
-    "method": "scrapingdog_llm",
-    "query": discovery_result.get("query"),  # NEW
-    "llm_model": discovery_result.get("llm_model"),  # NEW
-    # Store complete ScrapingDog search results
-    "scrapingdog_results": discovery_result.get("search_results"),  # NEW - ALL organic results
-    # Store LLM analysis details
-    "llm_analysis": discovery_result.get("llm_analysis")  # NEW - Match signals, rejected URLs
-}
-```
-
-**Applied to BOTH cases:**
-1. When website IS found
-2. When website is NOT found (for debugging)
-
-**Added Debug Logging:**
-```python
-logger.debug(f"  │  └─ Final biz_data: website_url={biz_data.get('website_url')}, validation_status={biz_data.get('website_validation_status')}, verified={biz_data.get('verified')}")
-```
-
-This will help us track if the issue happens again.
-
----
-
-## The Backfill
-
-### SQL Query Executed:
-```sql
-UPDATE businesses 
-SET 
-    website_url = raw_data->'llm_discovery'->>'url',
-    website_validation_status = 'pending',
-    verified = true,
-    updated_at = NOW()
-WHERE 
-    website_url IS NULL
-    AND raw_data->'llm_discovery'->>'url' IS NOT NULL
-    AND LENGTH(raw_data->'llm_discovery'->>'url') > 10
-RETURNING name, website_url, website_validation_status;
-```
-
-### Results:
-✅ **12 businesses updated**
-- All now have `website_url` set
-- All set to `website_validation_status = 'pending'` (ready for Playwright)
-- All set to `verified = true` (LLM verification completed)
-
----
-
-## Current Status
-
-### Before Fix:
-- **70 businesses** with LLM discovery data
-- **58 (83%)** had website_url properly saved
-- **12 (17%)** had LLM-found URLs but website_url was NULL
-
-### After Fix & Backfill:
-- **70 businesses** with LLM discovery data
-- **70 (100%)** have website_url properly saved ✅
-- **0 (0%)** missing website_url ✅
-- **66** ready for Playwright validation (`status = 'pending'`)
-- **4** confirmed as having no website (`status = 'confirmed_missing'`)
-
----
-
-## What We Now Save (Example)
-
-### Real Example from Database:
-
-```json
-{
-  "llm_discovery": {
-    "url": "https://sepulvedalawgroup.com/",
-    "confidence": 0.95,
-    "reasoning": "The phone number +1 213-431-0621 from the business data matches the snippet in Result #1, confirming this is the correct website.",
-    "verified_at": "2026-02-15T01:33:48.920170",
-    "method": "scrapingdog_llm",
-    "query": "\"Sepulveda Sanchez Accident Lawyers\" Los Angeles California website",
+# NOW: Save to raw_data field (preserves validation history)
+current_raw_data = business.raw_data or {}
+current_raw_data["scrapingdog_discovery"] = {
+    "timestamp": datetime.utcnow().isoformat(),
+    "query": '"M & D Plumbing" Ethel Louisiana website',
+    "url_found": found_url,
+    "confidence": 0.90,
+    "reasoning": "LLM analysis...",
     "llm_model": "claude-3-haiku-20240307",
-    "scrapingdog_results": {
-      "organic_results": [
-        {
-          "position": 1,
-          "title": "Sepulveda Sanchez Law - Los Angeles Personal Injury Lawyers",
-          "link": "https://sepulvedalawgroup.com/los-angeles-injury-lawyers/",
-          "snippet": "Call us today at 213-431-0621 for a free consultation. We serve clients in Los Angeles, California...",
-          "domain": "sepulvedalawgroup.com"
-        },
-        {
-          "position": 2,
-          "title": "Sepulveda Sanchez Accident Lawyers - Yelp",
-          "link": "https://yelp.com/...",
-          "snippet": "..."
-        }
-        // ... up to 10 results
-      ]
-    },
-    "llm_analysis": {
-      "url": "https://sepulvedalawgroup.com/",
-      "confidence": 0.95,
-      "reasoning": "Phone number matches...",
-      "match_signals": {
-        "phone_match": true,
-        "name_match": true,
-        "location_match": true
-      }
-    }
-  }
+    "llm_analysis": {...},  # Full LLM response
+    "search_results": {...},  # COMPLETE ScrapingDog response
+    "organic_results_count": 10
 }
+business.raw_data = current_raw_data
 ```
 
----
+**Now Saved:**
+- ✅ Complete search query used
+- ✅ All organic search results (title, snippet, URL, description)
+- ✅ Full LLM analysis and reasoning
+- ✅ Confidence scores
+- ✅ Timestamp for audit trail
+- ✅ Result count for analysis
 
-## Benefits of Storing All ScrapingDog Data
+### ✅ Loop Prevention Logic
+```python
+# Check if ScrapingDog returned the SAME rejected URL
+validation_history = business.website_metadata.get("validation_history", [])
+if validation_history:
+    last_validation = validation_history[-1]
+    last_rejected_url = last_validation.get("url", "")
+    
+    if last_rejected_url and found_url == last_rejected_url:
+        logger.warning("ScrapingDog returned same rejected URL - marking as confirmed_no_website")
+        return _handle_no_url_found(db, business, discovery_result, metadata_service)
+```
 
-### 1. **Debugging & Troubleshooting**
-- See exactly what ScrapingDog returned
-- Understand why LLM chose a specific URL
-- Identify false negatives (missed websites)
-- Track confidence patterns
+## Independent Search Queries - Confirmed Working ✅
 
-### 2. **Model Improvement**
-- Analyze match signals to improve LLM prompts
-- Identify patterns in successful vs failed matches
-- Retrain/refine matching logic based on real data
+Each business **does** get its own independent ScrapingDog search:
 
-### 3. **Alternative Website Discovery**
-- If primary URL fails validation, check alternative URLs in organic results
-- Extract secondary websites (Facebook, LinkedIn) as fallbacks
-- Build website discovery pipeline from stored results
+```python
+def _build_query(self, business_name: str, city: Optional[str], state: Optional[str]) -> str:
+    """Build search query for ScrapingDog."""
+    query_parts = [f'"{business_name}"']  # Exact match for business name
+    if city:
+        query_parts.append(city)
+    if state:
+        query_parts.append(state)
+    query_parts.append("website")
+    return " ".join(query_parts)
+```
 
-### 4. **Competitive Intelligence**
-- See what other businesses appear in search results
-- Analyze competitor presence
-- Track directory listings (Yelp, BBB, etc.)
+**Example Queries:**
+- `"M & D Plumbing" Ethel Louisiana website`
+- `"Thomas & Galbraith Heating" Fairfield Ohio website`
+- `"All-City Plumbing" Jacksonville Florida website`
 
-### 5. **Quality Assurance**
-- Verify LLM is correctly matching phone numbers
-- Check for address/location consistency
-- Audit domain quality assessments
+## What You Can Now Analyze
 
-### 6. **Cost Optimization**
-- Track which queries return useful results
-- Optimize query construction based on success rates
-- Avoid redundant ScrapingDog calls
+With the complete ScrapingDog data now saved in `raw_data`, you can:
 
----
+1. **See All Search Results** - Not just the picked URL, but all 10 organic results
+2. **Cross-Reference** - Compare what ScrapingDog found vs what Outscraper provided
+3. **LLM Decision Analysis** - Understand why the LLM picked (or rejected) each result
+4. **Query Optimization** - See the exact query used and adjust if needed
+5. **Confidence Tracking** - Monitor LLM confidence across discoveries
+
+## Database Query Examples
+
+### Get ScrapingDog Raw Data:
+```sql
+SELECT 
+    name,
+    raw_data->'scrapingdog_discovery'->>'query' as search_query,
+    raw_data->'scrapingdog_discovery'->>'url_found' as url_found,
+    raw_data->'scrapingdog_discovery'->>'confidence' as confidence,
+    raw_data->'scrapingdog_discovery'->>'organic_results_count' as results_count,
+    jsonb_pretty(raw_data->'scrapingdog_discovery'->'search_results'->'organic_results') as all_results
+FROM businesses
+WHERE raw_data ? 'scrapingdog_discovery';
+```
+
+### Compare Outscraper vs ScrapingDog:
+```sql
+SELECT 
+    name,
+    raw_data->'outscraper'->>'website' as outscraper_url,
+    raw_data->'scrapingdog_discovery'->>'url_found' as scrapingdog_url,
+    website_url as current_url,
+    website_metadata->>'source' as url_source
+FROM businesses
+WHERE raw_data ? 'scrapingdog_discovery';
+```
+
+## Testing the Fix
+
+The M & D Plumbing test case demonstrated:
+1. ✅ MapQuest URL correctly rejected as "aggregator"
+2. ✅ ScrapingDog automatically triggered
+3. ✅ Same URL detected and prevented loop
+4. ✅ Business marked as `confirmed_no_website`
+5. ✅ Full audit trail in metadata
 
 ## Next Steps
 
-### 1. Monitor Upcoming Scrapes
-- Check if the 12-business bug reoccurs
-- Watch debug logs for `Final biz_data` values
-- Track success rate of website_url persistence
-
-### 2. Analyze Stored ScrapingDog Data
-- Query `raw_data->llm_discovery->scrapingdog_results` for patterns
-- Build analytics dashboard showing:
-  - Average results per query
-  - Match signal distribution
-  - Confidence score trends
-  - Rejected URL reasons
-
-### 3. Improve LLM Matching
-- Use stored `match_signals` to refine prompts
-- Add more verification signals:
-  - Address matching
-  - Business hours matching
-  - Category/service matching
-
-### 4. Build Fallback Pipeline
-- If primary URL fails Playwright validation:
-  - Check `scrapingdog_results` for alternative URLs
-  - Try social media profiles as temporary placeholders
-  - Generate website based on enriched data
-
----
-
-## Technical Details
-
-### Data Storage Location
-- **Field:** `businesses.raw_data` (JSONB column)
-- **Path:** `raw_data->llm_discovery`
-- **Size:** ~5-10KB per business (vs ~200 bytes before)
-
-### Performance Impact
-- Negligible - JSONB compression handles large objects efficiently
-- Indexed queries still fast
-- Storage cost minimal (~500KB for 100 businesses)
-
-### Query Examples
-
-**Get all ScrapingDog results for a business:**
-```sql
-SELECT 
-    name,
-    raw_data->'llm_discovery'->'scrapingdog_results'->'organic_results' as search_results
-FROM businesses 
-WHERE name = 'Business Name';
-```
-
-**Analyze match signals:**
-```sql
-SELECT 
-    name,
-    raw_data->'llm_discovery'->'llm_analysis'->'match_signals' as signals,
-    raw_data->'llm_discovery'->>'confidence' as confidence
-FROM businesses 
-WHERE raw_data->'llm_discovery' IS NOT NULL
-ORDER BY (raw_data->'llm_discovery'->>'confidence')::float DESC;
-```
-
-**Find businesses where LLM rejected alternative URLs:**
-```sql
-SELECT 
-    name,
-    raw_data->'llm_discovery'->'llm_analysis'->'rejected_urls' as rejected
-FROM businesses 
-WHERE jsonb_array_length(raw_data->'llm_discovery'->'llm_analysis'->'rejected_urls') > 0;
-```
-
----
-
-## Deployment
-
-### Git Commit
-```
-1eb16dc - Fix ScrapingDog data storage and backfill missing website URLs
-```
-
-### Changes
-- `backend/services/hunter/hunter_service.py` (+24 lines)
-
-### Services Restarted
-```
-webmagic-celery-beat: started
-webmagic-celery: started
-webmagic-api: started
-```
-
----
+1. **Test with a business that has a real website** - See if ScrapingDog finds it when Outscraper provided a bad URL
+2. **Analyze existing ScrapingDog data** - For businesses already processed, we can backfill if needed
+3. **Adjust search queries if needed** - Based on the raw data, we can optimize query construction
+4. **Monitor LLM confidence** - Track which businesses need manual review
 
 ## Summary
 
-✅ **Fixed incomplete data storage** - now saving ALL ScrapingDog results  
-✅ **Backfilled 12 businesses** - restored missing website URLs  
-✅ **Added debug logging** - will help identify if issue recurs  
-✅ **100% success rate** - all 70 businesses with LLM data now have website_url  
-✅ **Rich data available** - can now analyze patterns, improve matching, build fallbacks  
+✅ **Each business gets independent search** (always worked correctly)  
+✅ **Complete raw data now saved** (FIXED)  
+✅ **Infinite loops prevented** (FIXED)  
+✅ **Full audit trail** (metadata + raw_data)  
+✅ **Ready for analysis** (all organic results preserved)
 
-**System Status:** 🟢 Fully Operational
-
-The ScrapingDog integration is now correctly storing all valuable data and successfully persisting discovered website URLs to the database.
+The system is now working as intended! 🎉
