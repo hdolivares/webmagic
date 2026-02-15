@@ -439,8 +439,8 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
               )}
             </div>
 
-            {/* Action Buttons */}
-            {strategy.status === 'active' && strategy.next_zone && (
+            {/* Action Buttons - Show zone selector for ALL strategies (for rescraping) */}
+            {strategy && strategy.zones && strategy.zones.length > 0 && (
               <div className="action-section">
                 {/* Zone Selector */}
                 <div className="zone-selector-section">
@@ -470,26 +470,37 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
                   </label>
                 </div>
 
-                <div className="next-zone-info">
-                  <h4>
-                    {selectedZoneId 
-                      ? `Selected Zone: ${selectedZoneId}` 
-                      : `Next Zone: ${strategy.next_zone.zone_id}`}
-                  </h4>
-                  <p>
-                    <strong>Priority:</strong> {strategy.next_zone.priority} | 
-                    <strong> Location:</strong> {strategy.next_zone.lat.toFixed(4)}, {strategy.next_zone.lon.toFixed(4)} | 
-                    <strong> Radius:</strong> {strategy.next_zone.radius_km}km
-                  </p>
-                  {strategy.next_zone.reason && (
-                    <p className="zone-reason">📌 {strategy.next_zone.reason}</p>
-                  )}
-                </div>
+                {strategy.next_zone && (
+                  <div className="next-zone-info">
+                    <h4>
+                      {selectedZoneId 
+                        ? `Selected Zone: ${selectedZoneId}` 
+                        : `Next Zone: ${strategy.next_zone.zone_id}`}
+                    </h4>
+                    <p>
+                      <strong>Priority:</strong> {strategy.next_zone.priority} | 
+                      <strong> Location:</strong> {strategy.next_zone.lat.toFixed(4)}, {strategy.next_zone.lon.toFixed(4)} | 
+                      <strong> Radius:</strong> {strategy.next_zone.radius_km}km
+                    </p>
+                    {strategy.next_zone.reason && (
+                      <p className="zone-reason">📌 {strategy.next_zone.reason}</p>
+                    )}
+                  </div>
+                )}
+
+                {!strategy.next_zone && !selectedZoneId && !forceRescrape && (
+                  <div className="info-box" style={{ marginTop: '15px' }}>
+                    <span className="info-icon">ℹ️</span>
+                    <p>
+                      All zones have been scraped. To rescrape a zone, select it from the dropdown and check "Force Rescrape".
+                    </p>
+                  </div>
+                )}
 
                 <div className="action-buttons">
                   <button
                     onClick={handleScrapeNextZone}
-                    disabled={loading}
+                    disabled={loading || (!selectedZoneId && !strategy.next_zone && !forceRescrape)}
                     className="scrape-btn primary"
                   >
                     {loading 
@@ -501,13 +512,15 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
                           : '🎯 Start Scraping Next Zone'}
                   </button>
                   
-                  <button
-                    onClick={handleBatchScrape}
-                    disabled={loading}
-                    className="scrape-btn secondary"
-                  >
-                    {loading ? '⏳ Starting...' : '⚡ Batch Scrape (5 zones)'}
-                  </button>
+                  {strategy.next_zone && (
+                    <button
+                      onClick={handleBatchScrape}
+                      disabled={loading}
+                      className="scrape-btn secondary"
+                    >
+                      {loading ? '⏳ Starting...' : '⚡ Batch Scrape (5 zones)'}
+                    </button>
+                  )}
                 </div>
                 
                 {loading && (
@@ -523,9 +536,12 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
               </div>
             )}
 
-            {strategy.status === 'completed' && (
+            {strategy.status === 'completed' && !selectedZoneId && !forceRescrape && (
               <div className="completion-message">
-                ✅ Strategy Complete! All {strategy.total_zones} zones have been scraped.
+                ✅ Strategy Complete! All {strategy.total_zones} zones have been scraped. 
+                <span style={{ marginLeft: '10px', fontSize: '0.9em' }}>
+                  (You can still rescrape zones using the selector above)
+                </span>
                 Found {strategy.businesses_found} businesses.
               </div>
             )}
