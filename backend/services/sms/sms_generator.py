@@ -246,35 +246,60 @@ Return ONLY the SMS message text, no quotes or explanations."""
         """
         Get fallback SMS template if AI generation fails.
         
+        Uses research-backed best practices for cold outreach:
+        - Personalization (name + location)
+        - Value-first messaging
+        - Conversational tone
+        - Invitation to reply
+        
         Args:
             business_data: Business information
             site_url: Website URL
         
         Returns:
-            Template-based SMS message
+            Template-based SMS message optimized for response rates
         """
         business_name = business_data.get("name", "Your business")
         category = business_data.get("category", "business")
+        city = business_data.get("city", "")
         
         # Shorten URL if too long
         url_display = self._shorten_url_display(site_url) if site_url else "[creating...]"
         
-        # Build template
+        # Build template (research-backed format)
+        # Format: "Hi [Name] in [City] - We created a preview website for your [category] business. [URL]. Take a look and let us know what you think. Reply STOP to opt out."
+        if city:
+            greeting = f"Hi {business_name} in {city}"
+        else:
+            greeting = f"Hi {business_name}"
+        
         template = (
-            f"{business_name} - We built you a {category} website! "
-            f"Preview: {url_display}. Reply STOP to opt out."
+            f"{greeting} - We created a preview website for your {category} business. "
+            f"{url_display}. Take a look and let us know what you think. Reply STOP to opt out."
         )
         
-        # Ensure it fits in single segment
+        # Ensure it fits in single segment (160 chars)
         if len(template) > self.SINGLE_SEGMENT_LIMIT:
-            # Truncate business name if needed
-            max_name_length = 30
+            # Fallback to shorter version
+            template = (
+                f"{greeting} - Preview website created for your {category} business. "
+                f"{url_display}. Take a look. Reply STOP to opt out."
+            )
+        
+        # If still too long, truncate business name
+        if len(template) > self.SINGLE_SEGMENT_LIMIT:
+            max_name_length = 20
             if len(business_name) > max_name_length:
                 business_name = business_name[:max_name_length] + "..."
             
+            if city:
+                greeting = f"Hi {business_name} in {city}"
+            else:
+                greeting = f"Hi {business_name}"
+            
             template = (
-                f"{business_name} - Free website: {url_display}. "
-                f"Reply STOP to opt out."
+                f"{greeting} - Preview site: {url_display}. "
+                f"Take a look. Reply STOP to opt out."
             )
         
         return template

@@ -19,6 +19,9 @@ from services.hunter.website_validator import WebsiteValidator
 from services.hunter.website_generation_queue_service import WebsiteGenerationQueueService
 # Deep verification with ScrapingDog + LLM
 from services.discovery.llm_discovery_service import LLMDiscoveryService
+# Progress tracking for real-time updates
+from services.progress.redis_service import RedisService
+from services.progress.progress_publisher import ProgressPublisher
 from core.exceptions import ExternalAPIException
 from core.config import get_settings
 import asyncio
@@ -38,7 +41,8 @@ class HunterService:
         self,
         db: AsyncSession,
         scraper: Optional[OutscraperClient] = None,
-        qualifier: Optional[LeadQualifier] = None
+        qualifier: Optional[LeadQualifier] = None,
+        progress_publisher: Optional[ProgressPublisher] = None
     ):
         """
         Initialize Hunter service.
@@ -47,6 +51,7 @@ class HunterService:
             db: Database session
             scraper: Outscraper client (creates new if None)
             qualifier: Lead qualifier (creates new if None)
+            progress_publisher: Optional progress publisher for real-time updates
         """
         self.db = db
         self.scraper = scraper or OutscraperClient()
@@ -60,6 +65,8 @@ class HunterService:
         self.geo_strategy_service = GeoStrategyService(db)
         # New Phase 2 services
         self.generation_queue_service = WebsiteGenerationQueueService(db)
+        # Progress publisher for real-time updates (optional)
+        self.progress_publisher = progress_publisher
     
     async def scrape_with_intelligent_strategy(
         self,
@@ -212,6 +219,18 @@ class HunterService:
                 for idx, biz_data in enumerate(raw_businesses):
                     business_name = biz_data.get('name', 'Unknown')
                     logger.info(f"🔍 [{idx+1}/{len(raw_businesses)}] Processing: {business_name}")
+                    
+                    # Publish progress event (real-time updates for frontend)
+                    if self.progress_publisher:
+                        try:
+                            self.progress_publisher.publish_business_scraped(
+                                session_id=str(coverage.id),  # Use coverage_id as session identifier
+                                business_name=business_name,
+                                current=idx + 1,
+                                total=len(raw_businesses)
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to publish progress event: {e}")
                     
                     try:
                         # **ENHANCED: Use data quality service for comprehensive analysis**
@@ -419,6 +438,19 @@ class HunterService:
                             else:
                                 businesses_with_valid_websites += 1
                                 logger.info(f"  └─ 💾 SAVED - Website status: {business.website_validation_status}")
+                            
+                            # Publish validation progress event
+                            if self.progress_publisher:
+                                try:
+                                    self.progress_publisher.publish_validation_progress(
+                                        session_id=str(coverage.id),
+                                        validated_count=total_saved,
+                                        total_count=len(raw_businesses),
+                                        business_id=str(business.id),
+                                        has_website=bool(business.website_url)
+                                    )
+                                except Exception as e:
+                                    logger.warning(f"Failed to publish validation progress: {e}")
                         else:
                             logger.warning(f"  └─ ⚠️  Failed to save business")
                         
