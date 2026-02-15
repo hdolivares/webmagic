@@ -134,6 +134,7 @@ class StrategyResponse(BaseModel):
     business_distribution_analysis: Optional[str]
     zones: List[Dict[str, Any]]
     next_zone: Optional[Dict[str, Any]]
+    scraped_zone_ids: List[str] = []  # List of zone_ids that have been scraped
 
 
 class ScrapeResultResponse(BaseModel):
@@ -184,6 +185,11 @@ async def create_strategy(
         
         next_zone = strategy.get_next_zone()
         
+        # Get list of scraped zone IDs
+        scraped_zone_ids = []
+        if strategy.performance_data and "zone_results" in strategy.performance_data:
+            scraped_zone_ids = [z["zone_id"] for z in strategy.performance_data["zone_results"]]
+        
         return StrategyResponse(
             strategy_id=str(strategy.id),
             city=strategy.city,
@@ -200,7 +206,8 @@ async def create_strategy(
             geographic_analysis=strategy.geographic_analysis,
             business_distribution_analysis=strategy.business_distribution_analysis,
             zones=strategy.zones,
-            next_zone=next_zone
+            next_zone=next_zone,
+            scraped_zone_ids=scraped_zone_ids
         )
         
     except Exception as e:
@@ -355,6 +362,11 @@ async def get_strategy(
         
         next_zone = strategy.get_next_zone()
         
+        # Get list of scraped zone IDs
+        scraped_zone_ids = []
+        if strategy.performance_data and "zone_results" in strategy.performance_data:
+            scraped_zone_ids = [z["zone_id"] for z in strategy.performance_data["zone_results"]]
+        
         return StrategyResponse(
             strategy_id=str(strategy.id),
             city=strategy.city,
@@ -371,7 +383,8 @@ async def get_strategy(
             geographic_analysis=strategy.geographic_analysis,
             business_distribution_analysis=strategy.business_distribution_analysis,
             zones=strategy.zones,
-            next_zone=next_zone
+            next_zone=next_zone,
+            scraped_zone_ids=scraped_zone_ids
         )
         
     except HTTPException:
