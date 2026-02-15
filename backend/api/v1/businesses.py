@@ -219,6 +219,81 @@ async def get_business_stats(
     return BusinessStats(**stats)
 
 
+@router.get("/needs-generation")
+async def get_businesses_needing_generation(
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Get all businesses that need website generation.
+    
+    Returns businesses that:
+    - Have no website URL
+    - Have been validated as truly having no website (missing or confirmed_missing)
+    - Are not already queued/generated (not in generated_sites table)
+    
+    Useful for bulk queueing on the AI Generation page.
+    """
+    try:
+        from sqlalchemy import select, and_, or_
+        from models.business import Business
+        from models.site import GeneratedSite
+        
+        logger.info("📊 Getting businesses needing generation...")
+        
+        # Find businesses that need generation and aren't already queued
+        query = select(Business).outerjoin(
+            GeneratedSite,
+            Business.id == GeneratedSite.business_id
+        ).where(
+            and_(
+                Business.website_url.is_(None),
+                or_(
+                    Business.website_validation_status == 'missing',
+                    Business.website_validation_status == 'confirmed_missing'
+                ),
+                GeneratedSite.id.is_(None)  # Not already in generation queue
+            )
+        ).order_by(Business.created_at.desc())
+        
+        result = await db.execute(query)
+        businesses = result.scalars().all()
+        
+        logger.info(f"Found {len(businesses)} businesses needing generation")
+        
+        # Format response with safe None handling
+        businesses_data = []
+        for b in businesses:
+            try:
+                business_dict = {
+                    "id": str(b.id),
+                    "name": b.name or "",
+                    "category": b.category or "",
+                    "city": b.city or "",
+                    "state": b.state or "",
+                    "country": b.country or "US",
+                    "phone": b.phone,
+                    "email": b.email,
+                    "rating": float(b.rating) if b.rating else None,
+                    "review_count": b.review_count or 0,
+                    "website_validation_status": b.website_validation_status or "missing",
+                    "created_at": b.created_at.isoformat() if b.created_at else None,
+                }
+                businesses_data.append(business_dict)
+            except Exception as e:
+                logger.error(f"Error formatting business {b.id}: {e}")
+                continue
+        
+        return {
+            "total": len(businesses_data),
+            "businesses": businesses_data
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting businesses needing generation: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/{business_id}", response_model=BusinessResponse)
 async def get_business(
     business_id: UUID,
@@ -653,81 +728,6 @@ async def get_filter_stats(
         raise
     except Exception as e:
         logger.error(f"Failed to get filter stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/needs-generation")
-async def get_businesses_needing_generation(
-    db: AsyncSession = Depends(get_db),
-    current_user: AdminUser = Depends(get_current_user)
-):
-    """
-    Get all businesses that need website generation.
-    
-    Returns businesses that:
-    - Have no website URL
-    - Have been validated as truly having no website (missing or confirmed_missing)
-    - Are not already queued/generated (not in generated_sites table)
-    
-    Useful for bulk queueing on the AI Generation page.
-    """
-    try:
-        from sqlalchemy import select, and_, or_
-        from models.business import Business
-        from models.site import GeneratedSite
-        
-        logger.info("📊 Getting businesses needing generation...")
-        
-        # Find businesses that need generation and aren't already queued
-        query = select(Business).outerjoin(
-            GeneratedSite,
-            Business.id == GeneratedSite.business_id
-        ).where(
-            and_(
-                Business.website_url.is_(None),
-                or_(
-                    Business.website_validation_status == 'missing',
-                    Business.website_validation_status == 'confirmed_missing'
-                ),
-                GeneratedSite.id.is_(None)  # Not already in generation queue
-            )
-        ).order_by(Business.created_at.desc())
-        
-        result = await db.execute(query)
-        businesses = result.scalars().all()
-        
-        logger.info(f"Found {len(businesses)} businesses needing generation")
-        
-        # Format response with safe None handling
-        businesses_data = []
-        for b in businesses:
-            try:
-                business_dict = {
-                    "id": str(b.id),
-                    "name": b.name or "",
-                    "category": b.category or "",
-                    "city": b.city or "",
-                    "state": b.state or "",
-                    "country": b.country or "US",
-                    "phone": b.phone,
-                    "email": b.email,
-                    "rating": float(b.rating) if b.rating else None,
-                    "review_count": b.review_count or 0,
-                    "website_validation_status": b.website_validation_status or "missing",
-                    "created_at": b.created_at.isoformat() if b.created_at else None,
-                }
-                businesses_data.append(business_dict)
-            except Exception as e:
-                logger.error(f"Error formatting business {b.id}: {e}")
-                continue
-        
-        return {
-            "total": len(businesses_data),
-            "businesses": businesses_data
-        }
-        
-    except Exception as e:
-        logger.error(f"Error getting businesses needing generation: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
