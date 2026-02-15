@@ -186,6 +186,7 @@ export interface ReadyBusiness {
   category?: string
   city?: string
   state?: string
+  country?: string
   phone?: string
   email?: string
   rating?: number
