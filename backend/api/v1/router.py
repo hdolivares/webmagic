@@ -54,10 +54,12 @@ api_router.include_router(geo_grid.router)  # Geo-grid scraping
 api_router.include_router(intelligent_campaigns.router)  # Claude-powered intelligent strategies
 api_router.include_router(draft_campaigns.router)  # Draft campaign review workflow
 api_router.include_router(sites.router)
-api_router.include_router(generated_preview.router, prefix="")  # PUBLIC: Serves generated site HTML
 api_router.include_router(settings.router)
 api_router.include_router(system.router)
 api_router.include_router(campaigns.router)
 api_router.include_router(payments.router)
 api_router.include_router(validation.router)  # Website validation
 api_router.include_router(scrapes.router)  # Phase 2: Async scraping with SSE progress
+
+# CRITICAL: This MUST be last - it has a catch-all /{subdomain} route
+api_router.include_router(generated_preview.router, prefix="")  # PUBLIC: Serves generated site HTML
