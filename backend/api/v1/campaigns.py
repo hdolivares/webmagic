@@ -180,6 +180,7 @@ async def get_ready_businesses(
     - Don't already have an existing website
     - Meet qualification criteria (score >= 70)
     - Have at least one contact method (email or phone)
+    - Are located in the United States (US only - SMS integration limitation)
     
     Returns plain JSON (no response_model) to avoid Pydantic V2 response validation issues.
     """
@@ -193,7 +194,8 @@ async def get_ready_businesses(
                 Business.website_validation_status == 'triple_verified',
                 Business.website_url.is_(None),
                 Business.qualification_score >= 70,
-                GeneratedSite.status == 'completed'
+                GeneratedSite.status == 'completed',
+                Business.country == 'US'  # SMS integration only works for US
             )
         )
         .order_by(GeneratedSite.created_at.desc())
@@ -230,6 +232,7 @@ async def get_ready_businesses(
             "category": business.category,
             "city": business.city,
             "state": business.state,
+            "country": business.country or "US",
             "phone": business.phone,
             "email": business.email,
             "rating": float(business.rating) if business.rating is not None else None,
