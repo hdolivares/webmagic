@@ -6,6 +6,7 @@ optimizing zone placement based on geographic, demographic, and industry factors
 """
 from sqlalchemy import Column, String, Integer, Float, JSON, DateTime, Index, Text
 from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.orm import relationship
 from sqlalchemy.orm.attributes import flag_modified
 from datetime import datetime
 import uuid
@@ -123,6 +124,16 @@ class GeoStrategy(BaseModel):
         Index('idx_geo_strategy_category', 'category'),
         Index('idx_geo_strategy_active', 'is_active'),
         Index('idx_geo_strategy_lookup', 'city', 'state', 'category', 'is_active'),
+    )
+    
+    # =========================================================================
+    # RELATIONSHIPS
+    # =========================================================================
+    
+    scrape_sessions = relationship(
+        "ScrapeSession",
+        back_populates="strategy",
+        lazy="select"
     )
     
     def to_dict(self):
