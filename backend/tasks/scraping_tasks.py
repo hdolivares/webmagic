@@ -121,26 +121,31 @@ def scrape_zone_async(
         )
         
         # Update session with results
+        logger.info(f"📊 Scrape result: {scrape_result}")
+        
         with get_db_session_sync() as db:
             session = db.query(ScrapeSession).filter(
                 ScrapeSession.id == session_id
             ).first()
             
-            if session:
-                # Update metrics from scrape result
-                session.total_businesses = scrape_result.get("businesses_found", 0)
-                session.scraped_businesses = scrape_result.get("businesses_found", 0)
-                session.validated_businesses = scrape_result.get("businesses_with_websites", 0)
-                session.status = "completed"
-                session.completed_at = datetime.utcnow()
-                
-                db.commit()
-                
-                logger.info(
-                    f"✅ Session {session_id} completed: "
-                    f"{session.scraped_businesses} businesses, "
-                    f"{session.validated_businesses} with websites"
-                )
+            if not session:
+                logger.error(f"❌ Session {session_id} not found for update!")
+                return {"error": "Session not found", "status": "failed"}
+            
+            # Update metrics from scrape result
+            session.total_businesses = scrape_result.get("businesses_found", 0)
+            session.scraped_businesses = scrape_result.get("businesses_found", 0)
+            session.validated_businesses = scrape_result.get("businesses_with_websites", 0)
+            session.status = "completed"
+            session.completed_at = datetime.utcnow()
+            
+            db.commit()
+            
+            logger.info(
+                f"✅ Session {session_id} completed: "
+                f"{session.scraped_businesses} businesses, "
+                f"{session.validated_businesses} with websites"
+            )
         
         # Publish completion event
         publisher.publish_scrape_complete(
@@ -236,8 +241,12 @@ def _run_scraping(
     async def _async_scrape():
         """Inner async function for scraping."""
         try:
-            # Create async database session
-            async for db in get_db():
+            # Create async database session using proper context manager
+            # FIXED: Use async context manager instead of async for loop
+            db_generator = get_db()
+            db = await db_generator.__anext__()
+            
+            try:
                 # Initialize HunterService
                 hunter = HunterService(db=db)
                 
@@ -263,6 +272,10 @@ def _run_scraping(
                 )
                 
                 return result
+                
+            finally:
+                # Properly close the database session
+                await db_generator.aclose()
                 
         except Exception as e:
             logger.error(f"❌ Async scraping failed: {e}", exc_info=True)
