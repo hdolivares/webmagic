@@ -15,7 +15,7 @@ from datetime import datetime
 from sqlalchemy import select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.database import get_async_db
+from core.database import get_db
 from models.business import Business
 from services.discovery.llm_discovery_service import LLMDiscoveryService
 
@@ -47,7 +47,7 @@ async def backfill_missing_websites(
     logger.info(f"   Dry run: {dry_run}")
     logger.info(f"   Only NULL raw_data: {only_null_raw_data}")
     
-    async for db in get_async_db():
+    async for db in get_db():
         try:
             # Build query for businesses needing discovery
             query = select(Business).where(
