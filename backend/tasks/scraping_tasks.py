@@ -271,15 +271,18 @@ def _run_scraping(
             db = await db_generator.__anext__()
             
             try:
-                # Initialize HunterService
-                hunter = HunterService(db=db)
+                # Initialize HunterService with progress publisher
+                hunter = HunterService(
+                    db=db,
+                    progress_publisher=publisher  # Pass progress publisher for real-time updates
+                )
                 
                 logger.info(
                     f"🔍 Calling HunterService.scrape_with_intelligent_strategy: "
                     f"city={city}, state={state}, category={category}"
                 )
                 
-                # Run intelligent scraping
+                # Run intelligent scraping with real-time progress updates
                 result = await hunter.scrape_with_intelligent_strategy(
                     city=city,
                     state=state,
