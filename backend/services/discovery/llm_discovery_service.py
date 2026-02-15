@@ -210,13 +210,29 @@ class LLMDiscoveryService:
             return None
     
     def _build_query(self, business_name: str, city: Optional[str], state: Optional[str]) -> str:
-        """Build search query for ScrapingDog."""
-        query_parts = [f'"{business_name}"']
+        """
+        Build SIMPLE search query for ScrapingDog.
+        
+        Format: "[business name] [city]"
+        - No quotes (they confuse the API with words like "Plus", "of", etc.)
+        - No state (redundant with city)
+        - No "website" keyword (not needed, Google understands)
+        
+        Examples:
+          - "Joe's Plumbing" + "Los Angeles" → "Joe's Plumbing Los Angeles"
+          - "ABC Law Firm, Inc." + "Beverly Hills" → "ABC Law Firm Beverly Hills"
+        """
+        # Clean business name - remove location suffixes that cause issues
+        clean_name = business_name
+        if city:
+            # Remove city from name if it's already there (e.g., "XYZ of Los Angeles")
+            clean_name = clean_name.replace(f" of {city}", "").replace(f" - {city}", "").strip()
+        
+        query_parts = [clean_name]
         if city:
             query_parts.append(city)
-        if state:
-            query_parts.append(state)
-        query_parts.append("website")
+        # No state, no "website" - keep it minimal for best results
+        
         return " ".join(query_parts)
     
     async def _analyze_with_llm(
