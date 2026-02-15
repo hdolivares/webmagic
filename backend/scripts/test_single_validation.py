@@ -16,7 +16,8 @@ from services.validation.validation_orchestrator import ValidationOrchestrator
 from services.validation.url_prescreener import URLPrescreener
 from services.validation.playwright_service import PlaywrightValidationService
 from services.validation.llm_validator import LLMWebsiteValidator
-from core.config import settings
+from core.config import Settings
+settings = Settings()
 import logging
 
 logging.basicConfig(level=logging.INFO)
