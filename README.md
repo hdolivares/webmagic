@@ -690,3 +690,93 @@ To make this "Auto-Pilot," you cannot manually send invoices. You need  **Stripe
 3. **Stripe Setup:** Create a standard "Website Package" product in Stripe.
 
 Would you like me to refine the **Analyst Prompt** further to include specific instructions for *layout types* (e.g., Bento Grids vs. Full Screen Hero) based on the industry?
+
+---
+
+## Running Backend Scripts on VPS
+
+**IMPORTANT:** When running Python scripts that import backend modules on the VPS, you must set the `PYTHONPATH` environment variable to avoid `ModuleNotFoundError`.
+
+### The Problem
+Scripts that import from `core`, `models`, `services`, etc. will fail with:
+```
+ModuleNotFoundError: No module named 'core'
+```
+
+### The Solution
+Always set `PYTHONPATH` when running scripts:
+
+```bash
+cd /var/www/webmagic/backend && \
+PYTHONPATH=/var/www/webmagic/backend \
+/var/www/webmagic/backend/.venv/bin/python scripts/your_script.py
+```
+
+### Example: Running the Queue Pending Validations Script
+```bash
+# Dry run (test without queuing)
+cd /var/www/webmagic/backend && \
+PYTHONPATH=/var/www/webmagic/backend \
+/var/www/webmagic/backend/.venv/bin/python \
+scripts/queue_pending_validations.py --dry-run
+
+# Actual run (queue all pending validations)
+cd /var/www/webmagic/backend && \
+PYTHONPATH=/var/www/webmagic/backend \
+/var/www/webmagic/backend/.venv/bin/python \
+scripts/queue_pending_validations.py --batch-size=10
+```
+
+### Why This Works
+- The `PYTHONPATH` variable tells Python where to look for modules
+- Without it, Python doesn't know that `/var/www/webmagic/backend` is the root of the module structure
+- The virtual environment (`.venv`) handles package dependencies, but not the project's own modules
+
+### Standard Deployment Workflow
+After making code changes and testing locally:
+
+```bash
+# 1. Commit and push changes
+git add .
+git commit -m "Your commit message"
+git push origin main
+
+# 2. On VPS: Pull latest changes
+cd /var/www/webmagic && git pull origin main
+
+# 3. Rebuild frontend (if frontend changed)
+cd /var/www/webmagic/frontend && npm run build
+
+# 4. Restart all services
+supervisorctl restart all
+
+# 5. Verify services are running
+supervisorctl status
+```
+
+### FastAPI Route Ordering Warning
+**CRITICAL:** In FastAPI, route order matters! Always define specific routes BEFORE parameterized routes.
+
+**WRONG Order:**
+```python
+@router.get("/{business_id}")  # This will match EVERYTHING
+async def get_business(business_id: str):
+    ...
+
+@router.get("/needs-generation")  # This will NEVER be reached
+async def get_needs_generation():
+    ...
+```
+
+**CORRECT Order:**
+```python
+@router.get("/needs-generation")  # Specific route FIRST
+async def get_needs_generation():
+    ...
+
+@router.get("/{business_id}")  # Parameterized route AFTER
+async def get_business(business_id: str):
+    ...
+```
+
+---
