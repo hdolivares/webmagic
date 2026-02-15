@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 
 from core.database import get_db
 from api.deps import get_current_user
-from models.user import User
+from models.user import AdminUser
 from models.scrape_session import ScrapeSession
 from services.progress.redis_service import RedisService
 from tasks.scraping_tasks import scrape_zone_async
@@ -112,7 +112,7 @@ class ScrapeStatusResponse(BaseModel):
 @router.post("/start", response_model=StartScrapeResponse, status_code=status.HTTP_202_ACCEPTED)
 async def start_scrape(
     request: StartScrapeRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: AdminUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -195,7 +195,7 @@ async def start_scrape(
 @router.get("/{session_id}/status", response_model=ScrapeStatusResponse)
 async def get_scrape_status(
     session_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: AdminUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -231,7 +231,7 @@ async def get_scrape_status(
 @router.get("/{session_id}/progress")
 async def stream_scrape_progress(
     session_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: AdminUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -363,7 +363,7 @@ async def stream_scrape_progress(
 
 @router.get("/", response_model=list[ScrapeStatusResponse])
 async def list_scrape_sessions(
-    current_user: User = Depends(get_current_user),
+    current_user: AdminUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     limit: int = 20,
     status_filter: Optional[str] = None
