@@ -100,6 +100,11 @@ class Business(BaseModel):
     discovered_urls = Column(JSONB, default=list, nullable=True)
     # URLs found in Google web results that weren't in the site field
     
+    # Website Metadata (New in Migration 013)
+    website_metadata = Column(JSONB, default=dict, nullable=True)
+    # Complete validation history, discovery attempts, URL source tracking
+    # Structure: {source, source_timestamp, validation_history[], discovery_attempts{}}
+    
     # Website Generation Queue Tracking (New in Migration 007)
     generation_queued_at = Column(DateTime, nullable=True)
     generation_started_at = Column(DateTime, nullable=True)
@@ -130,3 +135,52 @@ class Business(BaseModel):
     
     def __repr__(self):
         return f"<Business {self.name} ({self.city}, {self.state})>"
+    
+    # ============================================================================
+    # HELPER METHODS - Validation System
+    # ============================================================================
+    
+    @property
+    def url_source(self) -> str:
+        """Get the source of the current website URL."""
+        from core.validation_enums import URLSource
+        if not self.website_metadata:
+            return URLSource.NONE.value
+        return self.website_metadata.get("source", URLSource.NONE.value)
+    
+    @property
+    def has_valid_website(self) -> bool:
+        """Check if business has a validated website."""
+        from core.validation_enums import ValidationState
+        return ValidationState.is_success_state(self.website_validation_status or "")
+    
+    @property
+    def needs_discovery(self) -> bool:
+        """Check if business needs website discovery."""
+        from core.validation_enums import ValidationState
+        return ValidationState.needs_discovery_action(self.website_validation_status or "")
+    
+    @property
+    def validation_is_terminal(self) -> bool:
+        """Check if validation is in a terminal state (no further action needed)."""
+        from core.validation_enums import ValidationState
+        return ValidationState.is_terminal_state(self.website_validation_status or "")
+    
+    def get_validation_history_count(self) -> int:
+        """Get number of validation attempts."""
+        if not self.website_metadata:
+            return 0
+        return len(self.website_metadata.get("validation_history", []))
+    
+    def get_discovery_attempt_count(self) -> int:
+        """Get number of discovery attempts."""
+        if not self.website_metadata:
+            return 0
+        return len(self.website_metadata.get("discovery_attempts", {}))
+    
+    def has_attempted_scrapingdog(self) -> bool:
+        """Check if ScrapingDog discovery has been attempted."""
+        if not self.website_metadata:
+            return False
+        attempts = self.website_metadata.get("discovery_attempts", {})
+        return "scrapingdog" in attempts and attempts["scrapingdog"].get("attempted", False)
