@@ -1083,6 +1083,77 @@ class ApiClient {
     const response = await this.client.get(`/messages/business/${businessId}`, { params })
     return response.data
   }
+
+  // ============================================
+  // SCRAPING METHODS (Phase 2: Async with Progress)
+  // ============================================
+
+  /**
+   * Start a new scraping operation.
+   * Returns immediately with session_id for progress tracking.
+   */
+  async startScrape(request: {
+    zone_id: string
+    city: string
+    state: string
+    category: string
+    country?: string
+    limit_per_zone?: number
+    strategy_id?: string
+  }): Promise<{
+    session_id: string
+    status: string
+    message: string
+    progress_url: string
+    status_url: string
+  }> {
+    const response = await this.client.post('/scrapes/start', {
+      zone_id: request.zone_id,
+      city: request.city,
+      state: request.state,
+      category: request.category,
+      country: request.country || 'US',
+      limit_per_zone: request.limit_per_zone || 50,
+      strategy_id: request.strategy_id
+    })
+    return response.data
+  }
+
+  /**
+   * Get current status of a scrape session (polling).
+   */
+  async getScrapeStatus(sessionId: string): Promise<{
+    session_id: string
+    zone_id: string
+    status: string
+    progress: any
+    timestamps: any
+    error: string | null
+  }> {
+    const response = await this.client.get(`/scrapes/${sessionId}/status`)
+    return response.data
+  }
+
+  /**
+   * List recent scrape sessions.
+   */
+  async listScrapes(options?: {
+    limit?: number
+    status?: string
+  }): Promise<any[]> {
+    const params = new URLSearchParams()
+    
+    if (options?.limit) {
+      params.append('limit', options.limit.toString())
+    }
+    
+    if (options?.status) {
+      params.append('status_filter', options.status)
+    }
+    
+    const response = await this.client.get(`/scrapes?${params.toString()}`)
+    return response.data
+  }
 }
 
 // Export singleton instance

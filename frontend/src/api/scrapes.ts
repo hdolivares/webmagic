@@ -10,11 +10,10 @@
  *   - Error handling with typed errors
  *   - Consistent API interface
  *   - Separation from UI logic
+ *   - Uses authenticated API client
  */
 
-import axios from 'axios';
-
-const API_BASE = '/api/v1';
+import { api } from '@/services/api';
 
 // =============================================================================
 // TYPES
@@ -79,8 +78,8 @@ export const scrapesAPI = {
    */
   async startScrape(request: StartScrapeRequest): Promise<StartScrapeResponse> {
     try {
-      const response = await axios.post<StartScrapeResponse>(
-        `${API_BASE}/scrapes/start`,
+      const response = await api.post<StartScrapeResponse>(
+        '/scrapes/start',
         {
           zone_id: request.zone_id,
           city: request.city,
@@ -113,8 +112,8 @@ export const scrapesAPI = {
    */
   async getScrapeStatus(sessionId: string): Promise<ScrapeStatusResponse> {
     try {
-      const response = await axios.get<ScrapeStatusResponse>(
-        `${API_BASE}/scrapes/${sessionId}/status`
+      const response = await api.get<ScrapeStatusResponse>(
+        `/scrapes/${sessionId}/status`
       );
       
       return response.data;
@@ -153,8 +152,8 @@ export const scrapesAPI = {
         params.append('status_filter', options.status);
       }
       
-      const response = await axios.get<ScrapeStatusResponse[]>(
-        `${API_BASE}/scrapes?${params.toString()}`
+      const response = await api.get<ScrapeStatusResponse[]>(
+        `/scrapes?${params.toString()}`
       );
       
       return response.data;
