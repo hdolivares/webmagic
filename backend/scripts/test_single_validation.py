@@ -55,7 +55,7 @@ async def test_validation():
         
         # Run validation
         logger.info("Starting validation with FIXED orchestrator...")
-        result = await orchestrator.validate_website(
+        result = await orchestrator.validate_business_website(
             url=business.website_url,
             business_name=business.name,
             business_phone=business.phone or "",
