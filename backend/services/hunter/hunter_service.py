@@ -308,7 +308,7 @@ class HunterService:
                                     biz_data["verified"] = True
                                     biz_data["discovered_urls"] = [verified_url]
                                     
-                                    # Store discovery metadata
+                                    # Store ALL discovery data (ScrapingDog results + LLM analysis)
                                     if not biz_data.get("raw_data"):
                                         biz_data["raw_data"] = {}
                                     biz_data["raw_data"]["llm_discovery"] = {
@@ -316,7 +316,13 @@ class HunterService:
                                         "confidence": confidence,
                                         "reasoning": discovery_result.get("reasoning"),
                                         "verified_at": datetime.utcnow().isoformat(),
-                                        "method": "scrapingdog_llm"
+                                        "method": "scrapingdog_llm",
+                                        "query": discovery_result.get("query"),
+                                        "llm_model": discovery_result.get("llm_model"),
+                                        # Store complete ScrapingDog search results
+                                        "scrapingdog_results": discovery_result.get("search_results"),
+                                        # Store LLM analysis details
+                                        "llm_analysis": discovery_result.get("llm_analysis")
                                     }
                                 else:
                                     logger.info(
@@ -328,6 +334,21 @@ class HunterService:
                                     biz_data["website_url"] = None
                                     biz_data["website_validation_status"] = "confirmed_missing"
                                     biz_data["verified"] = True  # Verified as having NO website
+                                    
+                                    # Store discovery data even when no website found (for debugging)
+                                    if not biz_data.get("raw_data"):
+                                        biz_data["raw_data"] = {}
+                                    biz_data["raw_data"]["llm_discovery"] = {
+                                        "url": None,
+                                        "confidence": discovery_result.get("confidence", 0.95),
+                                        "reasoning": discovery_result.get("reasoning"),
+                                        "verified_at": datetime.utcnow().isoformat(),
+                                        "method": "scrapingdog_llm",
+                                        "query": discovery_result.get("query"),
+                                        "llm_model": discovery_result.get("llm_model"),
+                                        "scrapingdog_results": discovery_result.get("search_results"),
+                                        "llm_analysis": discovery_result.get("llm_analysis")
+                                    }
                                     
                             except Exception as e:
                                 logger.error(f"  │  └─ ❌ Deep verification ERROR: {e}", exc_info=True)
@@ -350,6 +371,7 @@ class HunterService:
                         
                         # **SAVE ALL BUSINESSES** (we paid for them!)
                         logger.debug(f"  ├─ Saving to database...")
+                        logger.debug(f"  │  └─ Final biz_data: website_url={biz_data.get('website_url')}, validation_status={biz_data.get('website_validation_status')}, verified={biz_data.get('verified')}")
                         business = await self.business_service.create_or_update_business(
                             data=biz_data,
                             source="outscraper_gmaps",
