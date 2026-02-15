@@ -42,8 +42,12 @@ class BusinessService:
             DatabaseException: If database operation fails
         """
         try:
-            # Generate slug from name
-            slug = self._generate_unique_slug(business_data.get("name", ""))
+            # Generate slug from name and location
+            slug = self._generate_unique_slug(
+                business_data.get("name", ""),
+                business_data.get("city", ""),
+                business_data.get("state", "")
+            )
             
             business = Business(
                 **business_data,
@@ -376,16 +380,216 @@ class BusinessService:
             "by_category": by_category
         }
     
-    def _generate_unique_slug(self, name: str) -> str:
-        """Generate URL-safe slug from business name."""
-        base_slug = slugify(name, max_length=200)
-        if not base_slug:
-            base_slug = "business"
+    def _generate_unique_slug(self, name: str, city: str = "", state: str = "") -> str:
+        """
+        Generate clean, human-readable slug: business-name-region
         
-        # Add timestamp suffix for uniqueness
-        import time
-        timestamp = int(time.time() * 1000)  # milliseconds
-        return f"{base_slug}-{timestamp}"
+        Examples:
+            - "Body Care Chiropractic" in "Los Angeles" -> "bodycare-la"
+            - "Elite Auto Repair" in "San Francisco" -> "elite-auto-sf"
+            - "ABC Company LLC" in "New York" -> "abc-ny"
+        
+        Args:
+            name: Business name
+            city: City name (optional)
+            state: State name (optional)
+            
+        Returns:
+            URL-safe slug like "business-name-region"
+        """
+        # Clean and shorten business name
+        name_slug = self._create_business_name_slug(name)
+        
+        # Create region code from city
+        region_code = self._create_region_code(city, state)
+        
+        # Combine: business-name-region
+        if region_code:
+            base_slug = f"{name_slug}-{region_code}"
+        else:
+            base_slug = name_slug
+        
+        # Ensure it's not too long (max 50 chars for safety)
+        if len(base_slug) > 50:
+            # Truncate business name part to fit
+            max_name_length = 50 - len(region_code) - 1  # -1 for hyphen
+            name_slug = name_slug[:max_name_length].rstrip('-')
+            base_slug = f"{name_slug}-{region_code}" if region_code else name_slug
+        
+        return base_slug
+    
+    def _create_business_name_slug(self, name: str) -> str:
+        """
+        Create clean, shortened business name slug.
+        
+        Rules:
+        - Remove common business suffixes (LLC, Inc, Co, Corp, etc.)
+        - Remove special characters
+        - Abbreviate if too long
+        - Max ~20 chars
+        
+        Examples:
+            "Body Care Chiropractic LLC" -> "bodycare-chiro"
+            "Elite Auto Repair & Detailing Inc" -> "elite-auto"
+            "ABC Company" -> "abc"
+        """
+        # Remove common business entity suffixes
+        suffixes_to_remove = [
+            'llc', 'inc', 'incorporated', 'corp', 'corporation',
+            'co', 'company', 'ltd', 'limited', 'pllc', 'pc',
+            '&', 'and', 'the'
+        ]
+        
+        # Convert to lowercase and split into words
+        name_lower = name.lower()
+        for suffix in suffixes_to_remove:
+            # Remove suffix with word boundaries
+            name_lower = name_lower.replace(f' {suffix} ', ' ')
+            name_lower = name_lower.replace(f' {suffix}', '')
+            name_lower = name_lower.replace(f'{suffix} ', '')
+        
+        # Slugify (handles special chars, extra spaces, etc.)
+        slug = slugify(name_lower, max_length=100)
+        
+        if not slug:
+            return "business"
+        
+        # If still too long (>20 chars), intelligently shorten
+        if len(slug) > 20:
+            words = slug.split('-')
+            
+            # Try to keep first word + abbreviated rest
+            if len(words) > 1:
+                # Keep first word, abbreviate others
+                first_word = words[0]
+                
+                # Common abbreviations for business types
+                abbreviations = {
+                    'chiropractic': 'chiro',
+                    'chiropractor': 'chiro',
+                    'veterinary': 'vet',
+                    'veterinarian': 'vet',
+                    'restaurant': 'rest',
+                    'pharmacy': 'pharm',
+                    'automobile': 'auto',
+                    'accounting': 'acct',
+                    'dentistry': 'dental',
+                    'dental': 'dental',
+                    'medical': 'med',
+                    'clinic': 'clinic',
+                    'hospital': 'hosp',
+                    'plumbing': 'plumb',
+                    'electrical': 'elec',
+                    'painting': 'paint',
+                    'cleaning': 'clean',
+                    'landscaping': 'landscape',
+                    'construction': 'const',
+                    'consulting': 'consult',
+                    'services': 'svc',
+                    'service': 'svc',
+                    'repair': 'repair',
+                    'rehab': 'rehab',
+                    'rehabilitation': 'rehab'
+                }
+                
+                # Abbreviate remaining words
+                abbreviated = [first_word]
+                for word in words[1:3]:  # Max 2 additional words
+                    abbreviated.append(abbreviations.get(word, word[:4]))
+                
+                slug = '-'.join(abbreviated)
+            
+            # Final truncate if still too long
+            slug = slug[:20].rstrip('-')
+        
+        return slug
+    
+    def _create_region_code(self, city: str, state: str) -> str:
+        """
+        Create short region code from city/state.
+        
+        Examples:
+            "Los Angeles", "California" -> "la"
+            "San Francisco", "California" -> "sf"
+            "New York", "New York" -> "ny"
+            "Las Vegas", "Nevada" -> "lv"
+        
+        Returns:
+            2-4 char region code
+        """
+        if not city:
+            # Fallback to state code if available
+            if state:
+                # Try to get state abbreviation
+                state_abbrev = self._get_state_abbreviation(state)
+                return state_abbrev.lower() if state_abbrev else ""
+            return ""
+        
+        city_lower = city.lower().strip()
+        
+        # Common city abbreviations
+        city_codes = {
+            'los angeles': 'la',
+            'san francisco': 'sf',
+            'san diego': 'sd',
+            'san jose': 'sj',
+            'new york': 'ny',
+            'las vegas': 'lv',
+            'washington': 'dc',
+            'philadelphia': 'phl',
+            'phoenix': 'phx',
+            'chicago': 'chi',
+            'houston': 'hou',
+            'dallas': 'dal',
+            'austin': 'atx',
+            'seattle': 'sea',
+            'denver': 'den',
+            'boston': 'bos',
+            'miami': 'mia',
+            'atlanta': 'atl',
+            'portland': 'pdx',
+            'sacramento': 'sac',
+            'santa barbara': 'sb',
+            'santa monica': 'sm',
+            'long beach': 'lb',
+            'palm springs': 'ps',
+        }
+        
+        # Check if we have a known abbreviation
+        if city_lower in city_codes:
+            return city_codes[city_lower]
+        
+        # Otherwise, create abbreviation from first letters of each word
+        words = city_lower.split()
+        if len(words) >= 2:
+            # Multi-word city: take first letter of each word (max 3)
+            return ''.join([w[0] for w in words[:3]])
+        elif len(words) == 1:
+            # Single word: take first 2-3 chars
+            return city_lower[:3]
+        
+        return ""
+    
+    def _get_state_abbreviation(self, state: str) -> str:
+        """Get 2-letter state code from full state name."""
+        state_map = {
+            'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR',
+            'california': 'CA', 'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE',
+            'florida': 'FL', 'georgia': 'GA', 'hawaii': 'HI', 'idaho': 'ID',
+            'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA', 'kansas': 'KS',
+            'kentucky': 'KY', 'louisiana': 'LA', 'maine': 'ME', 'maryland': 'MD',
+            'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN', 'mississippi': 'MS',
+            'missouri': 'MO', 'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV',
+            'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY',
+            'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH', 'oklahoma': 'OK',
+            'oregon': 'OR', 'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+            'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT',
+            'vermont': 'VT', 'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV',
+            'wisconsin': 'WI', 'wyoming': 'WY'
+        }
+        
+        state_lower = state.lower().strip()
+        return state_map.get(state_lower, state[:2].upper())
     
     def _build_filter_conditions(self, filters: Dict[str, Any]) -> List:
         """Build SQLAlchemy filter conditions from dict."""

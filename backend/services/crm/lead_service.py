@@ -212,8 +212,12 @@ class LeadService:
             DatabaseException: If creation fails
         """
         try:
-            # Generate unique slug
-            slug = self._generate_unique_slug(business_data.get("name", ""))
+            # Generate unique slug from name and location
+            slug = self._generate_unique_slug(
+                business_data.get("name", ""),
+                business_data.get("city", ""),
+                business_data.get("state", "")
+            )
             
             # Calculate qualification score
             qualification_score = self._calculate_qualification_score(business_data)
@@ -279,25 +283,32 @@ class LeadService:
             logger.error(f"Error creating business record: {str(e)}", exc_info=True)
             raise DatabaseException(f"Failed to create business: {str(e)}")
     
-    def _generate_unique_slug(self, name: str) -> str:
+    def _generate_unique_slug(self, name: str, city: str = "", state: str = "") -> str:
         """
-        Generate a unique URL-safe slug from business name.
+        Generate clean, human-readable slug: business-name-region
+        
+        Examples:
+            - "Body Care Chiropractic" in "Los Angeles" -> "bodycare-la"
+            - "Elite Auto Repair" in "San Francisco" -> "elite-auto-sf"
+            - "ABC Company LLC" in "New York" -> "abc-ny"
         
         Args:
             name: Business name
-        
+            city: City name (optional)
+            state: State name (optional)
+            
         Returns:
-            Unique slug string
+            URL-safe slug like "business-name-region"
         """
-        base_slug = slugify(name, max_length=180)
-        if not base_slug:
-            base_slug = "business"
+        # Import the helper methods from business_service
+        # (reusing same logic for consistency)
+        from services.hunter.business_service import BusinessService
         
-        # Add timestamp suffix for uniqueness
-        # Format: business-name-1642856400123
-        import time
-        timestamp = int(time.time() * 1000)  # milliseconds
-        return f"{base_slug}-{timestamp}"
+        # Create temporary instance to access helper methods
+        helper = BusinessService(self.db)
+        
+        # Use the same slug generation logic
+        return helper._generate_unique_slug(name, city, state)
     
     def _calculate_qualification_score(self, business_data: Dict[str, Any]) -> int:
         """
