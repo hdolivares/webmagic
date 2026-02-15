@@ -9,6 +9,8 @@ import './IntelligentCampaignPanel.css'
 
 interface Zone {
   zone_id: string
+  city?: string
+  target_city?: string
   lat: number
   lon: number
   radius_km: number
