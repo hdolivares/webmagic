@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui'
 import { api } from '@/services/api'
+import { scrapesAPI } from '@/api/scrapes'
 import { US_STATES } from '@/data/states'
 import { getCitiesForState } from '@/data/cities'
 import { CoverageBreakdownPanel } from './CoverageBreakdownPanel'
 import { ZoneStatisticsCard } from './ZoneStatisticsCard'
+import { ScrapeProgress } from '@/components/scraping'
 import './IntelligentCampaignPanel.css'
 
 interface Zone {
@@ -94,6 +96,10 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
   const [strategy, setStrategy] = useState<Strategy | null>(null)
   const [scrapeResult, setScrapeResult] = useState<ScrapeResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  
+  // Phase 2: Async scraping with SSE progress
+  const [scrapeSessionId, setScrapeSessionId] = useState<string | null>(null)
+  const [isScrapingAsync, setIsScrapingAsync] = useState(false)
 
   // Load business categories on mount
   useEffect(() => {
@@ -154,79 +160,65 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
     setScrapeResult(null) // Clear previous results
     
     try {
-      console.log('🔵 Starting zone scrape...', { 
+      console.log('🔵 Starting async zone scrape...', { 
         zone_id: selectedZoneId || 'auto (next)',
         force_rescrape: forceRescrape 
       })
-      const response = await api.scrapeIntelligentZone({
-        strategy_id: strategy.strategy_id,
-        zone_id: selectedZoneId || undefined,
-        force_rescrape: forceRescrape,
+      
+      // Phase 2: Use new async API with SSE progress
+      const response = await scrapesAPI.startScrape({
+        zone_id: selectedZoneId || strategy.next_zone?.zone_id || '',
+        city: city,
+        state: state,
+        category: category,
+        country: 'US',
         limit_per_zone: 50,
-        draft_mode: draftMode
+        strategy_id: strategy.strategy_id
       })
       
-      console.log('✅ Scrape complete:', response)
+      console.log('✅ Scrape queued:', response)
       
-      // Validate response has data
-      if (!response || !response.results) {
-        throw new Error('Invalid response from server - no results returned')
-      }
+      // Set session ID to start SSE stream
+      setScrapeSessionId(response.session_id)
+      setIsScrapingAsync(true)
+      setLoading(false) // No longer blocking!
       
-      setScrapeResult(response)
-      
-      // Show success notification inline
-      const { raw_businesses = 0, qualified_leads = 0, without_websites = 0, queued_for_generation = 0 } = response.results
-      console.log(`✅ Success! Found ${raw_businesses} businesses, ${qualified_leads} qualified, ${without_websites} need websites, ${queued_for_generation} queued for generation`)
-      
-      // Refresh strategy
-      const strategyResponse = await api.getIntelligentStrategy(strategy.strategy_id)
-      setStrategy(strategyResponse)
-      
-      // Notify parent if callback provided
-      if (onCampaignUpdate) {
-        onCampaignUpdate()
-      }
     } catch (err: any) {
-      const status = err.response?.status
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to scrape zone'
-      
-      // Check if this is a timeout error where the operation might have completed
-      if (status === 504 || err.code === 'ECONNABORTED' || errorMessage.includes('timeout')) {
-        setError(
-          '⚠️ The request timed out, but the scraping may have completed successfully in the background. ' +
-          'Please refresh the page in a moment to check if businesses were found.'
-        )
-        
-        // Auto-refresh strategy after 5 seconds to check results
-        setTimeout(async () => {
-          try {
-            const strategyResponse = await api.getIntelligentStrategy(strategy.strategy_id)
-            setStrategy(strategyResponse)
-            if (strategyResponse.businesses_found > strategy.businesses_found) {
-              setError(null)
-              console.log('✅ Scrape completed in background! Found new businesses.')
-              if (onCampaignUpdate) {
-                onCampaignUpdate()
-              }
-            }
-          } catch (e) {
-            console.error('Failed to refresh strategy:', e)
-          }
-        }, 5000)
-      } else {
-        setError(errorMessage)
-      }
-      
-      console.error('❌ Scrape error:', err)
-      console.error('Error details:', {
-        status: err.response?.status,
-        data: err.response?.data,
-        message: err.message
-      })
-    } finally {
+      const errorMessage = err.message || 'Failed to start scrape'
+      setError(errorMessage)
       setLoading(false)
+      
+      console.error('❌ Failed to queue scrape:', err)
     }
+  }
+  
+  const handleScrapeComplete = async (summary: Record<string, number>) => {
+    console.log('🎉 Scrape completed!', summary)
+    
+    setIsScrapingAsync(false)
+    setScrapeSessionId(null)
+    
+    // Refresh strategy to get updated counts
+    if (strategy) {
+      try {
+        const strategyResponse = await api.getIntelligentStrategy(strategy.strategy_id)
+        setStrategy(strategyResponse)
+        
+        // Notify parent
+        if (onCampaignUpdate) {
+          onCampaignUpdate()
+        }
+      } catch (err) {
+        console.error('Failed to refresh strategy:', err)
+      }
+    }
+  }
+  
+  const handleScrapeError = (errorMessage: string) => {
+    console.error('❌ Scrape error:', errorMessage)
+    setError(errorMessage)
+    setIsScrapingAsync(false)
+    setScrapeSessionId(null)
   }
 
   const handleBatchScrape = async () => {
@@ -506,11 +498,13 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
                 <div className="action-buttons">
                   <button
                     onClick={handleScrapeNextZone}
-                    disabled={loading || (!selectedZoneId && !strategy.next_zone && !forceRescrape)}
+                    disabled={loading || isScrapingAsync || (!selectedZoneId && !strategy.next_zone && !forceRescrape)}
                     className="scrape-btn primary"
                   >
-                    {loading 
-                      ? '⏳ Scraping... (may take 1-2 minutes)' 
+                    {isScrapingAsync 
+                      ? '⏳ Scraping in progress...' 
+                      : loading
+                      ? '⏳ Starting...'
                       : forceRescrape 
                         ? '🔄 Rescrape This Zone' 
                         : selectedZoneId 
@@ -521,7 +515,7 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
                   {strategy.next_zone && (
                     <button
                       onClick={handleBatchScrape}
-                      disabled={loading}
+                      disabled={loading || isScrapingAsync}
                       className="scrape-btn secondary"
                     >
                       {loading ? '⏳ Starting...' : '⚡ Batch Scrape (5 zones)'}
@@ -529,15 +523,14 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
                   )}
                 </div>
                 
-                {loading && (
-                  <div className="scraping-progress-info">
-                    <div className="progress-steps">
-                      <p>🔍 Searching Google Maps for businesses...</p>
-                      <p>📋 Processing and validating results...</p>
-                      <p>💾 Saving qualified leads to database...</p>
-                      <p className="text-secondary">This operation typically takes 60-90 seconds. Please wait...</p>
-                    </div>
-                  </div>
+                {/* Phase 2: Real-time progress with SSE */}
+                {scrapeSessionId && isScrapingAsync && (
+                  <ScrapeProgress 
+                    sessionId={scrapeSessionId}
+                    onComplete={handleScrapeComplete}
+                    onError={handleScrapeError}
+                    showEventLog={false}
+                  />
                 )}
               </div>
             )}

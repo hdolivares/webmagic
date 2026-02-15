@@ -1,0 +1,323 @@
+/**
+ * ScrapeProgress Component Styles
+ * 
+ * Uses semantic CSS variables for maintainable theming.
+ * All colors, spacing, and sizes reference root variables.
+ */
+
+@import '../../styles/semantic-variables.css';
+
+/* =============================================================================
+ * CONTAINER
+ * ============================================================================= */
+
+.scrape-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  
+  background: var(--card-background);
+  border: var(--card-border-width) solid var(--card-border-color);
+  border-radius: var(--card-border-radius);
+  padding: var(--card-padding);
+  box-shadow: var(--card-shadow);
+  
+  transition: box-shadow var(--transition-normal);
+}
+
+.scrape-progress:hover {
+  box-shadow: var(--card-shadow-hover);
+}
+
+/* =============================================================================
+ * HEADER
+ * ============================================================================= */
+
+.scrape-progress__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.scrape-progress__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  line-height: var(--line-height-tight);
+}
+
+.scrape-progress__count {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+/* =============================================================================
+ * PROGRESS BAR
+ * ============================================================================= */
+
+.scrape-progress__bar-container {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.scrape-progress__bar {
+  flex: 1;
+  height: var(--progress-bar-height-lg);
+  background: var(--progress-bar-background);
+  border-radius: var(--progress-bar-radius);
+  overflow: hidden;
+  position: relative;
+}
+
+.scrape-progress__bar-fill {
+  height: 100%;
+  background: var(--progress-bar-fill);
+  border-radius: var(--progress-bar-radius);
+  transition: var(--progress-bar-transition);
+  
+  /* Animated gradient for active state */
+  background-image: linear-gradient(
+    90deg,
+    var(--progress-bar-fill),
+    color-mix(in srgb, var(--progress-bar-fill) 80%, white),
+    var(--progress-bar-fill)
+  );
+  background-size: 200% 100%;
+  animation: progress-shimmer 2s ease-in-out infinite;
+}
+
+.scrape-progress__bar-fill--scraping {
+  background: var(--color-status-info);
+  background-image: linear-gradient(
+    90deg,
+    var(--color-status-info),
+    color-mix(in srgb, var(--color-status-info) 80%, white),
+    var(--color-status-info)
+  );
+  background-size: 200% 100%;
+}
+
+.scrape-progress__bar-fill--validating {
+  background: var(--color-status-pending);
+}
+
+.scrape-progress__bar-fill--completed {
+  background: var(--color-progress-fill-success);
+  animation: none;
+}
+
+.scrape-progress__percentage {
+  min-width: 3rem;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  text-align: right;
+}
+
+@keyframes progress-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* =============================================================================
+ * CURRENT BUSINESS
+ * ============================================================================= */
+
+.scrape-progress__current-business {
+  padding: var(--spacing-md);
+  background: color-mix(in srgb, var(--color-status-info) 10%, transparent);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--color-status-info);
+}
+
+.scrape-progress__current-label {
+  margin: 0 0 var(--spacing-xs) 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-status-info);
+}
+
+.scrape-progress__current-name {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+/* =============================================================================
+ * SUMMARY (Completion)
+ * ============================================================================= */
+
+.scrape-progress__summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: color-mix(in srgb, var(--color-status-success) 10%, transparent);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--color-status-success);
+}
+
+.scrape-progress__summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.scrape-progress__summary-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.scrape-progress__summary-value {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.scrape-progress__summary-value--success {
+  color: var(--color-status-success);
+}
+
+.scrape-progress__summary-value--warning {
+  color: var(--color-status-warning);
+}
+
+/* =============================================================================
+ * ERROR
+ * ============================================================================= */
+
+.scrape-progress__error {
+  padding: var(--alert-padding);
+  background: color-mix(in srgb, var(--color-status-error) 10%, transparent);
+  border: var(--alert-border-width) solid var(--color-status-error);
+  border-radius: var(--alert-border-radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.scrape-progress__error-message {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-status-error);
+  font-weight: var(--font-weight-medium);
+}
+
+.scrape-progress__error-action {
+  align-self: flex-start;
+  padding: var(--button-padding-y) var(--button-padding-x);
+  font-size: var(--font-size-sm);
+  font-weight: var(--button-font-weight);
+  color: var(--color-text-inverse);
+  background: var(--color-status-error);
+  border: none;
+  border-radius: var(--button-border-radius);
+  cursor: pointer;
+  transition: var(--button-transition);
+}
+
+.scrape-progress__error-action:hover {
+  background: color-mix(in srgb, var(--color-status-error) 90%, black);
+  transform: translateY(-1px);
+}
+
+.scrape-progress__error-action:active {
+  transform: translateY(0);
+}
+
+/* =============================================================================
+ * EVENT LOG (Development/Debug)
+ * ============================================================================= */
+
+.scrape-progress__event-log {
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: var(--color-surface-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.scrape-progress__event-log-summary {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  user-select: none;
+  padding: var(--spacing-xs);
+}
+
+.scrape-progress__event-log-summary:hover {
+  color: var(--color-text-secondary);
+}
+
+.scrape-progress__event-log-items {
+  margin-top: var(--spacing-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.scrape-progress__event-log-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-surface-primary);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+}
+
+.scrape-progress__event-log-type {
+  font-family: monospace;
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.scrape-progress__event-log-time {
+  color: var(--color-text-tertiary);
+}
+
+/* =============================================================================
+ * RESPONSIVE
+ * ============================================================================= */
+
+@media (max-width: 640px) {
+  .scrape-progress__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .scrape-progress__summary {
+    font-size: var(--font-size-sm);
+  }
+}
+
+/* =============================================================================
+ * ANIMATIONS
+ * ============================================================================= */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.scrape-progress__current-business,
+.scrape-progress__summary,
+.scrape-progress__error {
+  animation: fade-in var(--transition-normal);
+}
