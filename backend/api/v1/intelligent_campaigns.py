@@ -100,8 +100,10 @@ class CreateStrategyRequest(BaseModel):
 
 
 class ScrapeZoneRequest(BaseModel):
-    """Request to scrape the next zone in a strategy."""
+    """Request to scrape a zone in a strategy."""
     strategy_id: str = Field(..., description="Strategy UUID")
+    zone_id: Optional[str] = Field(None, description="Specific zone to scrape (if None, scrapes next zone)")
+    force_rescrape: bool = Field(default=False, description="If True, allows re-scraping already-scraped zones")
     limit_per_zone: int = Field(default=50, description="Maximum businesses per zone")
     draft_mode: bool = Field(default=False, description="If True, save businesses for review without sending messages")
 
@@ -232,10 +234,23 @@ async def scrape_next_zone(
             raise HTTPException(status_code=404, detail="Strategy not found")
         
         mode_label = "DRAFT MODE" if request.draft_mode else "LIVE MODE"
+        zone_label = f"zone {request.zone_id}" if request.zone_id else "next zone"
+        force_label = " (FORCE RESCRAPE)" if request.force_rescrape else ""
         logger.info(
-            f"Scraping next zone for strategy {request.strategy_id} ({mode_label}): "
+            f"Scraping {zone_label} for strategy {request.strategy_id} ({mode_label}{force_label}): "
             f"{strategy.city}, {strategy.state} - {strategy.category}"
         )
+        
+        # Handle force rescrape: clear zone from performance_data if requested
+        if request.force_rescrape and request.zone_id:
+            if strategy.performance_data and "zone_results" in strategy.performance_data:
+                strategy.performance_data["zone_results"] = [
+                    z for z in strategy.performance_data["zone_results"] 
+                    if z["zone_id"] != request.zone_id
+                ]
+                strategy.zones_completed = len(strategy.performance_data.get("zone_results", []))
+                await db.commit()
+                logger.info(f"Cleared zone {request.zone_id} from strategy for rescraping")
         
         # Execute scrape
         result = await hunter_service.scrape_with_intelligent_strategy(
@@ -245,7 +260,8 @@ async def scrape_next_zone(
             country=strategy.country,
             limit_per_zone=request.limit_per_zone,
             center_lat=strategy.city_center_lat,
-            center_lon=strategy.city_center_lon
+            center_lon=strategy.city_center_lon,
+            zone_id=request.zone_id  # Pass specific zone if provided
         )
         
         # Handle draft mode vs live mode

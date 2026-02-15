@@ -831,6 +831,8 @@ class ApiClient {
 
   async scrapeIntelligentZone(data: {
     strategy_id: string
+    zone_id?: string
+    force_rescrape?: boolean
     limit_per_zone?: number
     draft_mode?: boolean
   }): Promise<any> {
