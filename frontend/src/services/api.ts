@@ -287,6 +287,50 @@ class ApiClient {
   }
 
   // ============================================
+  // BUSINESS GENERATION QUEUE METHODS
+  // ============================================
+
+  async getBusinessesNeedingGeneration(): Promise<{ 
+    total: number
+    businesses: Array<{
+      id: string
+      name: string
+      category: string
+      city: string
+      state: string
+      country: string
+      phone: string | null
+      email: string | null
+      rating: number | null
+      review_count: number | null
+      website_validation_status: string
+      created_at: string
+    }>
+  }> {
+    const response = await this.client.get('/businesses/needs-generation')
+    return response.data
+  }
+
+  async queueBusinessesForGeneration(params?: {
+    business_ids?: string[]
+    queue_all?: boolean
+  }): Promise<{
+    queued: number
+    already_queued: number
+    failed: number
+    total: number
+    message: string
+  }> {
+    const response = await this.client.post('/businesses/queue-for-generation', null, {
+      params: {
+        business_ids: params?.business_ids,
+        queue_all: params?.queue_all || false
+      }
+    })
+    return response.data
+  }
+
+  // ============================================
   // PROMPT SETTINGS METHODS
   // ============================================
 
