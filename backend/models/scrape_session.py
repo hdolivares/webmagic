@@ -259,7 +259,7 @@ class ScrapeSession(Base):
                 "duration_seconds": self.duration_seconds
             },
             "error": self.error_message,
-            "metadata": self.metadata
+            "metadata": self.meta
         }
     
     def __repr__(self) -> str:
