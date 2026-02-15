@@ -1,10 +1,14 @@
 """
 Main FastAPI application for WebMagic.
 """
-from fastapi import FastAPI
+import logging
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from core.config import get_settings
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # Create FastAPI app
@@ -27,6 +31,19 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+
+# Custom exception handler for validation errors
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Log and handle validation errors with detailed information."""
+    logger.error(f"❌ Validation error on {request.method} {request.url.path}")
+    logger.error(f"   Errors: {exc.errors()}")
+    logger.error(f"   Body: {exc.body if hasattr(exc, 'body') else 'N/A'}")
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors(), "body": exc.body if hasattr(exc, 'body') else None},
+    )
 
 
 @app.get("/health")
