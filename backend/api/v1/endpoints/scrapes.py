@@ -143,7 +143,7 @@ async def start_scrape(
             zone_id=request.zone_id,
             strategy_id=request.strategy_id,
             status="queued",
-            metadata={
+            meta={
                 "city": request.city,
                 "state": request.state,
                 "category": request.category,
