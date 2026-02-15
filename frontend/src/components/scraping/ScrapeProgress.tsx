@@ -14,7 +14,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { useScrapeProgress } from '../../hooks/useScrapeProgress';
+import { useScrapeProgress, ScrapeStatus } from '../../hooks/useScrapeProgress';
 import './ScrapeProgress.css';
 
 // =============================================================================
