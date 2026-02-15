@@ -231,11 +231,13 @@ async def get_scrape_status(
 @router.get("/{session_id}/progress")
 async def stream_scrape_progress(
     session_id: UUID,
-    current_user: AdminUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Stream real-time progress updates via Server-Sent Events (SSE).
+    
+    **PUBLIC ENDPOINT** - No authentication required.
+    Authorization is provided by knowledge of the session UUID.
     
     **Event Stream** - maintains persistent connection to send updates.
     
@@ -269,7 +271,7 @@ async def stream_scrape_progress(
             detail=f"Scrape session {session_id} not found"
         )
     
-    logger.info(f"📡 SSE client connected: session={session_id}, user={current_user.email}")
+    logger.info(f"📡 SSE client connected: session={session_id}")
     
     async def event_generator() -> AsyncGenerator[str, None]:
         """
