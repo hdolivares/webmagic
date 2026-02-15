@@ -28,6 +28,7 @@ from api.v1 import (
     tickets,  # Phase 6: Support tickets
     validation  # Playwright website validation
 )
+from api.v1.endpoints import scrapes  # Phase 2: Async scraping with SSE progress
 from api.v1 import webhooks_telnyx as telnyx  # Phase 7: SMS webhooks (Telnyx)
 from api.v1 import messages  # Phase 7: SMS Messages inbox
 
@@ -59,3 +60,4 @@ api_router.include_router(system.router)
 api_router.include_router(campaigns.router)
 api_router.include_router(payments.router)
 api_router.include_router(validation.router)  # Website validation
+api_router.include_router(scrapes.router)  # Phase 2: Async scraping with SSE progress
