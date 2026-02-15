@@ -30,12 +30,11 @@ async def test_validation():
     business_id = "88162f51-8452-4e61-a882-526cd74fb5bb"
     
     async for db in get_db():
-        # Fetch business
-        result = await db.execute(
-            "SELECT * FROM businesses WHERE id = :id",
-            {"id": business_id}
-        )
-        business = result.first()
+        # Fetch business using ORM
+        from sqlalchemy import select
+        stmt = select(Business).where(Business.id == business_id)
+        result = await db.execute(stmt)
+        business = result.scalar_one_or_none()
         
         if not business:
             logger.error(f"Business {business_id} not found")
