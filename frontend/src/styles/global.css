@@ -4,6 +4,7 @@
  */
 
 @import './theme.css';
+@import './semantic-variables.css';
 
 @tailwind base;
 @tailwind components;
