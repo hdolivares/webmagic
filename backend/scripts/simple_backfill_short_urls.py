@@ -82,52 +82,54 @@ async def main():
     success_count = 0
     error_count = 0
     
-    async for db in get_db():
-        try:
-            # Get all sites without short_url
-            result = await db.execute(
-                select(GeneratedSite)
-                .where(
-                    GeneratedSite.status == 'completed',
-                    GeneratedSite.short_url == None  # noqa: E711
-                )
-                .order_by(GeneratedSite.created_at.asc())
+    # Get database session properly
+    db_gen = get_db()
+    db = await db_gen.__anext__()
+    
+    try:
+        # Get all sites without short_url
+        result = await db.execute(
+            select(GeneratedSite)
+            .where(
+                GeneratedSite.status == 'completed',
+                GeneratedSite.short_url == None  # noqa: E711
             )
+            .order_by(GeneratedSite.created_at.asc())
+        )
+        
+        sites = result.scalars().all()
+        total = len(sites)
+        
+        if total == 0:
+            logger.info("✅ No sites need backfilling!")
+            return
+        
+        logger.info(f"Found {total} sites needing short links\n")
+        
+        # Process each site
+        for i, site in enumerate(sites, 1):
+            logger.info(f"[{i}/{total}] Processing {site.subdomain}...")
             
-            sites = result.scalars().all()
-            total = len(sites)
-            
-            if total == 0:
-                logger.info("✅ No sites need backfilling!")
-                return
-            
-            logger.info(f"Found {total} sites needing short links\n")
-            
-            # Process each site
-            for i, site in enumerate(sites, 1):
-                logger.info(f"[{i}/{total}] Processing {site.subdomain}...")
-                
-                if await backfill_one_site(db, site):
-                    success_count += 1
-                else:
-                    error_count += 1
-            
-            # Summary
-            logger.info("")
-            logger.info("=" * 60)
-            logger.info("Backfill Complete!")
-            logger.info("=" * 60)
-            logger.info(f"Total sites: {total}")
-            logger.info(f"✅ Success: {success_count}")
-            logger.info(f"❌ Errors: {error_count}")
-            logger.info("=" * 60)
-            
-        except Exception as e:
-            logger.error(f"Fatal error: {e}", exc_info=True)
-            raise
-        finally:
-            await db.close()
-            break
+            if await backfill_one_site(db, site):
+                success_count += 1
+            else:
+                error_count += 1
+        
+        # Summary
+        logger.info("")
+        logger.info("=" * 60)
+        logger.info("Backfill Complete!")
+        logger.info("=" * 60)
+        logger.info(f"Total sites: {total}")
+        logger.info(f"✅ Success: {success_count}")
+        logger.info(f"❌ Errors: {error_count}")
+        logger.info("=" * 60)
+        
+    except Exception as e:
+        logger.error(f"Fatal error: {e}", exc_info=True)
+        raise
+    finally:
+        await db_gen.aclose()
 
 
 if __name__ == "__main__":
