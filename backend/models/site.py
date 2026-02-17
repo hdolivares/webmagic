@@ -24,6 +24,7 @@ class GeneratedSite(BaseModel):
     # Site info
     subdomain = Column(String(100), unique=True, nullable=False, index=True)
     custom_domain = Column(String(255), nullable=True, index=True)
+    short_url = Column(String(255), nullable=True, index=True)  # lvsh.cc short link (created at generation)
     
     # Content
     html_content = Column(Text, nullable=True)  # Nullable during generation

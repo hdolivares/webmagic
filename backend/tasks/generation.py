@@ -12,6 +12,7 @@ from core.database import get_db_session
 from models.business import Business
 from models.site import GeneratedSite
 from services.creative.orchestrator import CreativeOrchestrator
+from services.shortener.short_link_service_v2 import ShortLinkServiceV2
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,23 @@ async def generate_site_for_business(self, business_id: str):
             orchestrator = CreativeOrchestrator(db)
             result = await orchestrator.generate_complete_site(business.id)
             
-            # Update site
+            # Create short link for the site (ONCE at generation time)
+            site_url = f"https://sites.lavish.solutions/{site.subdomain}"
+            short_url = site_url  # Default to full URL if shortener fails
+            
+            try:
+                short_url = await ShortLinkServiceV2.get_or_create_short_link(
+                    db=db,
+                    destination_url=site_url,
+                    link_type="site_preview",
+                    business_id=business.id,
+                    site_id=site.id,
+                )
+                logger.info(f"Created short link for site {site.id}: {short_url}")
+            except Exception as e:
+                logger.warning(f"Failed to create short link for site {site.id}, using full URL: {e}")
+            
+            # Update site with content AND short link
             await db.execute(
                 update(GeneratedSite)
                 .where(GeneratedSite.id == site.id)
@@ -78,6 +95,7 @@ async def generate_site_for_business(self, business_id: str):
                     brand_analysis=result.get("analysis"),
                     brand_concept=result.get("concept"),
                     design_brief=result.get("brief"),
+                    short_url=short_url,  # Store short link on site
                     status="completed",
                     generation_completed_at=datetime.utcnow(),
                     updated_at=datetime.utcnow()
