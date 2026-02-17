@@ -12,35 +12,40 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-MIGRATION_SQL = """
--- Migration 017: Add short_url column to generated_sites
--- Stores the lvsh.cc short link directly on the site for fast access
-
--- Add short_url column (nullable for existing sites)
-ALTER TABLE generated_sites
-ADD COLUMN IF NOT EXISTS short_url VARCHAR(255) NULL;
-
--- Add index for fast lookups
-CREATE INDEX IF NOT EXISTS idx_generated_sites_short_url ON generated_sites(short_url);
-
--- Backfill existing sites with their short links (if they have one)
-UPDATE generated_sites gs
-SET short_url = (
-    SELECT CONCAT('https://lvsh.cc/', sl.slug)
-    FROM short_links sl
-    WHERE sl.site_id = gs.id
-      AND sl.is_active = true
-      AND sl.link_type = 'site_preview'
-    ORDER BY sl.created_at DESC
-    LIMIT 1
-)
-WHERE gs.short_url IS NULL
-  AND EXISTS (
-    SELECT 1 FROM short_links sl
-    WHERE sl.site_id = gs.id
-      AND sl.is_active = true
-  );
-"""
+# Migration SQL split into separate statements for asyncpg
+MIGRATION_STATEMENTS = [
+    # Step 1: Add column
+    """
+    ALTER TABLE generated_sites
+    ADD COLUMN IF NOT EXISTS short_url VARCHAR(255) NULL
+    """,
+    
+    # Step 2: Add index
+    """
+    CREATE INDEX IF NOT EXISTS idx_generated_sites_short_url
+    ON generated_sites(short_url)
+    """,
+    
+    # Step 3: Backfill existing sites
+    """
+    UPDATE generated_sites gs
+    SET short_url = (
+        SELECT CONCAT('https://lvsh.cc/', sl.slug)
+        FROM short_links sl
+        WHERE sl.site_id = gs.id
+          AND sl.is_active = true
+          AND sl.link_type = 'site_preview'
+        ORDER BY sl.created_at DESC
+        LIMIT 1
+    )
+    WHERE gs.short_url IS NULL
+      AND EXISTS (
+        SELECT 1 FROM short_links sl
+        WHERE sl.site_id = gs.id
+          AND sl.is_active = true
+      )
+    """
+]
 
 
 async def run_migration():
@@ -49,10 +54,12 @@ async def run_migration():
     
     async for db in get_db():
         try:
-            # Execute migration
-            await db.execute(text(MIGRATION_SQL))
-            await db.commit()
+            # Execute migration statements one by one
+            for i, statement in enumerate(MIGRATION_STATEMENTS, 1):
+                logger.info(f"Executing step {i}/{len(MIGRATION_STATEMENTS)}...")
+                await db.execute(text(statement))
             
+            await db.commit()
             logger.info("✅ Migration 017 completed successfully!")
             
             # Verify migration
