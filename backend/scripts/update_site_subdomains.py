@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from models.site import GeneratedSite
 from models.business import Business
-from models.shortener import ShortLink
+from models.short_link import ShortLink
 from tasks.generation_helpers import build_site_subdomain, build_site_url
 from services.shortener.short_link_service_v2 import ShortLinkServiceV2
 import logging
