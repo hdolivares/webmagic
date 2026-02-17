@@ -22,6 +22,7 @@ from services.pitcher.tracking import EmailTracker
 from services.pitcher.sms_campaign_helper import SMSCampaignHelper
 from services.sms import SMSGenerator, SMSSender, PhoneValidator, SMSComplianceService
 from services.system_settings_service import SystemSettingsService
+from services.shortener import ShortLinkService
 from services.crm import BusinessLifecycleService
 from core.exceptions import DatabaseException, ValidationException
 from core.config import get_settings
@@ -306,6 +307,24 @@ class CampaignService:
         if not can_send:
             raise ValidationException(f"Cannot send SMS: {reason}")
         
+        # Create short link if we have a site URL
+        url_to_use = site_url
+        if site_url:
+            try:
+                # Use get_or_create to avoid duplicates for same destination
+                url_to_use = await ShortLinkService.get_or_create_short_link(
+                    db=self.db,
+                    destination_url=site_url,
+                    link_type="site_preview",
+                    business_id=business.id,
+                    site_id=site_id,
+                )
+                logger.info(f"Created short link for campaign: {url_to_use}")
+            except Exception as e:
+                # Graceful fallback: use original URL if shortener fails
+                logger.warning(f"Shortener failed, using original URL: {e}")
+                url_to_use = site_url
+        
         # Prepare business data
         business_data = {
             "name": business.name,
@@ -321,10 +340,10 @@ class CampaignService:
         raw = (templates or {}).get(template_key)
         custom_template = (raw.strip() if raw else "") or None
         
-        # Generate SMS content
+        # Generate SMS content (using short URL)
         sms_body = await self.sms_generator.generate_sms(
             business_data=business_data,
-            site_url=site_url,
+            site_url=url_to_use,  # Use short URL here!
             variant=variant,
             custom_template=custom_template,
         )
