@@ -68,5 +68,7 @@ async def root():
 
 # Import and include routers
 from api.v1.router import api_router
+from api.redirect import router as redirect_router
 
+app.include_router(redirect_router)  # Public short-link redirect — no prefix
 app.include_router(api_router, prefix=f"/api/{settings.API_VERSION}")

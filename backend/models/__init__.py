@@ -32,6 +32,7 @@ from models.system_settings import SystemSetting
 from models.website_validation import WebsiteValidation
 from models.business_filter_preset import BusinessFilterPreset
 from models.scrape_session import ScrapeSession
+from models.short_link import ShortLink
 
 __all__ = [
     "BaseModel",
@@ -72,4 +73,6 @@ __all__ = [
     "BusinessFilterPreset",
     # Phase 2: Async scraping models
     "ScrapeSession",
+    # URL Shortener
+    "ShortLink",
 ]

@@ -8,13 +8,14 @@
  */
 import { useState } from 'react'
 import { Card } from '@/components/ui'
-import { User, Key, Bot, MessageSquare } from 'lucide-react'
+import { User, Key, Bot, MessageSquare, Link2 } from 'lucide-react'
 import { AccountSettings } from './AccountSettings'
 import { AISettingsTab } from './AISettingsTab'
 import { PromptsSettings } from './PromptsSettings'
 import { MessagingSettings } from './MessagingSettings'
+import { ShortenerSettings } from './ShortenerSettings'
 
-type SettingsTab = 'account' | 'ai' | 'prompts' | 'messaging'
+type SettingsTab = 'account' | 'ai' | 'prompts' | 'messaging' | 'shortener'
 
 export const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('account')
@@ -43,6 +44,12 @@ export const SettingsPage = () => {
       label: 'Prompt Settings',
       icon: Key,
       description: 'Configure AI agent prompts',
+    },
+    {
+      id: 'shortener' as SettingsTab,
+      label: 'URL Shortener',
+      icon: Link2,
+      description: 'Configure short URLs for SMS campaigns',
     },
   ]
 
@@ -81,6 +88,7 @@ export const SettingsPage = () => {
         {activeTab === 'ai' && <AISettingsTab />}
         {activeTab === 'messaging' && <MessagingSettings />}
         {activeTab === 'prompts' && <PromptsSettings />}
+        {activeTab === 'shortener' && <ShortenerSettings />}
       </div>
     </div>
   )
