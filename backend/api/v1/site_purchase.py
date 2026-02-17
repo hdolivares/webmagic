@@ -57,8 +57,12 @@ async def get_public_site_preview(
     Returns basic site information for the preview/purchase page.
     """
     try:
-        site_service = get_site_service()
-        site = await site_service.get_site_by_slug(db, slug)
+        # Query site from database
+        from sqlalchemy import select as sql_select
+        result = await db.execute(
+            sql_select(Site).where(Site.slug == slug)
+        )
+        site = result.scalar_one_or_none()
         
         if not site:
             raise HTTPException(
