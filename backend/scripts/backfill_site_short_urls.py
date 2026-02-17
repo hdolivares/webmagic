@@ -160,10 +160,13 @@ async def backfill_short_urls() -> None:
             logger.info(f"Found {stats.total} sites needing short links")
             logger.info("Starting backfill process...\n")
             
-            # Step 2: Process each site
+            # Step 2: Process each site (commit after each to avoid transaction failures)
             for site, business in sites_to_update:
                 try:
                     short_url = await _create_and_save_short_link(db, site, business)
+                    
+                    # Commit immediately to avoid cascading transaction errors
+                    await db.commit()
                     
                     stats.success += 1
                     logger.info(
@@ -172,6 +175,9 @@ async def backfill_short_urls() -> None:
                     )
                     
                 except Exception as e:
+                    # Rollback this failed transaction
+                    await db.rollback()
+                    
                     stats.errors += 1
                     logger.error(
                         f"[{stats.errors} errors] "
@@ -179,9 +185,8 @@ async def backfill_short_urls() -> None:
                     )
                     continue
             
-            # Step 3: Commit all updates
-            await db.commit()
-            logger.info("\nCommitted all changes to database")
+            # Step 3: Log completion
+            logger.info("\nAll changes committed to database")
             
             # Step 4: Log summary
             stats.log_summary()
