@@ -69,6 +69,11 @@ async def root():
 # Import and include routers
 from api.v1.router import api_router
 from api.redirect import router as redirect_router
+from api.v1 import generated_preview
 
 app.include_router(redirect_router)  # Public short-link redirect — no prefix
 app.include_router(api_router, prefix=f"/api/{settings.API_VERSION}")
+
+# Mount generated site preview router (serves sites.lavish.solutions/{subdomain})
+# This must be mounted AFTER other routers to avoid catching API routes
+app.include_router(generated_preview.router)
