@@ -38,6 +38,74 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Site Purchase"])
 
 
+@router.get(
+    "/sites/public/{slug}",
+    responses={
+        404: {"model": ErrorResponse, "description": "Site not found"},
+    },
+    summary="Get public site preview",
+    description="Get site details for public preview (no auth required)."
+)
+async def get_public_site_preview(
+    slug: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get public site preview information.
+    
+    This endpoint is PUBLIC - no authentication required.
+    Returns basic site information for the preview/purchase page.
+    """
+    try:
+        site_service = get_site_service()
+        site = await site_service.get_site_by_slug(db, slug)
+        
+        if not site:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Site not found: {slug}"
+            )
+        
+        # Only return preview-status sites publicly
+        if site.status != "preview":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Site is not available for purchase"
+            )
+        
+        # Get business info if available
+        business_name = None
+        if site.business_id:
+            from models.business import Business
+            from sqlalchemy import select as sql_select
+            result = await db.execute(
+                sql_select(Business).where(Business.id == site.business_id)
+            )
+            business = result.scalar_one_or_none()
+            if business:
+                business_name = business.name
+        
+        return {
+            "id": str(site.id),
+            "slug": site.slug,
+            "site_title": site.site_title,
+            "site_description": site.site_description,
+            "purchase_amount": float(site.purchase_amount),
+            "monthly_amount": float(site.monthly_amount),
+            "status": site.status,
+            "business_name": business_name
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching public site preview: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load site preview"
+        )
+
+
 @router.post(
     "/sites/{slug}/purchase",
     response_model=PurchaseCheckoutResponse,
