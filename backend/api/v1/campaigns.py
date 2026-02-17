@@ -424,12 +424,12 @@ async def preview_sms_message(
     site_url = f"https://sites.lavish.solutions/{site.subdomain}"
     
     # Create or get short link for preview (same as actual campaign creation)
-    from services.shortener import ShortLinkService
+    from services.shortener.short_link_service_v2 import ShortLinkServiceV2
     
     url_to_use = site_url
     try:
-        # Use get_or_create to match what happens in actual campaign
-        url_to_use = await ShortLinkService.get_or_create_short_link(
+        # Use V2 (race-condition-free) get_or_create
+        url_to_use = await ShortLinkServiceV2.get_or_create_short_link(
             db=db,
             destination_url=site_url,
             link_type="site_preview",
