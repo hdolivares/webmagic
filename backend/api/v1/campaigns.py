@@ -423,6 +423,25 @@ async def preview_sms_message(
     # Build site URL
     site_url = f"https://sites.lavish.solutions/{site.subdomain}"
     
+    # Create or get short link for preview (same as actual campaign creation)
+    from services.shortener import ShortLinkService
+    
+    url_to_use = site_url
+    try:
+        # Use get_or_create to match what happens in actual campaign
+        url_to_use = await ShortLinkService.get_or_create_short_link(
+            db=db,
+            destination_url=site_url,
+            link_type="site_preview",
+            business_id=business.id,
+            site_id=site.id,
+        )
+        logger.info(f"Preview using short link: {url_to_use}")
+    except Exception as e:
+        # Graceful fallback: use original URL if shortener fails
+        logger.warning(f"Shortener failed in preview, using original URL: {e}")
+        url_to_use = site_url
+    
     # Prepare business data
     business_data = {
         "name": business.name,
@@ -441,10 +460,14 @@ async def preview_sms_message(
     generator = SMSGenerator()
     sms_body = await generator.generate_sms(
         business_data=business_data,
-        site_url=site_url,
+        site_url=url_to_use,  # Use short URL here!
         variant=preview_request.variant,
         custom_template=custom_template,
     )
+    
+    # Commit the short link if one was created
+    if url_to_use != site_url:
+        await db.commit()
     
     # Calculate metrics
     char_count = len(sms_body)
@@ -458,6 +481,6 @@ async def preview_sms_message(
         character_count=char_count,
         segment_count=segment_count,
         estimated_cost=estimated_cost,
-        site_url=site_url,
+        site_url=url_to_use,  # Return short URL if created
         variant=preview_request.variant
     )
