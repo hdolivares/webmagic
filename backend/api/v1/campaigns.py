@@ -420,27 +420,17 @@ async def preview_sms_message(
             detail="Business has no phone number for SMS"
         )
     
-    # Build site URL
-    site_url = f"https://sites.lavish.solutions/{site.subdomain}"
+    # Use the pre-generated short link from site (created at generation time)
+    # This ensures consistency across all variants and prevents race conditions
+    url_to_use = site.short_url
     
-    # Create or get short link for preview (same as actual campaign creation)
-    from services.shortener.short_link_service_v2 import ShortLinkServiceV2
-    
-    url_to_use = site_url
-    try:
-        # Use V2 (race-condition-free) get_or_create
-        url_to_use = await ShortLinkServiceV2.get_or_create_short_link(
-            db=db,
-            destination_url=site_url,
-            link_type="site_preview",
-            business_id=business.id,
-            site_id=site.id,
+    if not url_to_use:
+        # Fallback: If site was generated before migration, use full URL
+        url_to_use = f"https://sites.lavish.solutions/{site.subdomain}"
+        logger.warning(
+            f"Site {site.id} has no short_url (legacy site?). "
+            f"Using full URL: {url_to_use}"
         )
-        logger.info(f"Preview using short link: {url_to_use}")
-    except Exception as e:
-        # Graceful fallback: use original URL if shortener fails
-        logger.warning(f"Shortener failed in preview, using original URL: {e}")
-        url_to_use = site_url
     
     # Prepare business data
     business_data = {

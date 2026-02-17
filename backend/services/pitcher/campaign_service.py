@@ -22,7 +22,7 @@ from services.pitcher.tracking import EmailTracker
 from services.pitcher.sms_campaign_helper import SMSCampaignHelper
 from services.sms import SMSGenerator, SMSSender, PhoneValidator, SMSComplianceService
 from services.system_settings_service import SystemSettingsService
-from services.shortener.short_link_service_v2 import ShortLinkServiceV2
+# ShortLinkServiceV2 import removed - short links now created at site generation, not campaign time
 from services.crm import BusinessLifecycleService
 from core.exceptions import DatabaseException, ValidationException
 from core.config import get_settings
@@ -174,12 +174,27 @@ class CampaignService:
         return business
     
     async def _get_site_url(self, site_id: UUID) -> Optional[str]:
-        """Get site URL by ID."""
+        """
+        Get site URL by ID.
+        
+        Returns the pre-generated short_url (created at site generation time).
+        Falls back to full_url for legacy sites without short links.
+        """
         result = await self.db.execute(
             select(GeneratedSite).where(GeneratedSite.id == site_id)
         )
         site = result.scalar_one_or_none()
-        return site.full_url if site else None
+        
+        if not site:
+            return None
+        
+        # Use pre-generated short link (created at site generation)
+        if site.short_url:
+            return site.short_url
+        
+        # Fallback for legacy sites (generated before migration)
+        logger.warning(f"Site {site_id} has no short_url, using full_url")
+        return site.full_url
     
     def _select_channel(self, requested_channel: str, business: Business) -> str:
         """
@@ -307,23 +322,9 @@ class CampaignService:
         if not can_send:
             raise ValidationException(f"Cannot send SMS: {reason}")
         
-        # Create short link if we have a site URL
+        # site_url is already the pre-generated short link (from site.short_url)
+        # No need to create/lookup a short link here - it was created at site generation!
         url_to_use = site_url
-        if site_url:
-            try:
-                # Use V2 (race-condition-free) get_or_create
-                url_to_use = await ShortLinkServiceV2.get_or_create_short_link(
-                    db=self.db,
-                    destination_url=site_url,
-                    link_type="site_preview",
-                    business_id=business.id,
-                    site_id=site_id,
-                )
-                logger.info(f"Created short link for campaign: {url_to_use}")
-            except Exception as e:
-                # Graceful fallback: use original URL if shortener fails
-                logger.warning(f"Shortener failed, using original URL: {e}")
-                url_to_use = site_url
         
         # Prepare business data
         business_data = {
