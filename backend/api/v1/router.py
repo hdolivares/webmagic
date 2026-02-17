@@ -26,7 +26,8 @@ from api.v1 import (
     preview,  # Phase 4: Preview system
     domains,  # Phase 5: Custom domains
     tickets,  # Phase 6: Support tickets
-    validation  # Playwright website validation
+    validation,  # Playwright website validation
+    shortener,  # URL Shortener admin API
 )
 from api.v1.endpoints import scrapes  # Phase 2: Async scraping with SSE progress
 from api.v1 import webhooks_telnyx as telnyx  # Phase 7: SMS webhooks (Telnyx)
@@ -60,6 +61,7 @@ api_router.include_router(campaigns.router)
 api_router.include_router(payments.router)
 api_router.include_router(validation.router)  # Website validation
 api_router.include_router(scrapes.router)  # Phase 2: Async scraping with SSE progress
+api_router.include_router(shortener.router)  # URL Shortener admin API
 
 # NOTE: generated_preview.router removed from API router - it has a catch-all /{subdomain}
 # route that was causing 502 errors by matching all /api/v1/* paths.
