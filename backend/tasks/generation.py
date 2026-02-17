@@ -83,7 +83,7 @@ async def _create_site_record(db, business: Business) -> GeneratedSite:
     Returns:
         Created GeneratedSite instance
     """
-    subdomain = build_site_subdomain(business.name, str(business.id))
+    subdomain = build_site_subdomain(business.name, business.city, str(business.id))
     
     site = GeneratedSite(
         business_id=business.id,

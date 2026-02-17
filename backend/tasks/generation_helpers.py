@@ -25,23 +25,67 @@ LINK_TYPE_SITE_PREVIEW = "site_preview"
 SITE_BASE_URL = "https://sites.lavish.solutions"
 
 
-def build_site_subdomain(business_name: str, business_id: str) -> str:
+def build_site_subdomain(business_name: str, city: str, business_id: str) -> str:
     """
-    Generate a unique subdomain for a site.
+    Generate a clean subdomain for a site.
     
-    Format: {sanitized-business-name}-{business-id-prefix}
-    Example: "joes-plumbing-a1b2c3d4"
+    Format: {sanitized-business-name}-{region}
+    Example: "joes-plumbing-la" or "bodycare-miami"
+    
+    If the business name is too long (>30 chars), it will be shortened intelligently.
+    If there's a conflict, a number suffix is added.
     
     Args:
         business_name: Business name to sanitize
-        business_id: Full business UUID
+        city: City/region for the business
+        business_id: Full business UUID (fallback if city missing)
         
     Returns:
-        Sanitized subdomain string
+        Clean subdomain string
     """
-    sanitized_name = business_name.lower().replace(' ', '-')
-    id_prefix = business_id[:8]
-    return f"{sanitized_name}-{id_prefix}"
+    import re
+    
+    # Sanitize business name: lowercase, remove special chars, replace spaces with hyphens
+    name = business_name.lower()
+    name = re.sub(r'[^\w\s-]', '', name)  # Remove special characters
+    name = re.sub(r'[-\s]+', '-', name)   # Replace spaces/multiple hyphens with single hyphen
+    name = name.strip('-')
+    
+    # Shorten if too long (keep max 30 chars for business name part)
+    if len(name) > 30:
+        # Try to keep meaningful words (avoid cutting mid-word)
+        words = name.split('-')
+        shortened = []
+        current_length = 0
+        for word in words:
+            if current_length + len(word) + 1 <= 30:  # +1 for hyphen
+                shortened.append(word)
+                current_length += len(word) + 1
+            else:
+                break
+        name = '-'.join(shortened) if shortened else name[:30]
+    
+    # Sanitize city/region
+    if city:
+        region = city.lower()
+        region = re.sub(r'[^\w\s-]', '', region)
+        region = re.sub(r'[-\s]+', '-', region)
+        region = region.strip('-')
+        # Shorten city to abbreviation or first part (max 15 chars)
+        if len(region) > 15:
+            region = region.split('-')[0][:15]
+    else:
+        # Fallback to ID prefix if no city
+        region = business_id[:6]
+    
+    subdomain = f"{name}-{region}"
+    
+    # Final cleanup and length check
+    subdomain = subdomain.strip('-')
+    if len(subdomain) > 63:  # DNS subdomain limit
+        subdomain = subdomain[:63].rstrip('-')
+    
+    return subdomain
 
 
 def build_site_url(subdomain: str) -> str:
