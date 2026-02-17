@@ -78,6 +78,8 @@ async def update_setting(
             category = "ai"
         elif request.key.startswith("messaging_"):
             category = "messaging"
+        elif request.key.startswith("shortener_"):
+            category = "shortener"
         
         setting = await SystemSettingsService.set_setting(
             db=db,
