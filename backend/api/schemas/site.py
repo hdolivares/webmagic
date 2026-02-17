@@ -19,6 +19,7 @@ class SiteResponse(BaseModel):
     business_id: UUID
     subdomain: str
     custom_domain: Optional[str]
+    short_url: Optional[str]  # Pre-generated short link (e.g., https://lvsh.cc/abc123)
     status: str
     version: int
     deployed_at: Optional[datetime]
