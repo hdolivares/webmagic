@@ -351,11 +351,19 @@ export const GeneratedSitesPage = () => {
                           variant="primary"
                           size="sm"
                           className="flex-1 flex items-center justify-center gap-1 text-xs"
-                          onClick={() => window.open(`https://sites.lavish.solutions/${site.subdomain}`, '_blank')}
+                          onClick={() => window.open(site.short_url || `https://sites.lavish.solutions/${site.subdomain}`, '_blank')}
                         >
                           <ExternalLink className="w-3 h-3" />
                           Preview
                         </Button>
+                      </div>
+                    )}
+                    
+                    {/* Show short link if available */}
+                    {site.short_url && (site.status === 'completed' || site.status === 'published') && (
+                      <div className="text-xs text-text-secondary truncate" title={site.short_url}>
+                        <LinkIcon className="w-3 h-3 inline mr-1" />
+                        {site.short_url}
                       </div>
                     )}
                     

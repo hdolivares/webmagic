@@ -211,6 +211,10 @@ class ShortLinkServiceV2:
         # Should never reach here, but just in case
         return destination_url
 
-# Import is done at the end to avoid circular dependency issues
-# These methods are added dynamically below
-pass
+    # Inherit all other methods from original service
+    create_short_link = ShortLinkService.create_short_link
+    resolve = ShortLinkService.resolve
+    deactivate = ShortLinkService.deactivate
+    get_link_by_id = ShortLinkService.get_link_by_id
+    list_links = ShortLinkService.list_links
+    get_stats = ShortLinkService.get_stats
