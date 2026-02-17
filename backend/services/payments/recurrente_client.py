@@ -66,10 +66,11 @@ class RecurrenteClient:
         """
         url = f"{self.base_url}{endpoint}"
         
-        # Build headers with authentication
+        # Build headers with authentication (Recurrente uses custom headers)
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.secret_key}"
+            "X-PUBLIC-KEY": self.public_key,
+            "X-SECRET-KEY": self.secret_key
         }
         
         try:
