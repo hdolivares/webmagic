@@ -22,7 +22,7 @@ from services.pitcher.tracking import EmailTracker
 from services.pitcher.sms_campaign_helper import SMSCampaignHelper
 from services.sms import SMSGenerator, SMSSender, PhoneValidator, SMSComplianceService
 from services.system_settings_service import SystemSettingsService
-from services.shortener import ShortLinkService
+from services.shortener.short_link_service_v2 import ShortLinkServiceV2
 from services.crm import BusinessLifecycleService
 from core.exceptions import DatabaseException, ValidationException
 from core.config import get_settings
@@ -311,8 +311,8 @@ class CampaignService:
         url_to_use = site_url
         if site_url:
             try:
-                # Use get_or_create to avoid duplicates for same destination
-                url_to_use = await ShortLinkService.get_or_create_short_link(
+                # Use V2 (race-condition-free) get_or_create
+                url_to_use = await ShortLinkServiceV2.get_or_create_short_link(
                     db=self.db,
                     destination_url=site_url,
                     link_type="site_preview",
