@@ -32,8 +32,8 @@ CREATE TABLE IF NOT EXISTS short_links (
   site_id UUID REFERENCES generated_sites(id) ON DELETE SET NULL,
   campaign_id UUID REFERENCES campaigns(id) ON DELETE SET NULL,
 
-  -- Flexible metadata (UTM params, source channel, etc.)
-  metadata JSONB,
+  -- Flexible extra data (UTM params, source channel, etc.)
+  extra_data JSONB,
 
   -- Timestamps
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,

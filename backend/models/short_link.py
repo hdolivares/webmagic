@@ -72,8 +72,8 @@ class ShortLink(BaseModel):
         index=True,
     )
 
-    # Flexible metadata (e.g., UTM params, source channel, etc.)
-    metadata = Column(JSONB, nullable=True)
+    # Flexible extra data (e.g., UTM params, source channel, etc.)
+    extra_data = Column(JSONB, nullable=True)
 
     # Relationships (lazy to avoid N+1 on bulk queries)
     business = relationship("Business", lazy="selectin")

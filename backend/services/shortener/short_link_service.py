@@ -100,7 +100,7 @@ class ShortLinkService:
         campaign_id: Optional[UUID] = None,
         custom_slug: Optional[str] = None,
         expires_at: Optional[datetime] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+            extra_data: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Create a new short link and return the full short URL.
@@ -117,7 +117,7 @@ class ShortLinkService:
             campaign_id: Optional FK to campaigns table.
             custom_slug: Use a specific slug instead of generating one.
             expires_at: Explicit expiry. If None, uses defaults by link_type.
-            metadata: Optional JSONB metadata.
+            extra_data: Optional JSONB extra data.
 
         Returns:
             The full short URL (e.g., "https://wm.gt/a1B2c3"), or
@@ -158,7 +158,7 @@ class ShortLinkService:
             site_id=site_id,
             campaign_id=campaign_id,
             expires_at=expires_at,
-            metadata=metadata,
+            extra_data=extra_data,
         )
         db.add(short_link)
         await db.flush()  # Get the ID without committing (caller controls transaction)
