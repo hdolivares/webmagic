@@ -35,6 +35,10 @@ import TicketsPage from '@/pages/CustomerPortal/TicketsPage'
 import TicketDetailPage from '@/pages/CustomerPortal/TicketDetailPage'
 import AccountSettingsPage from '@/pages/CustomerPortal/AccountSettingsPage'
 
+// Public Pages
+import SitePreviewPage from '@/pages/Public/SitePreviewPage'
+import PurchaseSuccessPage from '@/pages/Public/PurchaseSuccessPage'
+
 // Create React Query client
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -79,6 +83,10 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          
+          {/* Public site preview & purchase */}
+          <Route path="/site-preview/:slug" element={<SitePreviewPage />} />
+          <Route path="/purchase-success" element={<PurchaseSuccessPage />} />
 
           {/* Admin Protected routes */}
           <Route
