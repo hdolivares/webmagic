@@ -84,7 +84,8 @@ class RecurrenteClient:
                 )
                 
                 # Log request
-                logger.debug(f"Recurrente {method} {endpoint}: {response.status_code}")
+                logger.info(f"Recurrente {method} {url}: status={response.status_code}")
+                logger.debug(f"Recurrente response body: {response.text[:500]}")
                 
                 # Handle response
                 if response.status_code >= 400:
@@ -98,7 +99,12 @@ class RecurrenteClient:
                     logger.error(error_msg)
                     raise ExternalAPIException(error_msg)
                 
-                return response.json()
+                # Parse JSON response
+                try:
+                    return response.json()
+                except ValueError as e:
+                    logger.error(f"Recurrente returned non-JSON response: status={response.status_code}, body={response.text[:500]}")
+                    raise ExternalAPIException(f"Recurrente returned invalid JSON: {str(e)}")
                 
         except httpx.RequestError as e:
             logger.error(f"Recurrente request failed: {str(e)}")
