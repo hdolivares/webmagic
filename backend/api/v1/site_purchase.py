@@ -175,7 +175,7 @@ async def create_purchase_checkout(
             detail=str(e)
         )
     except Exception as e:
-        logger.error(f"Purchase checkout error: {e}")
+        logger.error(f"Purchase checkout error: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create checkout. Please try again."
