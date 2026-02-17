@@ -165,6 +165,7 @@ async def list_sites(
             "business_id": s.business_id,
             "subdomain": s.subdomain,
             "custom_domain": s.custom_domain,
+            "short_url": s.short_url,  # Pre-generated short link
             "status": s.status,
             "version": s.version,
             "deployed_at": s.deployed_at,
