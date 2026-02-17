@@ -188,13 +188,15 @@ class ShortLinkService:
         if not config["enabled"] or not config["domain"]:
             return destination_url
 
-        # Check for existing active link
+        # Check for existing active link (use most recent if duplicates exist)
         result = await db.execute(
             select(ShortLink).where(
                 ShortLink.destination_url == destination_url,
                 ShortLink.is_active == True,  # noqa: E712
                 ShortLink.link_type == link_type,
             )
+            .order_by(ShortLink.created_at.desc())
+            .limit(1)
         )
         existing = result.scalar_one_or_none()
 
