@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     SITES_DOMAIN: str = "sites.lavish.solutions"
     SITES_BASE_URL: str = "https://sites.lavish.solutions"
     SITES_BASE_PATH: str = "/var/www/sites"
+    SITES_USE_PATH_ROUTING: bool = True  # Use path-based URLs (/slug) instead of subdomains (slug.domain)
     
     # Email Configuration
     EMAIL_PROVIDER: str = "brevo"
