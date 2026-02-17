@@ -1154,6 +1154,59 @@ class ApiClient {
     const response = await this.client.get(`/scrapes?${params.toString()}`)
     return response.data
   }
+  // ============================================
+  // URL SHORTENER METHODS
+  // ============================================
+
+  async getShortenerConfig(): Promise<{
+    domain: string
+    protocol: string
+    slug_length: number
+    default_expiry_days: number
+    enabled: boolean
+  }> {
+    const response = await this.client.get('/shortener/config')
+    return response.data
+  }
+
+  async getShortenerStats(): Promise<{
+    total_links: number
+    active_links: number
+    total_clicks: number
+    links_by_type: Record<string, number>
+  }> {
+    const response = await this.client.get('/shortener/stats')
+    return response.data
+  }
+
+  async listShortLinks(params?: {
+    link_type?: string
+    is_active?: boolean
+    page?: number
+    page_size?: number
+  }): Promise<{
+    items: any[]
+    total: number
+    page: number
+    page_size: number
+  }> {
+    const response = await this.client.get('/shortener/links', { params })
+    return response.data
+  }
+
+  async createShortLink(data: {
+    destination_url: string
+    link_type?: string
+    custom_slug?: string
+  }): Promise<{ success: boolean; short_url: string }> {
+    const response = await this.client.post('/shortener/links', data)
+    return response.data
+  }
+
+  async deactivateShortLink(linkId: string): Promise<{ success: boolean }> {
+    const response = await this.client.delete(`/shortener/links/${linkId}`)
+    return response.data
+  }
 }
 
 // Export singleton instance

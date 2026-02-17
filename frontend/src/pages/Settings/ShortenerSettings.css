@@ -1,0 +1,218 @@
+/**
+ * Shortener Settings - Follows the same semantic pattern as MessagingSettings.css
+ */
+.shortener-settings {
+  --shortener-spacing: 1rem;
+  --shortener-spacing-lg: 1.5rem;
+  --shortener-radius: 0.5rem;
+  --shortener-section-border: var(--color-border-dark, #d1d5db);
+  --shortener-input-border: var(--color-border-dark, #d1d5db);
+  --shortener-input-border-focus: var(--color-primary-500, #8b5cf6);
+  --shortener-bg-surface: var(--color-background, #ffffff);
+  --shortener-bg-secondary: var(--color-background-secondary, #f9fafb);
+}
+
+.shortener-settings-loading {
+  padding: var(--shortener-spacing-lg);
+  color: var(--color-text-secondary);
+}
+
+.shortener-settings__intro {
+  margin-bottom: var(--shortener-spacing-lg);
+}
+
+.shortener-settings__title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.shortener-settings__description {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* Stats row */
+.shortener-settings__stats {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: var(--shortener-spacing-lg);
+}
+
+.shortener-settings__stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--shortener-spacing);
+  background: var(--shortener-bg-secondary);
+  border: 1px solid var(--shortener-section-border);
+  border-radius: var(--shortener-radius);
+}
+
+.shortener-settings__stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.shortener-settings__stat-label {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin-top: 0.25rem;
+}
+
+/* Fields */
+.shortener-settings__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--shortener-spacing-lg);
+  margin-bottom: var(--shortener-spacing-lg);
+}
+
+.shortener-settings__field {
+  padding: var(--shortener-spacing);
+  background: var(--shortener-bg-secondary);
+  border: 1px solid var(--shortener-section-border);
+  border-radius: var(--shortener-radius);
+}
+
+.shortener-settings__label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.shortener-settings__input,
+.shortener-settings__select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--color-text-primary);
+  background: var(--shortener-bg-surface);
+  border: 2px solid var(--shortener-input-border);
+  border-radius: var(--shortener-radius);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.shortener-settings__input--small {
+  max-width: 120px;
+}
+
+.shortener-settings__input:focus,
+.shortener-settings__select:focus {
+  outline: none;
+  border-color: var(--shortener-input-border-focus);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+}
+
+.shortener-settings__hint {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  margin: 0.375rem 0 0 0;
+}
+
+/* Toggle switch */
+.shortener-settings__toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.shortener-settings__toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  border: none;
+  background: var(--color-border-dark, #d1d5db);
+  cursor: pointer;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.shortener-settings__toggle--on {
+  background: var(--color-primary-600, #7c3aed);
+}
+
+.shortener-settings__toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.2s ease;
+}
+
+.shortener-settings__toggle--on .shortener-settings__toggle-knob {
+  transform: translateX(20px);
+}
+
+.shortener-settings__toggle-label {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+/* Example */
+.shortener-settings__example {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: var(--shortener-spacing);
+  background: var(--shortener-bg-secondary);
+  border: 1px solid var(--shortener-section-border);
+  border-radius: var(--shortener-radius);
+  margin-bottom: var(--shortener-spacing-lg);
+}
+
+.shortener-settings__example-label {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.shortener-settings__example-url {
+  font-size: 0.875rem;
+  font-family: monospace;
+  color: var(--color-primary-600);
+  background: var(--shortener-bg-surface);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--shortener-section-border);
+}
+
+/* Actions */
+.shortener-settings__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.shortener-settings__btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: var(--shortener-radius);
+  cursor: pointer;
+  border: none;
+}
+
+.shortener-settings__btn--primary {
+  background: var(--color-primary-600);
+  color: white;
+}
+
+.shortener-settings__btn--primary:hover:not(:disabled) {
+  background: var(--color-primary-700);
+}
+
+.shortener-settings__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
