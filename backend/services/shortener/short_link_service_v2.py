@@ -22,6 +22,7 @@ from sqlalchemy.dialects.postgresql import insert
 from models.short_link import ShortLink
 from services.shortener.slug_generator import generate_slug
 from services.system_settings_service import SystemSettingsService
+from services.shortener.short_link_service import ShortLinkService
 
 logger = logging.getLogger(__name__)
 
@@ -210,14 +211,6 @@ class ShortLinkServiceV2:
         # Should never reach here, but just in case
         return destination_url
 
-    # Inherit all other methods from original service
-    create_short_link = ShortLinkService.create_short_link
-    resolve = ShortLinkService.resolve
-    deactivate = ShortLinkService.deactivate
-    get_link_by_id = ShortLinkService.get_link_by_id
-    list_links = ShortLinkService.list_links
-    get_stats = ShortLinkService.get_stats
-
-
-# Import the original service for inherited methods
-from services.shortener.short_link_service import ShortLinkService
+# Import is done at the end to avoid circular dependency issues
+# These methods are added dynamically below
+pass
