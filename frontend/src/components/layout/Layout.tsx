@@ -18,6 +18,7 @@ import {
   Moon,
   Wand2,
   ChevronDown,
+  HeadphonesIcon,
 } from 'lucide-react'
 
 export const Layout = () => {
@@ -49,6 +50,7 @@ export const Layout = () => {
     { to: '/messages', icon: MessageSquare, label: 'Messages' },
     { to: '/customers', icon: Users, label: 'Customers' },
     { to: '/coverage', icon: Map, label: 'Coverage' },
+    { to: '/tickets', icon: HeadphonesIcon, label: 'Support' },
     { to: '/settings', icon: Settings, label: 'Settings' },
   ]
 

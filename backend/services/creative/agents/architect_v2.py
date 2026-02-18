@@ -3,8 +3,11 @@ Architect Agent - Generates website HTML/CSS/JS code
 Uses delimited output format instead of JSON for reliability
 """
 import logging
+import re
+import json
 from typing import Dict, Any, Optional
 from pathlib import Path
+from datetime import datetime, timezone
 
 from .base import BaseAgent
 from ..prompts.builder import PromptBuilder
@@ -94,23 +97,46 @@ Do NOT use JSON. Instead, return your code in clearly delimited sections like th
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    ...meta tags, title, fonts...
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="...">
+    <title>...</title>
+    <!-- Google Fonts (preconnect + font link with &display=swap) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=...&display=swap" rel="stylesheet">
+    <!-- NO Tailwind CDN. NO external CSS frameworks. All styles go in styles.css -->
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    ...your HTML content here...
+    ...semantic HTML5 here (nav, main, section, article, footer)...
     <script src="script.js"></script>
 </body>
 </html>
 
 === CSS ===
-/* Your CSS code here - will be saved as styles.css */
+/* ALL styles go here — this is the ONLY stylesheet. No Tailwind. No frameworks. */
+/* Every brand color, font, and spacing value MUST be a CSS variable in :root */
 :root {
-  --color-primary: ...;
+  --color-primary: #1e40af;
+  --color-secondary: #7c3aed;
+  --color-accent: #fbbf24;
+  --color-bg: #FAFAFA;
+  --color-surface: #ffffff;
+  --color-text: #1f2937;
+  --color-text-muted: #6b7280;
+  --font-heading: 'YourHeadingFont', serif;
+  --font-body: 'YourBodyFont', sans-serif;
+  --spacing-sm: 0.75rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  --border-radius: 0.5rem;
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+  --transition: all 0.3s ease;
 }
-body {
-  ...
-}
+/* Then all other CSS using var(--...) throughout */
 
 === JS ===
 // Your JavaScript code here - will be saved as script.js
@@ -125,9 +151,16 @@ document.addEventListener('DOMContentLoaded', () => {
   "technologies": ["HTML5", "CSS3", "Vanilla JS"]
 }
 
-**IMPORTANT**: 
-1. The HTML MUST include `<link rel="stylesheet" href="styles.css">` in the <head> to load your CSS
-2. The HTML MUST include `<script src="script.js"></script>` before </body> to load your JS
+**CRITICAL CSS RULES** (violations will break the site editor):
+1. ALL CSS goes in the === CSS === section — styles.css is the ONLY stylesheet
+2. NEVER include Tailwind CDN, Bootstrap, or any CSS framework `<script>` or `<link>` in HTML
+3. EVERY color, font, and brand value MUST be a CSS variable in `:root { }` — use var(--...) everywhere
+4. NEVER use hardcoded hex colors like `color: #1e40af` outside of `:root` — always reference variables
+5. Use SEMANTIC HTML class names (.hero, .nav-link, .service-card) — NEVER Tailwind utility classes
+
+**IMPORTANT**:
+1. The HTML MUST include `<link rel="stylesheet" href="styles.css">` in the <head>
+2. The HTML MUST include `<script src="script.js"></script>` before </body>
 3. Use exactly these delimiters: === HTML ===, === CSS ===, === JS ===, === METADATA ===
 """
         
@@ -137,13 +170,25 @@ document.addEventListener('DOMContentLoaded', () => {
         # STEP 7: Parse delimited output using LLM-friendly parsing
         website = self._parse_delimited_output(raw_output, enhanced_data)
         
-        # STEP 8: Inject proper claim bar with checkout link
+        # STEP 8: Post-process — enforce CSS variables, strip Tailwind CDN, inject SEO head
         slug = enhanced_data.get("slug") or self._generate_slug(enhanced_data.get("name", ""))
+        website["css"] = self._enforce_css_variables(website.get("css", ""), design_brief)
+        website["html"] = self._strip_external_css_frameworks(website.get("html", ""))
+        website["html"] = self._inject_seo_head(website.get("html", ""), enhanced_data, slug)
+        
+        # STEP 9: Inject proper claim bar with checkout link
         website["html"] = self._inject_claim_bar(website.get("html", ""), slug)
         website["css"] = self._add_claim_bar_css(website.get("css", ""))
         website["js"] = self._add_claim_bar_js(website.get("js", ""), slug)
         
-        # STEP 9: Validate
+        # STEP 10: Extract generation context for edit pipeline
+        website["generation_context"] = self._extract_generation_context(
+            css=website.get("css", ""),
+            metadata=website.get("metadata", {}),
+            design_brief=design_brief,
+        )
+        
+        # STEP 11: Validate
         if not website.get('html'):
             raise ValidationException("No HTML generated")
         
@@ -259,6 +304,219 @@ document.addEventListener('DOMContentLoaded', () => {
         
         return result
     
+    # ── Post-processing guards ────────────────────────────────────────────────
+
+    def _enforce_css_variables(self, css: str, design_brief: Dict[str, Any]) -> str:
+        """
+        Ensure the stylesheet has a :root {} block with CSS variables.
+        If the LLM omitted it, inject one built from the design brief.
+        """
+        if not css.strip():
+            css = ""
+
+        if "--color-primary" not in css:
+            logger.warning("[architect] CSS variables missing — injecting from design_brief")
+            root_block = self._build_root_block(design_brief)
+            css = root_block + "\n" + css
+
+        return css
+
+    def _build_root_block(self, design_brief: Dict[str, Any]) -> str:
+        """Build a :root { } block from design_brief color palette and typography."""
+        palette = design_brief.get("color_palette", {})
+        typography = design_brief.get("typography", {})
+
+        primary = palette.get("primary", "#1e40af")
+        secondary = palette.get("secondary", "#7c3aed")
+        accent = palette.get("accent", "#fbbf24")
+        bg = palette.get("background", "#fafafa")
+        text = palette.get("text", "#1f2937")
+
+        heading_font = typography.get("heading_font", "Georgia, serif")
+        body_font = typography.get("body_font", "system-ui, sans-serif")
+
+        return f""":root {{
+  --color-primary: {primary};
+  --color-secondary: {secondary};
+  --color-accent: {accent};
+  --color-bg: {bg};
+  --color-surface: #ffffff;
+  --color-text: {text};
+  --color-text-muted: #6b7280;
+  --font-heading: {heading_font};
+  --font-body: {body_font};
+  --spacing-sm: 0.75rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  --border-radius: 0.5rem;
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+  --transition: all 0.3s ease;
+}}"""
+
+    def _strip_external_css_frameworks(self, html: str) -> str:
+        """
+        Remove Tailwind CDN and any other runtime CSS framework scripts/links.
+        Sites must be fully self-contained via styles.css.
+        """
+        # Remove Tailwind CDN <script> tags
+        html = re.sub(
+            r'<script[^>]+cdn\.tailwindcss\.com[^>]*>.*?</script>',
+            '',
+            html,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        html = re.sub(
+            r'<script[^>]+cdn\.tailwindcss\.com[^>]*/?>',
+            '',
+            html,
+            flags=re.IGNORECASE,
+        )
+        # Remove Bootstrap CDN links
+        html = re.sub(
+            r'<link[^>]+bootstrapcdn[^>]*/?>',
+            '',
+            html,
+            flags=re.IGNORECASE,
+        )
+        return html
+
+    def _inject_seo_head(self, html: str, business_data: Dict[str, Any], slug: str) -> str:
+        """
+        Programmatically inject canonical URL, Open Graph, Twitter Card, JSON-LD
+        LocalBusiness schema, favicon, robots meta, and theme-color into <head>.
+        Uses business_data so tags are always correct and never hallucinated.
+        """
+        settings = get_settings()
+        site_url = f"{settings.SITES_BASE_URL}/{slug}"
+
+        name = business_data.get("name", "")
+        category = business_data.get("category", "")
+        location = business_data.get("location", {})
+        city = location.get("city", "")
+        state = location.get("state", "")
+        phone = business_data.get("phone", "")
+        rating = business_data.get("rating", "")
+        review_count = business_data.get("review_count", "")
+        hours = business_data.get("hours", "")
+
+        meta_description = (
+            f"Professional {category} services in {city}, {state}. "
+            f"Trusted by customers with a {rating}★ rating. Call {phone}."
+        ).strip(". ")
+
+        # Build JSON-LD schema
+        schema: Dict[str, Any] = {
+            "@context": "https://schema.org",
+            "@type": "LocalBusiness",
+            "name": name,
+            "description": meta_description,
+            "url": site_url,
+            "telephone": phone,
+            "address": {
+                "@type": "PostalAddress",
+                "addressLocality": city,
+                "addressRegion": state,
+                "addressCountry": "US",
+            },
+        }
+        if hours:
+            schema["openingHours"] = hours
+        if rating and review_count:
+            try:
+                schema["aggregateRating"] = {
+                    "@type": "AggregateRating",
+                    "ratingValue": str(rating),
+                    "reviewCount": str(review_count),
+                }
+            except Exception:
+                pass
+
+        schema_json = json.dumps(schema, ensure_ascii=False, indent=2)
+
+        # Detect primary color from existing CSS variable comment or fall back
+        primary_color = "#6366f1"
+        primary_match = re.search(r'--color-primary\s*:\s*([^;]+);', html)
+        if not primary_match:
+            # html may not have CSS; look for it separately via a flag
+            primary_color = "#6366f1"
+        else:
+            primary_color = primary_match.group(1).strip()
+
+        seo_tags = f"""
+    <!-- SEO: Canonical -->
+    <link rel="canonical" href="{site_url}">
+
+    <!-- SEO: Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <!-- SEO: Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{site_url}">
+    <meta property="og:title" content="{name}">
+    <meta property="og:description" content="{meta_description}">
+    <meta property="og:site_name" content="{name}">
+
+    <!-- SEO: Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{name}">
+    <meta name="twitter:description" content="{meta_description}">
+
+    <!-- SEO: Mobile / Robots -->
+    <meta name="theme-color" content="{primary_color}">
+    <meta name="robots" content="index, follow">
+
+    <!-- SEO: JSON-LD LocalBusiness -->
+    <script type="application/ld+json">
+{schema_json}
+    </script>"""
+
+        # Insert just before </head>
+        if "</head>" in html:
+            head_close = html.find("</head>")
+            html = html[:head_close] + seo_tags + "\n" + html[head_close:]
+        elif "<body" in html:
+            body_pos = html.find("<body")
+            html = html[:body_pos] + seo_tags + "\n" + html[body_pos:]
+
+        return html
+
+    def _extract_generation_context(
+        self,
+        css: str,
+        metadata: Dict[str, Any],
+        design_brief: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Extract structured metadata about the generated site for the edit pipeline.
+        Stored in SiteVersion.generation_context as JSONB.
+        """
+        css_variables: Dict[str, str] = {}
+        root_match = re.search(r':root\s*\{([^}]+)\}', css)
+        if root_match:
+            for line in root_match.group(1).splitlines():
+                line = line.strip()
+                if line.startswith('--') and ':' in line:
+                    name, _, value = line.partition(':')
+                    css_variables[name.strip()] = value.strip().rstrip(';')
+
+        return {
+            "sections": metadata.get("sections", []),
+            "features": metadata.get("features", []),
+            "css_variables": css_variables,
+            "design_brief_summary": {
+                "brand_personality": design_brief.get("brand_personality", ""),
+                "color_palette": design_brief.get("color_palette", {}),
+                "typography": design_brief.get("typography", {}),
+            },
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "architect_version": "v2",
+        }
+
+    # ── Simple fallback website ───────────────────────────────────────────────
+
     def _create_simple_website(self, business_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a simple but professional fallback website."""
         name = business_data.get("name", "Business")
@@ -270,41 +528,88 @@ document.addEventListener('DOMContentLoaded', () => {
         city = location.get("city", "")
         state = location.get("state", "")
         
+        fallback_css = f""":root {{
+  --color-primary: #1e40af;
+  --color-secondary: #7c3aed;
+  --color-accent: #fbbf24;
+  --color-bg: #f0f4ff;
+  --color-surface: #ffffff;
+  --color-text: #1f2937;
+  --color-text-muted: #6b7280;
+  --font-heading: Georgia, serif;
+  --font-body: system-ui, sans-serif;
+  --border-radius: 1rem;
+  --shadow-md: 0 4px 24px rgba(0,0,0,0.12);
+}}
+*, *::before, *::after {{ box-sizing: border-box; }}
+body {{
+  margin: 0; padding: 0;
+  font-family: var(--font-body);
+  background: var(--color-bg);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}}
+.card {{
+  background: var(--color-surface);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  max-width: 40rem;
+  width: 100%;
+  padding: 3rem 2rem;
+  text-align: center;
+}}
+h1 {{ margin: 0 0 0.5rem; font-family: var(--font-heading); font-size: 2.5rem; color: var(--color-text); }}
+.subtitle {{ font-size: 1.1rem; color: var(--color-text-muted); margin: 0 0 1.5rem; }}
+.rating {{ font-size: 1.75rem; color: var(--color-accent); font-weight: 700; margin-bottom: 1.5rem; }}
+.phone {{ font-size: 1.4rem; color: var(--color-text); margin: 0 0 2rem; }}
+.phone a {{ color: inherit; text-decoration: none; }}
+.btn {{
+  display: inline-block;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+  color: #fff;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition, all 0.3s ease);
+  text-decoration: none;
+}}
+.btn:hover {{ opacity: 0.9; transform: scale(1.03); }}"""
+
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{name} - Professional {category.title()} Services</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles.css">
 </head>
-<body class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen flex items-center justify-center p-4">
-    <div class="max-w-2xl w-full bg-white rounded-2xl shadow-2xl p-8 md:p-12">
-        <div class="text-center">
-            <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4">{name}</h1>
-            <p class="text-xl text-gray-600 mb-6">{category.title()} • {city}, {state}</p>
-            
-            {f'<div class="flex items-center justify-center mb-6"><span class="text-3xl font-bold text-yellow-500">{rating}★</span><span class="text-gray-600 ml-2">Rated by customers</span></div>' if rating > 0 else ''}
-            
-            {f'<p class="text-2xl text-gray-800 mb-8"><a href="tel:{phone}" class="hover:text-blue-600 transition">{phone}</a></p>' if phone else ''}
-            
-            <button onclick="window.location.href='tel:{phone}'" class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:shadow-lg transition transform hover:scale-105">
-                Get In Touch
-            </button>
-        </div>
+<body>
+    <div class="card">
+        <h1>{name}</h1>
+        <p class="subtitle">{category.title()} &bull; {city}, {state}</p>
+        {f'<p class="rating">{rating}★ Rated by customers</p>' if rating and float(rating) > 0 else ''}
+        {f'<p class="phone"><a href="tel:{phone}">{phone}</a></p>' if phone else ''}
+        <a href="tel:{phone}" class="btn">Get In Touch</a>
     </div>
+    <script src="script.js"></script>
 </body>
 </html>"""
-        
+
         return {
             "html": html,
-            "css": "",
+            "css": fallback_css,
             "js": "",
             "metadata": {
                 "sections": ["hero"],
                 "features": ["responsive", "fallback"],
-                "technologies": ["HTML5", "Tailwind CSS"]
-            }
+                "technologies": ["HTML5", "CSS3"],
+            },
         }
     
     def _prepare_content(

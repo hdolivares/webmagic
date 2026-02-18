@@ -27,6 +27,8 @@ import { CoveragePage } from '@/pages/Coverage/CoveragePage'
 import { SettingsPage } from '@/pages/Settings/SettingsPage'
 import { ImageGenerationPage } from '@/pages/ImageGeneration/ImageGenerationPage'
 import { MessagesPage } from '@/pages/Messages/MessagesPage'
+import AdminTicketsPage from '@/pages/Tickets/AdminTicketsPage'
+import AdminTicketDetailPage from '@/pages/Tickets/AdminTicketDetailPage'
 
 // Customer Pages
 import MySitesPage from '@/pages/CustomerPortal/MySitesPage'
@@ -107,6 +109,8 @@ function App() {
             <Route path="messages" element={<MessagesPage />} />
             <Route path="customers" element={<CustomersPage />} />
             <Route path="coverage" element={<CoveragePage />} />
+            <Route path="tickets" element={<AdminTicketsPage />} />
+            <Route path="tickets/:ticketId" element={<AdminTicketDetailPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
 

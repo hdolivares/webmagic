@@ -13,10 +13,11 @@ from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import selectinload
 
 from models.support_ticket import SupportTicket, TicketMessage, TicketTemplate
-from models.site_models import CustomerUser, Site
+from models.site_models import CustomerUser, Site, SiteVersion
 from core.exceptions import NotFoundError, ValidationError, ForbiddenError
 from anthropic import AsyncAnthropic
 from core.config import get_settings
+from services.emails.email_service import get_email_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -147,6 +148,26 @@ class TicketService:
         await db.commit()
         await db.refresh(ticket)
         
+        # Email admin: new ticket notification
+        try:
+            email_service = get_email_service()
+            admin_link = (
+                f"{settings.FRONTEND_URL}/admin/tickets/{ticket.id}"
+            )
+            await email_service.send_new_ticket_admin_notification(
+                admin_email=settings.SUPPORT_ADMIN_EMAIL,
+                ticket_number=ticket.ticket_number,
+                customer_name=customer.full_name or customer.email,
+                customer_email=customer.email,
+                category=ticket.category,
+                priority=ticket.priority,
+                subject=ticket.subject,
+                description=ticket.description,
+                admin_link=admin_link,
+            )
+        except Exception as e:
+            logger.error(f"Failed to send admin notification for ticket {ticket.ticket_number}: {e}")
+        
         # Process with AI asynchronously (non-blocking)
         try:
             await TicketService._process_with_ai(db, ticket)
@@ -259,7 +280,7 @@ Respond in JSON format:
                     message=ticket.ai_suggested_response,
                     message_type="ai",
                     ai_generated=True,
-                    ai_model="claude-sonnet-3.5",
+                    ai_model="claude-sonnet-4-5",
                     ai_confidence=ai_analysis.get("category_confidence", {})
                 )
                 db.add(ai_message)
@@ -272,6 +293,29 @@ Respond in JSON format:
                 ticket.status = "in_progress"
             
             await db.commit()
+
+            # For site_edit tickets: run the 3-stage edit pipeline
+            if ticket.category == "site_edit" and ticket.site_id:
+                try:
+                    from services.support.site_edit_processor import SiteEditProcessor
+                    processor = SiteEditProcessor()
+                    edit_result = await processor.process(db=db, ticket=ticket)
+
+                    # Merge edit pipeline result into ai_processing_notes
+                    current_notes = ticket.ai_processing_notes or {}
+                    current_notes.update(edit_result)
+                    ticket.ai_processing_notes = current_notes
+                    await db.commit()
+
+                    logger.info(
+                        f"[SiteEditProcessor] Completed for ticket {ticket.ticket_number}: "
+                        f"summary={edit_result.get('edit_summary')}, "
+                        f"preview_id={edit_result.get('preview_version_id')}"
+                    )
+                except Exception as edit_err:
+                    logger.error(
+                        f"[SiteEditProcessor] Failed for ticket {ticket.ticket_number}: {edit_err}"
+                    )
             
         except Exception as e:
             logger.error(f"Error in AI processing for ticket {ticket.ticket_number}: {e}")
@@ -340,6 +384,50 @@ Respond in JSON format:
         await db.commit()
         await db.refresh(ticket_message)
         
+        # Email notifications (failures must not break the reply)
+        try:
+            email_service = get_email_service()
+            portal_link = f"{settings.FRONTEND_URL}/customer/tickets/{ticket.id}"
+            admin_link = f"{settings.FRONTEND_URL}/admin/tickets/{ticket.id}"
+
+            if author_type in ("staff", "ai") and not internal_only:
+                # Notify customer that staff/AI replied
+                customer_stmt = select(CustomerUser).where(
+                    CustomerUser.id == ticket.customer_user_id
+                )
+                customer_result = await db.execute(customer_stmt)
+                ticket_customer = customer_result.scalar_one_or_none()
+                if ticket_customer:
+                    await email_service.send_ticket_reply_to_customer(
+                        customer_email=ticket_customer.email,
+                        customer_name=ticket_customer.full_name or ticket_customer.email,
+                        ticket_number=ticket.ticket_number,
+                        subject=ticket.subject,
+                        reply_message=message,
+                        portal_link=portal_link,
+                        is_ai_reply=(author_type == "ai"),
+                    )
+            elif author_type == "customer":
+                # Notify admin that customer replied
+                customer_stmt = select(CustomerUser).where(
+                    CustomerUser.id == author_id
+                )
+                customer_result = await db.execute(customer_stmt)
+                replying_customer = customer_result.scalar_one_or_none()
+                customer_name = replying_customer.full_name or replying_customer.email if replying_customer else "Customer"
+                customer_email_addr = replying_customer.email if replying_customer else ""
+                await email_service.send_customer_reply_admin_notification(
+                    admin_email=settings.SUPPORT_ADMIN_EMAIL,
+                    ticket_number=ticket.ticket_number,
+                    customer_name=customer_name,
+                    customer_email=customer_email_addr,
+                    subject=ticket.subject,
+                    reply_message=message,
+                    admin_link=admin_link,
+                )
+        except Exception as e:
+            logger.error(f"Failed to send reply email notification for ticket {ticket_id}: {e}")
+
         return ticket_message
     
     @staticmethod
@@ -521,4 +609,178 @@ Respond in JSON format:
             "resolved": status_counts.get("resolved", 0),
             "closed": status_counts.get("closed", 0)
         }
+
+    @staticmethod
+    async def list_all_tickets(
+        db: AsyncSession,
+        status: Optional[str] = None,
+        category: Optional[str] = None,
+        priority: Optional[str] = None,
+        site_slug: Optional[str] = None,
+        search: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Tuple[List[SupportTicket], int]:
+        """
+        Admin-only: list all tickets across all customers.
+        Supports filtering by status, category, priority, site_slug, and text search.
+        """
+        stmt = (
+            select(SupportTicket)
+            .options(
+                selectinload(SupportTicket.customer_user),
+                selectinload(SupportTicket.site),
+            )
+        )
+
+        if status:
+            stmt = stmt.where(SupportTicket.status == status)
+        if category:
+            stmt = stmt.where(SupportTicket.category == category)
+        if priority:
+            stmt = stmt.where(SupportTicket.priority == priority)
+        if site_slug:
+            stmt = stmt.join(Site, SupportTicket.site_id == Site.id).where(Site.slug == site_slug)
+        if search:
+            search_term = f"%{search}%"
+            stmt = stmt.where(
+                or_(
+                    SupportTicket.subject.ilike(search_term),
+                    SupportTicket.ticket_number.ilike(search_term),
+                )
+            )
+
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        count_result = await db.execute(count_stmt)
+        total = count_result.scalar() or 0
+
+        stmt = stmt.order_by(SupportTicket.created_at.desc()).limit(limit).offset(offset)
+        result = await db.execute(stmt)
+        tickets = result.scalars().all()
+
+        return list(tickets), total
+
+    @staticmethod
+    async def apply_site_edit(
+        db: AsyncSession,
+        ticket_id: UUID,
+        admin_user_id: UUID,
+    ) -> SupportTicket:
+        """
+        Apply the AI-proposed site edit for a site_edit ticket.
+        1. Reads preview_version_id from ai_processing_notes
+        2. Promotes that SiteVersion to is_current=True
+        3. Writes files to disk via SiteService.deploy_site()
+        4. Posts a staff message and resolves the ticket
+        5. Emails the customer
+        """
+        from services.site_service import SiteService as FileSiteService
+
+        stmt = (
+            select(SupportTicket)
+            .where(SupportTicket.id == ticket_id)
+            .options(
+                selectinload(SupportTicket.customer_user),
+                selectinload(SupportTicket.site),
+            )
+        )
+        result = await db.execute(stmt)
+        ticket = result.scalar_one_or_none()
+
+        if not ticket:
+            raise NotFoundError("Ticket not found")
+        if ticket.category != "site_edit":
+            raise ValidationError("Only site_edit tickets can have edits applied")
+
+        notes = ticket.ai_processing_notes or {}
+        preview_version_id = notes.get("preview_version_id")
+        if not preview_version_id:
+            raise ValidationError("No preview version available for this ticket")
+
+        # Load preview version
+        version_stmt = select(SiteVersion).where(SiteVersion.id == preview_version_id)
+        version_result = await db.execute(version_stmt)
+        preview_version = version_result.scalar_one_or_none()
+
+        if not preview_version:
+            raise NotFoundError("Preview version not found")
+
+        # Unset current version on existing versions for this site
+        unset_stmt = (
+            select(SiteVersion)
+            .where(SiteVersion.site_id == preview_version.site_id)
+            .where(SiteVersion.is_current == True)  # noqa: E712
+        )
+        unset_result = await db.execute(unset_stmt)
+        for old_version in unset_result.scalars().all():
+            old_version.is_current = False
+
+        # Promote preview version
+        preview_version.is_current = True
+        preview_version.is_preview = False
+
+        # Update site's current_version_id
+        if ticket.site:
+            ticket.site.current_version_id = preview_version.id
+
+        await db.flush()
+
+        # Deploy to disk
+        try:
+            site_slug = ticket.site.slug if ticket.site else None
+            if site_slug:
+                file_service = FileSiteService()
+                file_service.deploy_site(
+                    slug=site_slug,
+                    html_content=preview_version.html_content,
+                    css_content=preview_version.css_content,
+                    js_content=preview_version.js_content,
+                    overwrite=True,
+                )
+        except Exception as deploy_err:
+            logger.error(f"Failed to deploy site for ticket {ticket_id}: {deploy_err}")
+
+        # Post staff confirmation message
+        edit_summary = notes.get("edit_summary", "Your requested changes have been applied.")
+        confirmation = TicketMessage(
+            ticket_id=ticket_id,
+            admin_user_id=admin_user_id,
+            message=(
+                f"✅ Your website has been updated! {edit_summary}\n\n"
+                "The changes are now live on your website. "
+                "Please check it and let us know if you need any further adjustments."
+            ),
+            message_type="staff",
+            ai_generated=False,
+        )
+        db.add(confirmation)
+
+        # Resolve ticket
+        ticket.status = "resolved"
+        ticket.resolved_at = datetime.now(timezone.utc)
+        ticket.last_staff_message_at = datetime.now(timezone.utc)
+        if not ticket.first_response_at:
+            ticket.first_response_at = datetime.now(timezone.utc)
+
+        await db.commit()
+        await db.refresh(ticket)
+
+        # Email customer
+        try:
+            email_service = get_email_service()
+            if ticket.customer_user:
+                portal_link = f"{settings.FRONTEND_URL}/customer/tickets/{ticket_id}"
+                await email_service.send_ticket_reply_to_customer(
+                    customer_email=ticket.customer_user.email,
+                    customer_name=ticket.customer_user.full_name or ticket.customer_user.email,
+                    ticket_number=ticket.ticket_number,
+                    subject=ticket.subject,
+                    reply_message=confirmation.message,
+                    portal_link=portal_link,
+                    is_ai_reply=False,
+                )
+        except Exception as e:
+            logger.error(f"Failed to send apply-edit confirmation email: {e}")
+
+        return ticket
 
