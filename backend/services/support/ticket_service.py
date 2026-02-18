@@ -161,9 +161,17 @@ class TicketService:
         
         db.add(initial_message)
         await db.commit()
-        await db.refresh(ticket)
-        
-        # Email admin: new ticket notification
+
+        # Reload ticket with messages so the response object is fully populated
+        refreshed_stmt = (
+            select(SupportTicket)
+            .options(selectinload(SupportTicket.messages))
+            .where(SupportTicket.id == ticket.id)
+        )
+        refreshed_result = await db.execute(refreshed_stmt)
+        ticket = refreshed_result.scalar_one()
+
+        # Email admin: new ticket notification (fire-and-forget)
         try:
             email_service = get_email_service()
             admin_email = await TicketService._get_admin_email(db)
@@ -181,14 +189,15 @@ class TicketService:
             )
         except Exception as e:
             logger.error(f"Failed to send admin notification for ticket {ticket.ticket_number}: {e}")
-        
-        # Process with AI asynchronously (non-blocking)
+
+        # Queue AI processing as a background Celery task — do NOT block the request
         try:
-            await TicketService._process_with_ai(db, ticket)
+            from tasks.ticket_tasks import process_ticket_with_ai
+            process_ticket_with_ai.delay(str(ticket.id))
+            logger.info(f"Queued AI processing for ticket {ticket.ticket_number}")
         except Exception as e:
-            logger.error(f"AI processing failed for ticket {ticket.ticket_number}: {e}")
-            # Continue even if AI processing fails
-        
+            logger.error(f"Failed to queue AI task for ticket {ticket.ticket_number}: {e}")
+
         return ticket
     
     @staticmethod

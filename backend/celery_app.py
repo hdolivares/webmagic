@@ -44,6 +44,7 @@ celery_app.autodiscover_tasks([
     "tasks.validation_tasks",  # Playwright website validation (old system)
     "tasks.validation_tasks_enhanced",  # Enhanced V2 validation with metadata
     "tasks.discovery_tasks",  # Website discovery pipeline (ScrapingDog)
+    "tasks.ticket_tasks",  # Support ticket AI processing
 ])
 
 # Periodic task schedule (using SYNC tasks only)
@@ -106,6 +107,7 @@ celery_app.conf.task_routes = {
     "tasks.campaigns.*": {"queue": "campaigns"},
     "tasks.sms_sync.*": {"queue": "campaigns"},
     "tasks.monitoring_sync.*": {"queue": "monitoring"},
+    "tasks.ticket_tasks.*": {"queue": "celery"},  # Default queue, low latency
 }
 
 # Enable priority support (0-10, 10 = highest)
