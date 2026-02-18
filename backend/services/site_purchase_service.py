@@ -83,33 +83,79 @@ class SitePurchaseService:
         if site.status != "preview":
             raise ValidationError(f"Site is not available for purchase (status: {site.status})")
         
-        # Create checkout with Recurrente
+        # Build site URL for metadata
         site_url = self.site_service.generate_site_url(slug)
-        checkout = await self.recurrente.create_checkout(
-            description=f"Website Purchase - {site.site_title or slug}",
-            price_cents=int(site.purchase_amount * 100),  # Convert to cents
+        
+        # Get or create Recurrente user (to prepopulate checkout form)
+        recurrente_user = None
+        if customer_email and customer_name:
+            try:
+                recurrente_user = await self.recurrente.get_or_create_user(
+                    email=customer_email,
+                    full_name=customer_name
+                )
+                logger.info(f"Using Recurrente user: {recurrente_user.id} for checkout")
+            except Exception as e:
+                logger.warning(f"Failed to create Recurrente user, continuing without: {e}")
+        
+        # Prepare checkout items following Recurrente's format
+        from services.payments.recurrente_models import CheckoutItem
+        
+        items = []
+        
+        # Item 1: One-time setup payment ($495)
+        items.append(CheckoutItem(
+            name=f"Website Setup - {site.site_title or slug}",
+            amount_in_cents=int(site.purchase_amount * 100),  # $495.00 -> 49500 cents
             currency="USD",
-            recurrence_type="once",
-            success_url=success_url or f"{settings.SITES_BASE_URL}/purchase-success",
-            cancel_url=cancel_url or f"{settings.SITES_BASE_URL}/purchase-cancelled",
-            user_email=customer_email,
-            user_name=customer_name,
+            quantity=1,
+            charge_type="one_time",
+            description=f"One-time setup and customization for {site.site_title or slug}"
+        ))
+        
+        # Item 2: Monthly hosting subscription ($99/month)
+        items.append(CheckoutItem(
+            name=f"Monthly Hosting - {site.site_title or slug}",
+            amount_in_cents=int(site.monthly_amount * 100),  # $99.00 -> 9900 cents
+            currency="USD",
+            quantity=1,
+            charge_type="recurring",
+            billing_interval="month",
+            billing_interval_count=1,
+            description=f"Monthly hosting, maintenance, and unlimited AI-powered updates",
+            periods_before_automatic_cancellation=None,  # Never auto-cancel
+            free_trial_interval_count=0  # No free trial
+        ))
+        
+        # Create checkout with both items (one-time + subscription)
+        checkout = await self.recurrente.create_checkout(
+            items=items,
+            success_url=success_url or f"{settings.FRONTEND_URL}/purchase-success?slug={slug}",
+            cancel_url=cancel_url or f"{settings.FRONTEND_URL}/site-preview/{slug}",
+            user_id=recurrente_user.id if recurrente_user else None,
             metadata={
                 "site_id": str(site.id),
                 "site_slug": slug,
                 "site_url": site_url,
-                "purchase_type": "website"
+                "purchase_type": "website",
+                "customer_email": customer_email,
+                "setup_amount_usd": str(site.purchase_amount),
+                "monthly_amount_usd": str(site.monthly_amount)
             }
         )
         
-        logger.info(f"Created purchase checkout for site {slug}: {checkout['id']}")
+        logger.info(
+            f"Created purchase checkout for site {slug}: {checkout.id} "
+            f"(Setup: ${site.purchase_amount}, Monthly: ${site.monthly_amount})"
+        )
         
         return {
-            "checkout_id": checkout["id"],
-            "checkout_url": checkout["checkout_url"],
+            "checkout_id": checkout.id,
+            "checkout_url": checkout.checkout_url,
             "site_slug": slug,
             "site_title": site.site_title,
-            "amount": float(site.purchase_amount),
+            "setup_amount": float(site.purchase_amount),
+            "monthly_amount": float(site.monthly_amount),
             "currency": "USD"
         }
     

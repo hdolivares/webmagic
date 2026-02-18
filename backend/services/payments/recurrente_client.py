@@ -1,8 +1,10 @@
 """
 Recurrente API client wrapper.
 Handles authentication, requests, and error handling.
+
+API Documentation: https://docs.recurrente.com
 """
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Literal
 import httpx
 import logging
 import hashlib
@@ -10,6 +12,13 @@ import hmac
 
 from core.config import get_settings
 from core.exceptions import ExternalAPIException
+from services.payments.recurrente_models import (
+    CheckoutRequest,
+    CheckoutResponse,
+    CheckoutItem,
+    RecurrenteUser,
+    RecurrenteUserResponse
+)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -84,9 +93,9 @@ class RecurrenteClient:
                     timeout=30.0
                 )
                 
-                # Log request
+                # Log request and response
                 logger.info(f"Recurrente {method} {url}: status={response.status_code}")
-                logger.debug(f"Recurrente response body: {response.text[:500]}")
+                logger.debug(f"Response body (first 500 chars): {response.text[:500]}")
                 
                 # Handle response
                 if response.status_code >= 400:
@@ -111,59 +120,169 @@ class RecurrenteClient:
             logger.error(f"Recurrente request failed: {str(e)}")
             raise ExternalAPIException(f"Recurrente request failed: {str(e)}")
     
-    # Checkouts
+    # ========================================
+    # CHECKOUTS
+    # ========================================
     
     async def create_checkout(
         self,
-        description: str,
-        price_cents: int,
-        currency: str = "GTQ",
-        recurrence_type: str = "once",
+        items: List[CheckoutItem],
         success_url: Optional[str] = None,
         cancel_url: Optional[str] = None,
-        user_email: Optional[str] = None,
-        user_name: Optional[str] = None,
+        user_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    ) -> CheckoutResponse:
         """
-        Create a checkout session.
+        Create a checkout session with proper Recurrente API format.
+        
+        According to Recurrente docs, checkouts require an 'items' array.
+        Each item must have: name, amount_in_cents, currency, quantity.
+        
+        For subscriptions, items must also include:
+        - charge_type: "recurring"
+        - billing_interval: "week" | "month" | "year"
+        - billing_interval_count: number
         
         Args:
-            description: Product/service description
-            price_cents: Price in cents
-            currency: Currency code (GTQ, USD, etc.)
-            recurrence_type: "once" or "subscription"
+            items: List of items to add to checkout (CheckoutItem objects)
             success_url: Redirect URL after successful payment
-            cancel_url: Redirect URL if user cancels
-            user_email: Pre-fill customer email
-            user_name: Pre-fill customer name
+            cancel_url: Redirect URL if payment is cancelled
+            user_id: Recurrente user ID (prepopulates customer info)
+            metadata: Custom metadata (max 50 keys)
+            
+        Returns:
+            CheckoutResponse with checkout_id and checkout_url
+            
+        Raises:
+            ExternalAPIException: If checkout creation fails
+        """
+        # Build checkout request following Recurrente's format
+        checkout_data = CheckoutRequest(
+            items=items,
+            success_url=success_url,
+            cancel_url=cancel_url,
+            user_id=user_id,
+            metadata=metadata or {}
+        )
+        
+        # Convert to dict and send request
+        response = await self._request(
+            "POST", 
+            "/checkouts", 
+            data=checkout_data.model_dump(exclude_none=True)
+        )
+        
+        logger.info(f"Created checkout: {response.get('id')}")
+        return CheckoutResponse(**response)
+    
+    async def create_one_time_checkout(
+        self,
+        name: str,
+        amount_cents: int,
+        currency: str = "USD",
+        description: Optional[str] = None,
+        image_url: Optional[str] = None,
+        success_url: Optional[str] = None,
+        cancel_url: Optional[str] = None,
+        user_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> CheckoutResponse:
+        """
+        Helper method to create a one-time payment checkout.
+        
+        Args:
+            name: Product/service name
+            amount_cents: Price in cents (e.g., 49500 for $495)
+            currency: Currency code (USD or GTQ)
+            description: Product description
+            image_url: Product image URL
+            success_url: Redirect URL after success
+            cancel_url: Redirect URL if cancelled
+            user_id: Recurrente user ID
             metadata: Custom metadata
             
         Returns:
-            Checkout data with checkout_url
+            CheckoutResponse with checkout_id and checkout_url
         """
-        data = {
-            "description": description,
-            "price": price_cents,
-            "currency": currency,
-            "recurrence_type": recurrence_type
-        }
+        item = CheckoutItem(
+            name=name,
+            amount_in_cents=amount_cents,
+            currency=currency,
+            quantity=1,
+            description=description,
+            image_url=image_url,
+            charge_type="one_time"
+        )
         
-        if success_url:
-            data["success_url"] = success_url
-        if cancel_url:
-            data["cancel_url"] = cancel_url
-        if user_email:
-            data["user_email"] = user_email
-        if user_name:
-            data["user_name"] = user_name
-        if metadata:
-            data["metadata"] = metadata
+        return await self.create_checkout(
+            items=[item],
+            success_url=success_url,
+            cancel_url=cancel_url,
+            user_id=user_id,
+            metadata=metadata
+        )
+    
+    async def create_subscription_checkout(
+        self,
+        name: str,
+        amount_cents: int,
+        billing_interval: Literal["week", "month", "year"],
+        billing_interval_count: int = 1,
+        currency: str = "USD",
+        description: Optional[str] = None,
+        image_url: Optional[str] = None,
+        free_trial_interval: Optional[Literal["week", "month", "year"]] = None,
+        free_trial_interval_count: int = 0,
+        periods_before_cancellation: Optional[int] = None,
+        success_url: Optional[str] = None,
+        cancel_url: Optional[str] = None,
+        user_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> CheckoutResponse:
+        """
+        Helper method to create a subscription checkout.
         
-        response = await self._request("POST", "/checkouts", data=data)
+        Args:
+            name: Subscription name
+            amount_cents: Price in cents per billing period (e.g., 9900 for $99/month)
+            billing_interval: How often to bill ("week", "month", or "year")
+            billing_interval_count: Number of intervals (e.g., 1 = every month, 2 = every 2 months)
+            currency: Currency code (USD or GTQ)
+            description: Subscription description
+            image_url: Product image URL
+            free_trial_interval: Free trial period unit
+            free_trial_interval_count: Number of free trial periods (0 = no trial)
+            periods_before_cancellation: Auto-cancel after N periods (None = never)
+            success_url: Redirect URL after success
+            cancel_url: Redirect URL if cancelled
+            user_id: Recurrente user ID
+            metadata: Custom metadata
+            
+        Returns:
+            CheckoutResponse with checkout_id and checkout_url
+        """
+        item = CheckoutItem(
+            name=name,
+            amount_in_cents=amount_cents,
+            currency=currency,
+            quantity=1,
+            description=description,
+            image_url=image_url,
+            charge_type="recurring",
+            billing_interval=billing_interval,
+            billing_interval_count=billing_interval_count,
+            periods_before_automatic_cancellation=periods_before_cancellation,
+            free_trial_interval=free_trial_interval,
+            free_trial_interval_count=free_trial_interval_count
+        )
         
-        logger.info(f"Created checkout: {response.get('id')}")
-        return response
+        return await self.create_checkout(
+            items=[item],
+            success_url=success_url,
+            cancel_url=cancel_url,
+            user_id=user_id,
+            metadata=metadata
+        )
     
     async def get_checkout(self, checkout_id: str) -> Dict[str, Any]:
         """
@@ -177,35 +296,66 @@ class RecurrenteClient:
         """
         return await self._request("GET", f"/checkouts/{checkout_id}")
     
-    # Users (Customers)
+    # ========================================
+    # USERS (CUSTOMERS)
+    # ========================================
     
     async def create_user(
         self,
         email: str,
-        name: Optional[str] = None,
+        full_name: Optional[str] = None,
         phone: Optional[str] = None
-    ) -> Dict[str, Any]:
+    ) -> RecurrenteUserResponse:
         """
-        Create a user (customer).
+        Create or get a Recurrente user (customer).
+        
+        According to Recurrente docs, the API uses 'full_name' not 'name'.
+        If the user already exists, returns existing user data.
         
         Args:
             email: User email
-            name: User full name
+            full_name: User full name
             phone: User phone number
             
         Returns:
-            User data
+            RecurrenteUserResponse with user_id and email
         """
-        data = {"email": email}
-        if name:
-            data["name"] = name
-        if phone:
-            data["phone"] = phone
+        user_data = RecurrenteUser(
+            email=email,
+            full_name=full_name,
+            phone=phone
+        )
         
-        response = await self._request("POST", "/users", data=data)
+        response = await self._request(
+            "POST", 
+            "/users", 
+            data=user_data.model_dump(exclude_none=True)
+        )
         
-        logger.info(f"Created user: {response.get('id')}")
-        return response
+        logger.info(f"Created/Retrieved user: {response.get('id')} ({email})")
+        return RecurrenteUserResponse(**response)
+    
+    async def get_or_create_user(
+        self,
+        email: str,
+        full_name: Optional[str] = None,
+        phone: Optional[str] = None
+    ) -> RecurrenteUserResponse:
+        """
+        Get or create a Recurrente user.
+        
+        This is an alias for create_user since Recurrente's API
+        automatically returns existing users if they already exist.
+        
+        Args:
+            email: User email
+            full_name: User full name
+            phone: User phone number
+            
+        Returns:
+            RecurrenteUserResponse with user_id and email
+        """
+        return await self.create_user(email, full_name, phone)
     
     async def get_user(self, user_id: str) -> Dict[str, Any]:
         """Get user details."""
