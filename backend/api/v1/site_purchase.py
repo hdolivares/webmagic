@@ -70,11 +70,13 @@ async def get_public_site_preview(
                 detail=f"Site not found: {slug}"
             )
         
-        # Only return preview-status sites publicly
-        if site.status != "preview":
+        # Only return preview and owned sites publicly
+        # Preview sites: Available for purchase
+        # Owned sites: Already purchased, accessible to owner
+        if site.status not in ["preview", "owned"]:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Site is not available for purchase"
+                detail="Site is not available"
             )
         
         # Get business info if available

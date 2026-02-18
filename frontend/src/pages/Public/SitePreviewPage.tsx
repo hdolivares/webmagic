@@ -239,7 +239,52 @@ export default function SitePreviewPage() {
 
           {/* Right Column - CTA Card */}
           <div className="bg-white rounded-2xl shadow-2xl p-8 space-y-6">
-            {!showForm ? (
+            {site.status === 'owned' ? (
+              <>
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-success-100 rounded-full mb-4">
+                    <Check className="w-8 h-8 text-success-600" />
+                  </div>
+                  <h2 className="text-3xl font-bold text-text-primary mb-2">
+                    This Site is Active
+                  </h2>
+                  <p className="text-text-secondary">
+                    This website has been claimed and is currently live
+                  </p>
+                </div>
+
+                <div className="space-y-3 py-4">
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-success-600 flex-shrink-0" />
+                    <span className="text-text-secondary">Fully hosted and secured</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-success-600 flex-shrink-0" />
+                    <span className="text-text-secondary">Custom domain configured</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-success-600 flex-shrink-0" />
+                    <span className="text-text-secondary">Regular backups enabled</span>
+                  </div>
+                </div>
+
+                <a
+                  href={site.preview_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-4 px-6 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center space-x-2 shadow-lg"
+                >
+                  <span>Visit Live Site</span>
+                  <ExternalLink className="w-5 h-5" />
+                </a>
+
+                <div className="bg-bg-secondary p-4 rounded-lg text-center">
+                  <p className="text-sm text-text-secondary">
+                    Are you the owner? Check your email for dashboard access credentials.
+                  </p>
+                </div>
+              </>
+            ) : !showForm ? (
               <>
                 <div className="text-center">
                   <h2 className="text-3xl font-bold text-text-primary mb-2">
