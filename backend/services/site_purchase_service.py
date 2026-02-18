@@ -109,22 +109,23 @@ class SitePurchaseService:
         
         if site.status != "preview":
             raise ValidationError(f"Site is not available for purchase (status: {site.status})")
-        
-        # Build site URL for metadata
+
         site_url = self.site_service.generate_site_url(slug)
-        
-        # TWO-STEP PAYMENT FLOW:
-        # Step 1: One-time setup fee checkout ($497). On success, customer is
-        #         redirected to our /subscription-setup endpoint which creates
-        #         Step 2: A subscription checkout ($97/month).
-        # This avoids Recurrente's 422 error on mixed one_time + recurring checkouts.
+        site_cancel_url = cancel_url or f"https://{settings.SITES_DOMAIN}/{slug}"
+        site_title = site.site_title or slug
+        shared_metadata = {
+            "site_id": str(site.id),
+            "site_slug": slug,
+            "site_url": site_url,
+            "customer_email": customer_email,
+            "customer_name": customer_name,
+            "setup_amount_usd": str(site.purchase_amount),
+            "monthly_amount_usd": str(site.monthly_amount),
+            "subscription_type": "monthly_hosting",
+        }
 
-        # Pre-generate session_id so we can embed it in the success URL BEFORE
-        # creating the Recurrente checkout (chicken-and-egg problem).
-        import uuid as _uuid
-        pre_session_id = f"cs_{_uuid.uuid4().hex}"
-
-        # Get or create Recurrente user (to prepopulate checkout form)
+        # ── Get or create the Recurrente customer record ─────────────────────
+        # This pre-populates the payment form so the customer doesn't re-enter data.
         recurrente_user = None
         if customer_email and customer_name:
             try:
@@ -132,60 +133,96 @@ class SitePurchaseService:
                     email=customer_email,
                     full_name=customer_name
                 )
-                logger.info(f"Using Recurrente user: {recurrente_user.id} for checkout")
-            except Exception as e:
-                logger.warning(f"Failed to create Recurrente user, continuing without: {e}")
+                logger.info(f"Recurrente user ready: {recurrente_user.id}")
+            except Exception as exc:
+                logger.warning(f"Could not create Recurrente user (continuing): {exc}")
 
-        # Step 1 checkout: one-time setup fee
-        # After payment, Recurrente redirects to our subscription-setup endpoint
-        subscription_setup_url = (
-            f"{settings.API_URL}/api/v1/sites/{slug}/subscription-setup"
-            f"?session={pre_session_id}"
-        )
+        recurrente_user_id = recurrente_user.id if recurrente_user else None
 
-        checkout = await self.recurrente.create_one_time_checkout(
-            name=f"Website Setup - {site.site_title or slug}",
-            amount_cents=int(site.purchase_amount * 100),  # $497 -> 49700 cents
+        # ── TWO-STEP PAYMENT — BOTH CHECKOUTS PRE-CREATED UPFRONT ────────────
+        #
+        # Recurrente does NOT support mixed one_time + recurring items in one checkout
+        # (API accepts creation but returns 422 on fulfillment).
+        #
+        # Design: create both Recurrente checkouts before showing anything to the
+        # customer.  Step 1's success_url points DIRECTLY at Step 2's Recurrente
+        # checkout URL — no intermediate server round-trip needed.
+        #
+        #   Customer → [Step 1: $497 setup] ──(pays)──► [Step 2: $97/mo subscription]
+        #                       (Recurrente URL)                  (Recurrente URL, pre-created)
+        #                                                                    │
+        #                                                          (pays) ──►  success page
+        #
+        # Advantages over the previous GET-with-side-effects approach:
+        #   • Idempotent: refreshing the success redirect hits the same pre-created URL
+        #   • No orphaned checkouts from repeated server calls
+        #   • Zero server latency between step 1 and step 2 redirects
+        #   • Clean separation: checkout initiation vs. payment processing (webhooks)
+
+        # Step 2 — subscription checkout (created FIRST so we have its URL)
+        subscription_checkout = await self.recurrente.create_subscription_checkout(
+            name=f"Monthly Hosting – {site_title}",
+            amount_cents=int(site.monthly_amount * 100),
+            billing_interval="month",
+            billing_interval_count=1,
             currency="USD",
-            description=f"One-time setup fee for {site.site_title or slug}. Monthly hosting (${ site.monthly_amount}/mo) will be set up next.",
-            success_url=subscription_setup_url,
-            cancel_url=cancel_url or f"https://{settings.SITES_DOMAIN}/{slug}",
-            user_id=recurrente_user.id if recurrente_user else None,
-            metadata={
-                "site_id": str(site.id),
-                "site_slug": slug,
-                "site_url": site_url,
-                "purchase_type": "website_setup",
-                "customer_email": customer_email,
-                "customer_name": customer_name,
-                "setup_amount_usd": str(site.purchase_amount),
-                "monthly_amount_usd": str(site.monthly_amount),
-                "subscription_type": "monthly_hosting",
-                "session_id": pre_session_id
-            }
+            description=f"${site.monthly_amount}/month website hosting for {site_title}",
+            success_url=success_url or f"{settings.FRONTEND_URL}/purchase-success?slug={slug}",
+            cancel_url=site_cancel_url,
+            user_id=recurrente_user_id,
+            metadata={**shared_metadata, "purchase_type": "website_subscription"},
         )
+        logger.info(f"Pre-created subscription checkout: {subscription_checkout.id}")
 
+        # Step 1 — setup fee checkout; its success_url IS the subscription checkout URL
+        setup_checkout = await self.recurrente.create_one_time_checkout(
+            name=f"Website Setup – {site_title}",
+            amount_cents=int(site.purchase_amount * 100),
+            currency="USD",
+            description=(
+                f"One-time setup fee for {site_title}. "
+                f"Monthly hosting (${site.monthly_amount}/mo) begins after this step."
+            ),
+            success_url=subscription_checkout.checkout_url,  # Direct Recurrente → Recurrente
+            cancel_url=site_cancel_url,
+            user_id=recurrente_user_id,
+            metadata={**shared_metadata, "purchase_type": "website_setup"},
+        )
         logger.info(
-            f"Created STEP-1 setup checkout for site {slug}: {checkout.id} "
-            f"(Setup fee: ${site.purchase_amount}. Subscription step follows on success.)"
+            f"Pre-created setup checkout: {setup_checkout.id} "
+            f"(success → subscription checkout {subscription_checkout.id})"
         )
 
-        # Create checkout session record using the pre-generated session_id
-        checkout_session = CheckoutSession(
-            session_id=pre_session_id,
+        # ── Persist both sessions for tracking / abandoned-cart recovery ─────
+        setup_session = CheckoutSession(
             customer_email=customer_email,
             customer_name=customer_name or "Unknown",
             site_slug=slug,
             site_id=site.id,
-            checkout_id=checkout.id,
-            checkout_url=checkout.checkout_url,
+            checkout_id=setup_checkout.id,
+            checkout_url=setup_checkout.checkout_url,
             purchase_amount=site.purchase_amount,
             monthly_amount=site.monthly_amount,
-            status='checkout_created'
+            status="checkout_created",
         )
-        db.add(checkout_session)
+        subscription_session = CheckoutSession(
+            customer_email=customer_email,
+            customer_name=customer_name or "Unknown",
+            site_slug=slug,
+            site_id=site.id,
+            checkout_id=subscription_checkout.id,
+            checkout_url=subscription_checkout.checkout_url,
+            purchase_amount=0,                   # setup already paid in step 1
+            monthly_amount=site.monthly_amount,
+            status="pending_setup_payment",       # waiting for step 1 to complete
+        )
+        db.add(setup_session)
+        db.add(subscription_session)
         await db.commit()
-        await db.refresh(checkout_session)
+        await db.refresh(setup_session)
+
+        checkout = setup_checkout          # alias — the one we return to the frontend
+        checkout_session = setup_session
         
         logger.info(
             f"Created checkout session {checkout_session.session_id} for "

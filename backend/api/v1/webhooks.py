@@ -220,68 +220,59 @@ async def handle_payment_succeeded(
             payment_data=payment_data
         )
         
-        # Mark checkout session as completed
+        # Mark the matching checkout session as completed
         from models.checkout_session import CheckoutSession
         from sqlalchemy import update
-        
+
         await db.execute(
             update(CheckoutSession)
             .where(CheckoutSession.checkout_id == checkout_id)
             .values(
-                status='completed',
+                status="completed",
                 payment_intent_id=payment_id,
-                completed_at=func.now()
+                completed_at=func.now(),
             )
         )
         await db.commit()
-        logger.info(f"Marked checkout session as completed for checkout: {checkout_id}")
+        logger.info(f"Marked checkout session as completed for checkout: {checkout_id} (type={purchase_type})")
         
-        # Send purchase confirmation email
-        temp_password = result.get('temp_password')
-        is_new_customer = result.get('is_new_customer', False)
-        
-        print(f"[WEBHOOK] 📧 Preparing to send purchase confirmation email to {result['customer_email']}")
-        print(f"[WEBHOOK] 📧 Email params: customer_name={result['customer_name']}, site_title={result['site_title']}, amount=${result['purchase_amount']}, new_customer={is_new_customer}")
-        logger.info(f"📧 Preparing to send purchase confirmation email to {result['customer_email']}")
-        logger.info(f"📧 Email params: customer_name={result['customer_name']}, site_title={result['site_title']}, amount=${result['purchase_amount']}, new_customer={is_new_customer}")
-        
-        if is_new_customer and temp_password:
-            print(f"[WEBHOOK] 🔑 New customer - including credentials in email")
-            logger.info(f"🔑 New customer - including credentials in email")
-        
-        try:
-            email_service = get_email_service()
-            print(f"[WEBHOOK] 📧 Email service initialized")
-            logger.info(f"📧 Email service initialized")
-            
-            email_sent = await email_service.send_purchase_confirmation_email(
-                to_email=result['customer_email'],
-                customer_name=result['customer_name'],
-                site_title=result['site_title'],
-                site_url=result['site_url'],
-                purchase_amount=result['purchase_amount'],
-                transaction_id=payment_id,
-                site_password=temp_password  # Pass password if available
+        # Only send credentials email for the setup-fee payment.
+        # The subscription's first payment fires a separate payment_intent.succeeded;
+        # by then the site is already owned and result['already_owned'] is True.
+        already_owned = result.get('already_owned', False)
+
+        if not already_owned:
+            temp_password = result.get('temp_password')
+            is_new_customer = result.get('is_new_customer', False)
+
+            print(f"[WEBHOOK] 📧 Sending credentials email to {result['customer_email']} (new={is_new_customer})")
+            logger.info(f"📧 Sending purchase confirmation to {result['customer_email']}, new_customer={is_new_customer}")
+
+            try:
+                email_service = get_email_service()
+                email_sent = await email_service.send_purchase_confirmation_email(
+                    to_email=result['customer_email'],
+                    customer_name=result['customer_name'],
+                    site_title=result['site_title'],
+                    site_url=result['site_url'],
+                    purchase_amount=result['purchase_amount'],
+                    transaction_id=payment_id,
+                    site_password=temp_password,
+                )
+                status_word = "✅ sent" if email_sent else "❌ failed"
+                print(f"[WEBHOOK] 📧 Credentials email {status_word} → {result['customer_email']}")
+                logger.info(f"📧 Credentials email {status_word} → {result['customer_email']}")
+            except Exception as exc:
+                print(f"[WEBHOOK] ❌ Email error: {exc}")
+                logger.error(f"❌ Email error: {exc}", exc_info=True)
+        else:
+            logger.info(
+                f"Skipping email for subscription payment — site already owned by {result['customer_email']}"
             )
-            
-            if email_sent:
-                print(f"[WEBHOOK] ✅ Purchase confirmation email sent successfully to {result['customer_email']}")
-                logger.info(f"✅ Purchase confirmation email sent successfully to {result['customer_email']}")
-            else:
-                print(f"[WEBHOOK] ❌ Failed to send purchase confirmation email to {result['customer_email']}")
-                logger.error(f"❌ Failed to send purchase confirmation email to {result['customer_email']}")
-        except Exception as e:
-            print(f"[WEBHOOK] ❌ Error sending purchase confirmation email: {e}")
-            logger.error(f"❌ Error sending purchase confirmation email: {e}", exc_info=True)
-        
-        # Two-step payment flow:
-        # - purchase_type="website_setup"       → this handler (setup fee paid → site owned, email sent)
-        # - purchase_type="website_subscription" → recurring payment, just log (site already owned)
-        # The subscription.create webhook handles saving the real su_xxx subscription ID.
 
         logger.info(
-            f"Purchase completed and confirmation sent: Site {result['site_slug']} "
-            f"by {result['customer_email']}"
+            f"payment_intent.succeeded handled: site={result['site_slug']}, "
+            f"customer={result['customer_email']}, type={purchase_type}"
         )
         
         # TODO: Trigger post-purchase tasks (Celery)
