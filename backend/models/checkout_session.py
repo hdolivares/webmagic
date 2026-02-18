@@ -15,6 +15,7 @@ Date: February 14, 2026
 from sqlalchemy import (
     Column, Integer, String, Numeric, DateTime, Index, Text
 )
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.sql import func
 from typing import Optional
 import uuid
