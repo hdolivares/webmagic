@@ -231,7 +231,11 @@ async def _run_site_edit_pipeline(db, ticket) -> None:
         processor = SiteEditProcessor()
         edit_result = await processor.process(db=db, ticket=ticket)
 
-        current_notes = ticket.ai_processing_notes or {}
+        # Refresh ticket after processor's internal commits to get fresh attribute state,
+        # then copy to a NEW dict so SQLAlchemy detects the change (avoids MutableDict
+        # same-reference issue where assignment of identical object is silently skipped).
+        await db.refresh(ticket)
+        current_notes = dict(ticket.ai_processing_notes or {})
         current_notes.update(edit_result)
         ticket.ai_processing_notes = current_notes
 
