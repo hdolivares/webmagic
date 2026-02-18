@@ -57,9 +57,13 @@ class SitePurchaseService:
         """
         Create a Recurrente checkout session for site purchase.
         
+        Handles both:
+        - Purchase preview sites (sites table)
+        - Generated sites (generated_sites table) - creates site record on-demand
+        
         Args:
             db: Database session
-            slug: Site slug
+            slug: Site slug or generated site subdomain
             customer_email: Customer email
             customer_name: Optional customer name
             success_url: URL to redirect after successful payment
@@ -69,17 +73,39 @@ class SitePurchaseService:
             Dictionary with checkout_id and checkout_url
         
         Raises:
-            NotFoundError: If site doesn't exist
+            NotFoundError: If site doesn't exist in either table
             ValidationError: If site is not in preview status
         """
-        # Get site
+        # First, try to find in sites table (purchase preview sites)
         result = await db.execute(
             select(Site).where(Site.slug == slug)
         )
         site = result.scalar_one_or_none()
         
+        # If not found in sites table, check generated_sites table
         if not site:
-            raise NotFoundError(f"Site not found: {slug}")
+            from models.site import GeneratedSite
+            gen_result = await db.execute(
+                select(GeneratedSite).where(GeneratedSite.subdomain == slug)
+            )
+            gen_site = gen_result.scalar_one_or_none()
+            
+            if gen_site:
+                # Create a site record for this generated site
+                site = Site(
+                    slug=slug,
+                    business_id=gen_site.business_id,
+                    status="preview",
+                    purchase_amount=497.00,
+                    monthly_amount=97.00,
+                    site_title=f"Professional Website - {slug}",
+                    site_description="AI-generated professional website"
+                )
+                db.add(site)
+                await db.flush()  # Get the ID without committing
+                logger.info(f"Created site record for generated site: {slug} (business_id: {gen_site.business_id})")
+            else:
+                raise NotFoundError(f"Site not found: {slug}")
         
         if site.status != "preview":
             raise ValidationError(f"Site is not available for purchase (status: {site.status})")
