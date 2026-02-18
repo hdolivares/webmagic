@@ -13,7 +13,7 @@ from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import selectinload
 
 from models.support_ticket import SupportTicket, TicketMessage, TicketTemplate
-from models.site_models import CustomerUser, Site, SiteVersion
+from models.site_models import CustomerUser, Site, SiteVersion, CustomerSiteOwnership
 from core.exceptions import NotFoundError, ValidationError, ForbiddenError
 from anthropic import AsyncAnthropic
 from core.config import get_settings
@@ -108,10 +108,14 @@ class TicketService:
         
         # Verify site ownership if site_id provided
         if site_id:
-            site_stmt = select(Site).where(
-                and_(
-                    Site.id == site_id,
-                    Site.customer_user.has(CustomerUser.id == customer_user_id)
+            site_stmt = (
+                select(Site)
+                .join(CustomerSiteOwnership, CustomerSiteOwnership.site_id == Site.id)
+                .where(
+                    and_(
+                        Site.id == site_id,
+                        CustomerSiteOwnership.customer_user_id == customer_user_id,
+                    )
                 )
             )
             site_result = await db.execute(site_stmt)
