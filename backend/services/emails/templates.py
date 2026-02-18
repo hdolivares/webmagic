@@ -290,14 +290,61 @@ class EmailTemplates:
     
     def render_purchase_confirmation_email(
         self,
+        customer_email: str,
         customer_name: str,
         site_title: str,
         site_url: str,
         purchase_amount: float,
         transaction_id: str,
-        portal_url: str
+        portal_url: str,
+        site_password: Optional[str] = None
     ) -> str:
         """Render purchase confirmation email."""
+        
+        # Credentials section (only for new customers)
+        credentials_html = ""
+        if site_password:
+            credentials_html = f"""
+                            <!-- Login Credentials Box -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fef3c7; border: 2px solid #f59e0b; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
+                                <tr>
+                                    <td>
+                                        <h3 style="margin: 0 0 15px; color: {self.text_color}; font-size: 18px; font-weight: 600;">
+                                            🔑 Your Login Credentials
+                                        </h3>
+                                        <p style="margin: 0 0 15px; color: {self.text_color}; font-size: 15px; line-height: 1.6;">
+                                            Use these credentials to access your website dashboard and manage your site:
+                                        </p>
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 6px; padding: 15px; margin-bottom: 15px;">
+                                            <tr>
+                                                <td style="color: {self.text_light}; font-size: 14px; padding-bottom: 8px;">
+                                                    <strong>Email:</strong>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: {self.text_color}; font-size: 15px; font-family: monospace; padding-bottom: 15px;">
+                                                    {customer_email}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: {self.text_light}; font-size: 14px; padding-bottom: 8px;">
+                                                    <strong>Temporary Password:</strong>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: {self.text_color}; font-size: 15px; font-family: monospace; background-color: {self.bg_light}; padding: 10px; border-radius: 4px;">
+                                                    {site_password}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                                            ⚠️ <strong>Important:</strong> Please change your password after your first login for security.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+            """
+        
         return f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -376,6 +423,8 @@ class EmailTemplates:
                                     </td>
                                 </tr>
                             </table>
+                            
+                            {credentials_html}
                             
                             <!-- CTA Button -->
                             <table width="100%" cellpadding="0" cellspacing="0">

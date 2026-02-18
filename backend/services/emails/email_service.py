@@ -229,7 +229,8 @@ class EmailService:
         site_title: str,
         site_url: str,
         purchase_amount: float,
-        transaction_id: str
+        transaction_id: str,
+        site_password: Optional[str] = None
     ) -> bool:
         """
         Send purchase confirmation email.
@@ -241,6 +242,7 @@ class EmailService:
             site_url: URL of the site
             purchase_amount: Amount paid
             transaction_id: Transaction ID
+            site_password: Temporary password for new customers (optional)
         
         Returns:
             True if sent successfully
@@ -249,12 +251,14 @@ class EmailService:
             portal_url = f"{settings.FRONTEND_URL}/dashboard"
             
             html_content = self.templates.render_purchase_confirmation_email(
+                customer_email=to_email,
                 customer_name=customer_name,
                 site_title=site_title,
                 site_url=site_url,
                 purchase_amount=purchase_amount,
                 transaction_id=transaction_id,
-                portal_url=portal_url
+                portal_url=portal_url,
+                site_password=site_password  # Pass to template
             )
             
             return await self._send_email(
