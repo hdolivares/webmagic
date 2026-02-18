@@ -36,11 +36,11 @@ class TicketCreateRequest(BaseModel):
         description="Ticket category (billing, technical_support, site_edit, question, other)",
     )
     site_id: Optional[UUID] = Field(None, description="Optional site ID if ticket is site-specific")
-    element_context: Optional[ElementContextSchema] = Field(
+    element_context: Optional[List[ElementContextSchema]] = Field(
         None,
         description=(
-            "DOM element snapshot from the visual element picker. "
-            "Only meaningful for site_edit tickets."
+            "Ordered list of DOM element snapshots from the visual element picker "
+            "(maximum 3). Only meaningful for site_edit tickets."
         ),
     )
 

@@ -150,9 +150,11 @@ async def create_ticket(
                 detail="You don't own this site"
             )
         
-        # Create the ticket — include element_context when provided
+        # Serialise element_context list → plain dicts for JSONB storage
         element_context = (
-            request.element_context.model_dump() if request.element_context else None
+            [ec.model_dump() for ec in request.element_context]
+            if request.element_context
+            else None
         )
         ticket = await TicketService.create_ticket(
             db=db,

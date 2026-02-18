@@ -6,5 +6,5 @@
  */
 export { ElementPickerOverlay } from './ElementPickerOverlay'
 export { ElementPickerCard } from './ElementPickerCard'
-export { useElementPicker } from './useElementPicker'
+export { useElementPicker, MAX_SELECTIONS } from './useElementPicker'
 export type { ElementContext, CapturedStyles, BoundingBox } from './types'
