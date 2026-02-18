@@ -229,11 +229,14 @@ async def handle_payment_succeeded(
         logger.info(f"Marked checkout session as completed for checkout: {checkout_id}")
         
         # Send purchase confirmation email
+        print(f"[WEBHOOK] 📧 Preparing to send purchase confirmation email to {result['customer_email']}")
+        print(f"[WEBHOOK] 📧 Email params: customer_name={result['customer_name']}, site_title={result['site_title']}, amount=${result['purchase_amount']}")
         logger.info(f"📧 Preparing to send purchase confirmation email to {result['customer_email']}")
         logger.info(f"📧 Email params: customer_name={result['customer_name']}, site_title={result['site_title']}, amount=${result['purchase_amount']}")
         
         try:
             email_service = get_email_service()
+            print(f"[WEBHOOK] 📧 Email service initialized")
             logger.info(f"📧 Email service initialized")
             
             email_sent = await email_service.send_purchase_confirmation_email(
@@ -246,10 +249,13 @@ async def handle_payment_succeeded(
             )
             
             if email_sent:
+                print(f"[WEBHOOK] ✅ Purchase confirmation email sent successfully to {result['customer_email']}")
                 logger.info(f"✅ Purchase confirmation email sent successfully to {result['customer_email']}")
             else:
+                print(f"[WEBHOOK] ❌ Failed to send purchase confirmation email to {result['customer_email']}")
                 logger.error(f"❌ Failed to send purchase confirmation email to {result['customer_email']}")
         except Exception as e:
+            print(f"[WEBHOOK] ❌ Error sending purchase confirmation email: {e}")
             logger.error(f"❌ Error sending purchase confirmation email: {e}", exc_info=True)
         
         # AUTO-CREATE SUBSCRIPTION if this was a setup payment
