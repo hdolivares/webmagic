@@ -109,8 +109,18 @@ async def recurrente_webhook(
             detail="Invalid JSON"
         )
     
-    event_type = webhook_data.get('event')
-    event_data = webhook_data.get('data', {})
+    # Log full payload for debugging
+    logger.info(f"📦 Full webhook payload: {json.dumps(webhook_data, indent=2)}")
+    logger.info(f"📦 Webhook keys: {list(webhook_data.keys())}")
+    
+    # Try multiple possible field names for event type
+    event_type = (
+        webhook_data.get('event') or 
+        webhook_data.get('type') or
+        webhook_data.get('event_type') or
+        webhook_data.get('eventType')
+    )
+    event_data = webhook_data.get('data', webhook_data)  # Some webhooks put data at root
     
     logger.info(f"Received Recurrente webhook: {event_type}")
     
