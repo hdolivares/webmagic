@@ -510,26 +510,32 @@ Respond in JSON format:
         Returns:
             Tuple of (list of tickets, total count)
         """
-        # Build query
-        stmt = select(SupportTicket).where(
+        # Build base query (without options for count)
+        base_stmt = select(SupportTicket).where(
             SupportTicket.customer_user_id == customer_user_id
         )
-        
+
         if status:
-            stmt = stmt.where(SupportTicket.status == status)
+            base_stmt = base_stmt.where(SupportTicket.status == status)
         if category:
-            stmt = stmt.where(SupportTicket.category == category)
-        
+            base_stmt = base_stmt.where(SupportTicket.category == category)
+
         # Count total
-        count_stmt = select(func.count()).select_from(stmt.subquery())
+        count_stmt = select(func.count()).select_from(base_stmt.subquery())
         count_result = await db.execute(count_stmt)
         total = count_result.scalar() or 0
-        
-        # Get tickets
-        stmt = stmt.order_by(SupportTicket.created_at.desc()).limit(limit).offset(offset)
-        result = await db.execute(stmt)
+
+        # Get tickets with messages eagerly loaded to avoid async lazy-load errors
+        fetch_stmt = (
+            base_stmt
+            .options(selectinload(SupportTicket.messages))
+            .order_by(SupportTicket.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        result = await db.execute(fetch_stmt)
         tickets = result.scalars().all()
-        
+
         return list(tickets), total
     
     @staticmethod
@@ -558,27 +564,32 @@ Respond in JSON format:
         stmt = select(SupportTicket).where(SupportTicket.id == ticket_id)
         if customer_user_id:
             stmt = stmt.where(SupportTicket.customer_user_id == customer_user_id)
-        
+
         result = await db.execute(stmt)
         ticket = result.scalar_one_or_none()
-        
+
         if not ticket:
             raise NotFoundError("Ticket not found")
-        
+
         old_status = ticket.status
         ticket.status = new_status
-        
+
         # Update timestamps based on status
         now = datetime.now(timezone.utc)
         if new_status == "resolved" and old_status != "resolved":
             ticket.resolved_at = now
         elif new_status == "closed" and old_status != "closed":
             ticket.closed_at = now
-        
+
         await db.commit()
-        await db.refresh(ticket)
-        
-        return ticket
+
+        # Reload with messages to satisfy response serialization
+        reloaded = await db.execute(
+            select(SupportTicket)
+            .options(selectinload(SupportTicket.messages))
+            .where(SupportTicket.id == ticket.id)
+        )
+        return reloaded.scalar_one()
     
     @staticmethod
     async def get_ticket_stats(
@@ -649,37 +660,41 @@ Respond in JSON format:
         Admin-only: list all tickets across all customers.
         Supports filtering by status, category, priority, site_slug, and text search.
         """
-        stmt = (
-            select(SupportTicket)
-            .options(
-                selectinload(SupportTicket.customer_user),
-                selectinload(SupportTicket.site),
-            )
-        )
+        base_stmt = select(SupportTicket)
 
         if status:
-            stmt = stmt.where(SupportTicket.status == status)
+            base_stmt = base_stmt.where(SupportTicket.status == status)
         if category:
-            stmt = stmt.where(SupportTicket.category == category)
+            base_stmt = base_stmt.where(SupportTicket.category == category)
         if priority:
-            stmt = stmt.where(SupportTicket.priority == priority)
+            base_stmt = base_stmt.where(SupportTicket.priority == priority)
         if site_slug:
-            stmt = stmt.join(Site, SupportTicket.site_id == Site.id).where(Site.slug == site_slug)
+            base_stmt = base_stmt.join(Site, SupportTicket.site_id == Site.id).where(Site.slug == site_slug)
         if search:
             search_term = f"%{search}%"
-            stmt = stmt.where(
+            base_stmt = base_stmt.where(
                 or_(
                     SupportTicket.subject.ilike(search_term),
                     SupportTicket.ticket_number.ilike(search_term),
                 )
             )
 
-        count_stmt = select(func.count()).select_from(stmt.subquery())
+        count_stmt = select(func.count()).select_from(base_stmt.subquery())
         count_result = await db.execute(count_stmt)
         total = count_result.scalar() or 0
 
-        stmt = stmt.order_by(SupportTicket.created_at.desc()).limit(limit).offset(offset)
-        result = await db.execute(stmt)
+        fetch_stmt = (
+            base_stmt
+            .options(
+                selectinload(SupportTicket.customer_user),
+                selectinload(SupportTicket.site),
+                selectinload(SupportTicket.messages),
+            )
+            .order_by(SupportTicket.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        result = await db.execute(fetch_stmt)
         tickets = result.scalars().all()
 
         return list(tickets), total
@@ -787,7 +802,18 @@ Respond in JSON format:
             ticket.first_response_at = datetime.now(timezone.utc)
 
         await db.commit()
-        await db.refresh(ticket)
+
+        # Reload with messages to satisfy response serialization
+        reloaded = await db.execute(
+            select(SupportTicket)
+            .options(
+                selectinload(SupportTicket.customer_user),
+                selectinload(SupportTicket.site),
+                selectinload(SupportTicket.messages),
+            )
+            .where(SupportTicket.id == ticket_id)
+        )
+        ticket = reloaded.scalar_one()
 
         # Email customer
         try:
