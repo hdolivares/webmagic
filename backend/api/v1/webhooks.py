@@ -165,9 +165,47 @@ async def handle_payment_succeeded(
             transaction_id=payment_id
         )
         
+        # AUTO-CREATE SUBSCRIPTION if this was a setup payment
+        metadata = event_data.get('metadata', {})
+        auto_subscribe = metadata.get('auto_subscribe') == 'true'
+        payment_method = event_data.get('payment_method', {})
+        payment_method_id = payment_method.get('id') if payment_method else None
+        
+        if auto_subscribe and payment_method_id:
+            logger.info(
+                f"Auto-subscribe flag detected. Creating subscription for site {result['site_id']} "
+                f"using payment method {payment_method_id}"
+            )
+            
+            try:
+                from services.subscription_service import get_subscription_service
+                
+                subscription_service = get_subscription_service()
+                subscription_result = await subscription_service.create_subscription_with_tokenized_payment(
+                    db=db,
+                    site_id=result['site_id'],
+                    payment_method_id=payment_method_id,
+                    customer_email=result['customer_email'],
+                    customer_name=result.get('customer_name')
+                )
+                
+                logger.info(
+                    f"✅ Subscription auto-created! Site: {result['site_slug']}, "
+                    f"Monthly: ${subscription_result['monthly_amount']}, Starts: {subscription_result['start_date']}"
+                )
+                
+                result['subscription_created'] = True
+                result['monthly_amount'] = subscription_result['monthly_amount']
+                
+            except Exception as sub_error:
+                logger.error(f"⚠️ Failed to auto-create subscription: {sub_error}", exc_info=True)
+                result['subscription_created'] = False
+        else:
+            result['subscription_created'] = False
+        
         logger.info(
             f"Purchase completed and confirmation sent: Site {result['site_slug']} "
-            f"by {result['customer_email']}"
+            f"by {result['customer_email']} (Subscription: {'✅' if result.get('subscription_created') else '❌'})"
         )
         
         # TODO: Trigger post-purchase tasks (Celery)

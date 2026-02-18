@@ -214,8 +214,12 @@ export default function SitePreviewPage() {
                 <span className="text-5xl font-bold">${site.purchase_amount}</span>
                 <span className="text-xl text-white/80">one-time</span>
               </div>
-              <div className="text-white/80">
+              <div className="text-white/80 mb-4">
                 + ${site.monthly_amount}/month hosting
+              </div>
+              <div className="text-sm text-white/70 border-t border-white/20 pt-4">
+                <p className="mb-2"><strong>What you pay today:</strong> ${site.purchase_amount}</p>
+                <p><strong>Starting next month:</strong> ${site.monthly_amount}/month</p>
               </div>
             </div>
           </div>
@@ -309,19 +313,32 @@ export default function SitePreviewPage() {
                     />
                   </div>
 
-                  <div className="bg-bg-secondary p-4 rounded-lg">
-                    <div className="flex items-center justify-between text-sm mb-2">
-                      <span className="text-text-secondary">One-time payment:</span>
-                      <span className="font-semibold text-text-primary">
+                  {/* Pricing Breakdown */}
+                  <div className="bg-bg-secondary p-4 rounded-lg space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-text-secondary">Today's Payment:</span>
+                      <span className="font-bold text-text-primary text-lg">
                         ${site.purchase_amount}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-text-secondary">Monthly hosting:</span>
+                    <div className="flex items-center justify-between text-sm pb-3 border-b border-border-default">
+                      <span className="text-text-secondary">Then Monthly:</span>
                       <span className="font-semibold text-text-primary">
                         ${site.monthly_amount}/mo
                       </span>
                     </div>
+                    <div className="text-xs text-text-tertiary leading-relaxed">
+                      <p className="mb-1">✓ Includes first month hosting</p>
+                      <p>✓ Monthly billing starts in 30 days</p>
+                      <p>✓ Cancel anytime, no commitment</p>
+                    </div>
+                  </div>
+
+                  {/* Legal Disclaimer */}
+                  <div className="bg-warning-50 border border-warning-200 rounded-lg p-3">
+                    <p className="text-xs text-warning-800 leading-relaxed">
+                      <strong>Payment Authorization:</strong> By completing this purchase, you authorize Lavish Solutions to charge your payment method <strong>${site.purchase_amount} today</strong> for website setup and first month hosting, and <strong>${site.monthly_amount} per month</strong> starting 30 days from today for continued hosting and maintenance. You may cancel your subscription anytime.
+                    </p>
                   </div>
 
                   <button

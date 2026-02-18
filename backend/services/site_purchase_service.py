@@ -98,38 +98,13 @@ class SitePurchaseService:
             except Exception as e:
                 logger.warning(f"Failed to create Recurrente user, continuing without: {e}")
         
-        # Prepare checkout items following Recurrente's format
-        from services.payments.recurrente_models import CheckoutItem
-        
-        items = []
-        
-        # Item 1: One-time setup payment ($495)
-        items.append(CheckoutItem(
+        # Create ONE-TIME PAYMENT checkout only
+        # Subscription will be created automatically after successful payment via webhook
+        checkout = await self.recurrente.create_one_time_checkout(
             name=f"Website Setup - {site.site_title or slug}",
-            amount_in_cents=int(site.purchase_amount * 100),  # $495.00 -> 49500 cents
+            amount_cents=int(site.purchase_amount * 100),  # $497.00 -> 49700 cents
             currency="USD",
-            quantity=1,
-            charge_type="one_time",
-            description=f"One-time setup and customization for {site.site_title or slug}"
-        ))
-        
-        # Item 2: Monthly hosting subscription ($99/month)
-        items.append(CheckoutItem(
-            name=f"Monthly Hosting - {site.site_title or slug}",
-            amount_in_cents=int(site.monthly_amount * 100),  # $99.00 -> 9900 cents
-            currency="USD",
-            quantity=1,
-            charge_type="recurring",
-            billing_interval="month",
-            billing_interval_count=1,
-            description=f"Monthly hosting, maintenance, and unlimited AI-powered updates",
-            periods_before_automatic_cancellation=None,  # Never auto-cancel
-            free_trial_interval_count=0  # No free trial
-        ))
-        
-        # Create checkout with both items (one-time + subscription)
-        checkout = await self.recurrente.create_checkout(
-            items=items,
+            description=f"Professional website setup and first month hosting for {site.site_title or slug}",
             success_url=success_url or f"{settings.FRONTEND_URL}/purchase-success?slug={slug}",
             cancel_url=cancel_url or f"{settings.FRONTEND_URL}/site-preview/{slug}",
             user_id=recurrente_user.id if recurrente_user else None,
@@ -137,16 +112,19 @@ class SitePurchaseService:
                 "site_id": str(site.id),
                 "site_slug": slug,
                 "site_url": site_url,
-                "purchase_type": "website",
+                "purchase_type": "website_setup",
                 "customer_email": customer_email,
+                "customer_name": customer_name,
                 "setup_amount_usd": str(site.purchase_amount),
-                "monthly_amount_usd": str(site.monthly_amount)
+                "monthly_amount_usd": str(site.monthly_amount),
+                "auto_subscribe": "true",  # Flag to trigger subscription creation in webhook
+                "monthly_billing_starts": (datetime.utcnow() + timedelta(days=30)).date().isoformat()
             }
         )
         
         logger.info(
-            f"Created purchase checkout for site {slug}: {checkout.id} "
-            f"(Setup: ${site.purchase_amount}, Monthly: ${site.monthly_amount})"
+            f"Created ONE-TIME checkout for site {slug}: {checkout.id} "
+            f"(Amount: ${site.purchase_amount}. Subscription ${site.monthly_amount}/mo will auto-create on payment success)"
         )
         
         return {
