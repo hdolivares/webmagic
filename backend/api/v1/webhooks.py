@@ -191,11 +191,14 @@ async def handle_payment_succeeded(
                 
                 logger.info(
                     f"✅ Subscription auto-created! Site: {result['site_slug']}, "
+                    f"Subscription ID: {subscription_result.get('subscription_id')}, "
                     f"Monthly: ${subscription_result['monthly_amount']}, Starts: {subscription_result['start_date']}"
                 )
                 
                 result['subscription_created'] = True
+                result['subscription_id'] = subscription_result.get('subscription_id')
                 result['monthly_amount'] = subscription_result['monthly_amount']
+                result['billing_starts'] = subscription_result['start_date']
                 
             except Exception as sub_error:
                 logger.error(f"⚠️ Failed to auto-create subscription: {sub_error}", exc_info=True)
