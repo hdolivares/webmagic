@@ -466,8 +466,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         </p>
                         
                         <form id="webmagic-claim-form" style="display: flex; flex-direction: column; gap: 12px;">
-                            <input type="email" id="claim-email" placeholder="Your email address" required style="padding: 14px 16px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 15px; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e2e8f0'">
-                            <input type="text" id="claim-name" placeholder="Your name (optional)" style="padding: 14px 16px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 15px; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e2e8f0'">
+                            <input type="email" id="claim-email" placeholder="Your email address *" required style="padding: 14px 16px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 15px; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e2e8f0'">
+                            <input type="text" id="claim-name" placeholder="Your full name *" required style="padding: 14px 16px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 15px; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e2e8f0'">
                             <button type="submit" style="background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%); color: white; border: none; padding: 16px; border-radius: 8px; font-weight: 700; font-size: 16px; cursor: pointer; transition: transform 0.2s, opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
                                 Proceed to Checkout →
                             </button>
@@ -491,13 +491,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.textContent = 'Processing...';
                 btn.disabled = true;
                 
+                // Validate name is not empty
+                if (!name || name.trim().length === 0) {{
+                    alert('Please enter your full name');
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                    return;
+                }}
+                
                 try {{
                     const response = await fetch('{api_url}/api/v1/sites/{slug}/purchase', {{
                         method: 'POST',
                         headers: {{ 'Content-Type': 'application/json' }},
                         body: JSON.stringify({{
                             customer_email: email,
-                            customer_name: name || undefined,
+                            customer_name: name,
                             success_url: window.location.href + '?purchased=true',
                             cancel_url: window.location.href
                         }})
