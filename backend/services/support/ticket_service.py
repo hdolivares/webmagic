@@ -152,7 +152,7 @@ class TicketService:
         try:
             email_service = get_email_service()
             admin_link = (
-                f"{settings.FRONTEND_URL}/admin/tickets/{ticket.id}"
+                f"{settings.FRONTEND_URL}/tickets/{ticket.id}"
             )
             await email_service.send_new_ticket_admin_notification(
                 admin_email=settings.SUPPORT_ADMIN_EMAIL,
@@ -388,7 +388,7 @@ Respond in JSON format:
         try:
             email_service = get_email_service()
             portal_link = f"{settings.FRONTEND_URL}/customer/tickets/{ticket.id}"
-            admin_link = f"{settings.FRONTEND_URL}/admin/tickets/{ticket.id}"
+            admin_link = f"{settings.FRONTEND_URL}/tickets/{ticket.id}"
 
             if author_type in ("staff", "ai") and not internal_only:
                 # Notify customer that staff/AI replied
