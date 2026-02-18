@@ -6,14 +6,18 @@ set of edit operations and applies them to the current HTML/CSS.
 
 Stage 1 — Context Extraction:
     Read generation_context from SiteVersion (or parse HTML/CSS as fallback).
+    Now also extracts CSS *rules* for key sections so Stage 2 has visual context.
 
 Stage 2 — Request Decomposition (one Claude call):
     Map the customer's natural-language request to a structured list of
     edit_operations (text changes, CSS variable updates, etc.).
+    Receives full CSS rules for hero/nav/key sections, not just variable names.
 
-Stage 3 — Edit Execution (one Claude call):
-    Apply the structured operations to the full HTML + CSS and return
-    complete updated files.
+Stage 3 — Edit Execution (smart dispatch, minimal AI):
+    - css_var_change  → direct Python regex on the CSS string (no AI)
+    - text_change     → direct Python string replacement on HTML (no AI)
+    - complex ops     → targeted AI call with only the affected section
+    Returns (updated_html, updated_css).
 
 The result is stored as a new SiteVersion with is_preview=True.
 The ticket's ai_processing_notes stores the edit_summary, edit_operations,
@@ -25,7 +29,7 @@ import json
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from anthropic import AsyncAnthropic
@@ -33,6 +37,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import get_settings
+from core.html_utils import strip_claim_bar, strip_claim_bar_css
 from models.site_models import Site, SiteVersion
 from models.support_ticket import SupportTicket
 
@@ -72,16 +77,22 @@ class SiteEditProcessor:
             }
 
         # Stage 1: Extract site context
+        logger.info(f"[SiteEditProcessor] Stage 1: extracting context for site {ticket.site_id}")
         context = await self._stage1_extract_context(db, ticket.site_id)
 
         # Stage 2: Decompose customer request
+        logger.info(f"[SiteEditProcessor] Stage 2: decomposing request: {ticket.description[:100]!r}")
         decomposition = await self._stage2_decompose_request(
             edit_request=ticket.description,
             site_context=context,
         )
 
         if decomposition.get("error"):
+            logger.error(f"[SiteEditProcessor] Stage 2 failed: {decomposition}")
             return {**decomposition, "requires_review": True}
+
+        ops = decomposition.get("edit_operations", [])
+        logger.info(f"[SiteEditProcessor] Stage 2 produced {len(ops)} operations: {json.dumps(ops, indent=2)}")
 
         # Stage 3: Execute edits against full HTML/CSS
         current_version = context.get("_current_version")
@@ -91,11 +102,28 @@ class SiteEditProcessor:
                 "requires_review": True,
             }
 
-        updated_html, updated_css = await self._stage3_execute_edits(
-            html_content=current_version.html_content,
-            css_content=current_version.css_content or "",
-            edit_operations=decomposition.get("edit_operations", []),
+        # Strip claim bar before passing to AI — owned sites don't need it,
+        # and it confuses the LLM into preserving or regenerating it.
+        clean_html = strip_claim_bar(current_version.html_content)
+        clean_css = strip_claim_bar_css(current_version.css_content or "")
+
+        logger.info(f"[SiteEditProcessor] Stage 3: applying {len(ops)} operations")
+        updated_html, updated_css, applied_ops = await self._stage3_execute_edits(
+            html_content=clean_html,
+            css_content=clean_css,
+            edit_operations=ops,
         )
+
+        # Ensure claim bar never ends up in the preview version
+        updated_html = strip_claim_bar(updated_html)
+        updated_css = strip_claim_bar_css(updated_css)
+
+        logger.info(f"[SiteEditProcessor] Stage 3 applied {applied_ops}/{len(ops)} operations. "
+                    f"HTML: {len(clean_html)} → {len(updated_html)} chars, "
+                    f"CSS: {len(clean_css)} → {len(updated_css)} chars")
+
+        if updated_html == clean_html and updated_css == clean_css:
+            logger.warning("[SiteEditProcessor] Stage 3 produced NO changes vs input — edit may have failed")
 
         # Store preview version
         preview_version = await self._create_preview_version(
@@ -105,15 +133,16 @@ class SiteEditProcessor:
             updated_html=updated_html,
             updated_css=updated_css,
             edit_summary=decomposition.get("edit_summary", "Site changes"),
-            edit_operations=decomposition.get("edit_operations", []),
+            edit_operations=ops,
         )
 
         return {
             "edit_summary": decomposition.get("edit_summary", ""),
-            "edit_operations": decomposition.get("edit_operations", []),
+            "edit_operations": ops,
             "preview_version_id": str(preview_version.id),
             "complexity": decomposition.get("complexity", "simple"),
             "requires_review": decomposition.get("requires_review", True),
+            "operations_applied": applied_ops,
         }
 
     # ── Stage 1: Context Extraction ────────────────────────────────────────
@@ -125,7 +154,9 @@ class SiteEditProcessor:
     ) -> Dict[str, Any]:
         """
         Load the current SiteVersion and extract structured context.
-        Prefers generation_context JSONB; falls back to parsing CSS.
+        Prefers generation_context JSONB; falls back to parsing CSS/HTML.
+        Also extracts the actual CSS *rules* for the top sections so Stage 2
+        has real visual context (not just variable names).
         """
         stmt = (
             select(SiteVersion)
@@ -136,7 +167,6 @@ class SiteEditProcessor:
         current_version = result.scalar_one_or_none()
 
         if not current_version:
-            # Try any version
             stmt2 = (
                 select(SiteVersion)
                 .where(SiteVersion.site_id == site_id)
@@ -148,15 +178,11 @@ class SiteEditProcessor:
         if not current_version:
             return {"_current_version": None}
 
-        # Use stored generation_context if available
-        if current_version.generation_context:
-            ctx = dict(current_version.generation_context)
-            ctx["_current_version"] = current_version
-            return ctx
+        css_content = strip_claim_bar_css(current_version.css_content or "")
+        html_content = strip_claim_bar(current_version.html_content or "")
 
-        # Fallback: parse CSS variables from css_content
+        # Parse CSS variables from :root
         css_variables: Dict[str, str] = {}
-        css_content = current_version.css_content or ""
         root_match = re.search(r":root\s*\{([^}]+)\}", css_content)
         if root_match:
             for line in root_match.group(1).splitlines():
@@ -165,9 +191,13 @@ class SiteEditProcessor:
                     name, _, value = line.partition(":")
                     css_variables[name.strip()] = value.strip().rstrip(";")
 
+        # Extract full :root block as text (for Stage 2 prompt)
+        root_block = root_match.group(0) if root_match else ""
+
+        # Extract CSS rules for key visual sections (hero, nav, header, body, footer)
+        key_section_rules = self._extract_key_css_rules(css_content)
+
         # Extract section headings from HTML
-        sections: List[str] = []
-        html_content = current_version.html_content or ""
         heading_matches = re.findall(
             r'<(?:h1|h2)[^>]*>([^<]{3,60})</(?:h1|h2)>',
             html_content,
@@ -175,13 +205,63 @@ class SiteEditProcessor:
         )
         sections = [h.strip() for h in heading_matches[:8]]
 
-        return {
+        # Extract first ~2KB of body content to show structure
+        body_preview = ""
+        body_match = re.search(r'<body[^>]*>(.*)', html_content, re.DOTALL | re.IGNORECASE)
+        if body_match:
+            body_preview = body_match.group(1)[:2000]
+
+        ctx: Dict[str, Any] = {
             "_current_version": current_version,
             "css_variables": css_variables,
+            "css_root_block": root_block,
+            "key_section_rules": key_section_rules,
             "sections": sections,
+            "body_preview": body_preview,
             "features": [],
             "design_brief_summary": {},
         }
+
+        # Overlay stored generation_context if available (preserves design intent)
+        if current_version.generation_context:
+            stored = dict(current_version.generation_context)
+            stored.pop("_current_version", None)
+            for k, v in stored.items():
+                if k not in ctx or not ctx[k]:
+                    ctx[k] = v
+
+        return ctx
+
+    def _extract_key_css_rules(self, css: str) -> str:
+        """
+        Extract the CSS rules for visually important sections (hero, nav, header,
+        footer, body) so Stage 2 can see which selectors/variables control what.
+        Returns up to 3000 chars of the most relevant rules.
+        """
+        key_selectors = [
+            "body", ".nav", "nav", ".hero", "#hero", "header",
+            ".hero::before", ".header", ".site-header",
+            ".top", ".banner", ".section-hero", "footer", ".footer",
+        ]
+        collected: List[str] = []
+        total = 0
+
+        # Find each rule block by selector
+        for sel in key_selectors:
+            escaped = re.escape(sel)
+            pattern = rf"{escaped}[^{{]*\{{[^}}]*\}}"
+            matches = re.findall(pattern, css, re.DOTALL)
+            for m in matches:
+                block = m.strip()
+                if block and block not in collected:
+                    collected.append(block)
+                    total += len(block)
+                    if total > 3000:
+                        break
+            if total > 3000:
+                break
+
+        return "\n\n".join(collected) if collected else "(could not extract section rules)"
 
     # ── Stage 2: Request Decomposition ────────────────────────────────────
 
@@ -192,65 +272,87 @@ class SiteEditProcessor:
     ) -> Dict[str, Any]:
         """
         Use Claude to map the customer's natural-language request to a structured
-        list of edit operations.
+        list of edit operations. Provides rich CSS context so the LLM can
+        correctly identify which variables/selectors control the requested element.
         """
         css_vars = site_context.get("css_variables", {})
+        css_root_block = site_context.get("css_root_block", "")
+        key_section_rules = site_context.get("key_section_rules", "")
         sections = site_context.get("sections", [])
+        body_preview = site_context.get("body_preview", "")
 
-        css_summary = "\n".join(f"  {k}: {v}" for k, v in css_vars.items()) or "  (none found)"
+        css_vars_summary = "\n".join(
+            f"  {k}: {v}" for k, v in css_vars.items()
+        ) or "  (none found)"
         sections_summary = "\n".join(f"  - {s}" for s in sections) or "  (none found)"
 
         prompt = f"""You are a website editing assistant. A customer has submitted a change request for their website.
+You must figure out EXACTLY which CSS variable or HTML element needs to change to satisfy their request.
+The customer is NOT technical — they describe things visually, not by code.
 
-SITE CONTEXT:
-CSS Variables (brand values):
-{css_summary}
+=== AVAILABLE CSS VARIABLES (:root) ===
+{css_vars_summary}
 
-Page Sections (headings detected):
+=== KEY SECTION CSS RULES (actual selectors controlling layout & color) ===
+{key_section_rules}
+
+=== PAGE SECTIONS (headings) ===
 {sections_summary}
 
-CUSTOMER REQUEST:
-\"{edit_request}\"
+=== TOP OF PAGE HTML STRUCTURE ===
+{body_preview[:1500]}
 
-TASK:
-Analyze the customer request and return a JSON object describing exactly what needs to change.
-The customer is NOT technical — interpret their intent clearly.
+=== CUSTOMER REQUEST ===
+"{edit_request}"
 
-Return ONLY valid JSON (no markdown, no explanation):
+=== YOUR TASK ===
+1. Read the customer request carefully. Interpret their visual/plain-language description.
+2. Match their description to the actual CSS rules and variables shown above.
+   - "the top section" / "the banner" / "the header" usually means .hero or nav
+   - "background color" means a `background` or `background-color` CSS property
+   - "the black one" means find which variable is dark/black (e.g. #0a0a0f, #000)
+   - For color changes, prefer css_var_change if the color is controlled by a :root variable
+   - If the background is a gradient, you may need to change MULTIPLE variables
+3. Return ONLY valid JSON with no markdown fences:
+
 {{
-  "edit_summary": "One sentence describing the overall change",
+  "edit_summary": "One clear sentence describing exactly what will change",
   "edit_operations": [
     {{
-      "type": "text_change",
-      "location": "Hero section — main heading",
-      "selector_hint": "h1 in the hero / header section",
-      "current_value": "approximate current text if known, or leave empty",
-      "new_value": "exact replacement text"
+      "type": "css_var_change",
+      "target_variable": "--color-off-black",
+      "current_value": "#0a0a0f",
+      "new_value": "#0d1b2e",
+      "reason": "Hero gradient endpoint is --color-off-black which appears black; customer wants darker navy"
     }},
     {{
-      "type": "css_var_change",
-      "target_variable": "--color-primary",
-      "current_value": "#1e40af",
-      "new_value": "#10b981",
-      "reason": "customer asked for green color"
+      "type": "text_change",
+      "selector_hint": "h1 in .hero section",
+      "current_value": "exact current text here",
+      "new_value": "exact new text here",
+      "reason": "Customer asked to change heading"
     }}
   ],
-  "complexity": "simple | moderate | complex",
+  "complexity": "simple",
   "requires_review": true
 }}
 
 Operation types:
-- text_change: change visible text (headings, paragraphs, button labels, phone numbers, etc.)
-- css_var_change: change a CSS variable in :root (colors, fonts, spacing)
-- section_add: add a new section (specify content in new_value as HTML description)
-- section_remove: remove a section
-- image_change: swap an image (describe in new_value)
+- css_var_change: change a CSS custom property in :root (best for color/font/spacing)
+- text_change: change visible text content (headings, paragraphs, phone numbers, CTAs)
+- css_rule_change: change a CSS property that is NOT a variable (inline style, hardcoded color in a rule)
+- section_add: add a new page section
+- section_remove: remove an existing section
+- image_change: swap an image src
+
+For css_var_change, target_variable MUST be one of the variables listed in AVAILABLE CSS VARIABLES above.
+For text_change, current_value must be as close to the exact text as possible.
 """
         try:
             response = await self._client.messages.create(
                 model=self.MODEL,
                 max_tokens=4096,
-                temperature=0.2,
+                temperature=0.1,
                 messages=[{"role": "user", "content": prompt}],
             )
             raw = response.content[0].text.strip()
@@ -260,10 +362,12 @@ Operation types:
                 raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.IGNORECASE)
                 raw = re.sub(r"```\s*$", "", raw).strip()
 
-            return json.loads(raw)
+            result = json.loads(raw)
+            logger.info(f"[SiteEditProcessor] Stage 2 result: {json.dumps(result, indent=2)}")
+            return result
 
         except json.JSONDecodeError as e:
-            logger.error(f"[SiteEditProcessor] Stage 2 JSON parse error: {e}")
+            logger.error(f"[SiteEditProcessor] Stage 2 JSON parse error: {e}\nRaw response: {raw!r}")
             return {
                 "error": "Failed to parse decomposition response",
                 "edit_summary": "Manual review required",
@@ -278,75 +382,235 @@ Operation types:
                 "requires_review": True,
             }
 
-    # ── Stage 3: Edit Execution ────────────────────────────────────────────
+    # ── Stage 3: Edit Execution (smart dispatch) ──────────────────────────
 
     async def _stage3_execute_edits(
         self,
         html_content: str,
         css_content: str,
         edit_operations: List[Dict[str, Any]],
-    ) -> tuple[str, str]:
+    ) -> Tuple[str, str, int]:
         """
-        Apply the structured edit operations to the full HTML + CSS using Claude.
-        Returns (updated_html, updated_css).
+        Apply edit operations with a smart dispatch strategy:
+        - css_var_change  → direct Python regex on CSS (reliable, instant)
+        - text_change     → direct Python string replacement on HTML (reliable, instant)
+        - css_rule_change → direct Python regex on CSS (reliable, instant)
+        - complex ops     → targeted AI call with only relevant section (not full file)
+
+        Returns (updated_html, updated_css, num_operations_applied).
         """
-        ops_json = json.dumps(edit_operations, indent=2, ensure_ascii=False)
+        updated_html = html_content
+        updated_css = css_content
+        applied = 0
 
-        prompt = f"""You are a professional web developer making precise, surgical edits to a website.
+        for op in edit_operations:
+            op_type = op.get("type", "")
+            try:
+                if op_type == "css_var_change":
+                    result_css = self._apply_css_var_change(updated_css, op)
+                    if result_css != updated_css:
+                        updated_css = result_css
+                        applied += 1
+                        logger.info(f"[SiteEditProcessor] ✓ Applied css_var_change: {op.get('target_variable')} → {op.get('new_value')}")
+                    else:
+                        logger.warning(f"[SiteEditProcessor] ✗ css_var_change made no change: {op.get('target_variable')!r} not found or already matches")
 
-EDIT OPERATIONS TO APPLY:
-{ops_json}
+                elif op_type == "text_change":
+                    result_html = self._apply_text_change(updated_html, op)
+                    if result_html != updated_html:
+                        updated_html = result_html
+                        applied += 1
+                        logger.info(f"[SiteEditProcessor] ✓ Applied text_change: {op.get('current_value','')[:40]!r} → {op.get('new_value','')[:40]!r}")
+                    else:
+                        logger.warning(f"[SiteEditProcessor] ✗ text_change made no change: {op.get('current_value','')[:60]!r} not found")
 
-CURRENT HTML:
-{html_content[:40000]}
+                elif op_type == "css_rule_change":
+                    result_css = self._apply_css_rule_change(updated_css, op)
+                    if result_css != updated_css:
+                        updated_css = result_css
+                        applied += 1
+                        logger.info(f"[SiteEditProcessor] ✓ Applied css_rule_change")
+                    else:
+                        logger.warning(f"[SiteEditProcessor] ✗ css_rule_change made no change")
 
-CURRENT CSS:
-{css_content[:15000]}
+                else:
+                    # Complex operation — use AI with targeted context
+                    logger.info(f"[SiteEditProcessor] Complex op '{op_type}' → AI call")
+                    result_html, result_css = await self._apply_complex_op_with_ai(
+                        updated_html, updated_css, op
+                    )
+                    if result_html != updated_html or result_css != updated_css:
+                        updated_html = result_html
+                        updated_css = result_css
+                        applied += 1
+                        logger.info(f"[SiteEditProcessor] ✓ Applied complex op '{op_type}' via AI")
+                    else:
+                        logger.warning(f"[SiteEditProcessor] ✗ Complex op '{op_type}' via AI made no change")
 
-TASK:
-Apply EXACTLY the edit operations above — nothing more, nothing less.
-Do not add, remove, or restructure any sections or elements beyond what is specified.
-Preserve all existing HTML structure, CSS classes, and JavaScript.
-For css_var_change operations: update only the matching variable inside :root {{ }}.
-For text_change operations: find the closest matching text and replace it with the new_value.
+            except Exception as e:
+                logger.error(f"[SiteEditProcessor] Error applying op {op_type}: {e}", exc_info=True)
 
-Return ONLY in this format (no explanation):
+        return updated_html, updated_css, applied
 
-=== HTML ===
-[complete updated HTML]
+    def _apply_css_var_change(self, css: str, op: Dict[str, Any]) -> str:
+        """Replace a single CSS custom property value inside :root { }."""
+        var_name = op.get("target_variable", "").strip()
+        new_value = op.get("new_value", "").strip()
+        if not var_name or not new_value:
+            return css
 
-=== CSS ===
-[complete updated CSS]
-"""
+        # Replace inside :root block specifically
+        def replace_in_root(m: re.Match) -> str:
+            root_block = m.group(0)
+            # Replace the variable line
+            updated = re.sub(
+                rf"({re.escape(var_name)}\s*:\s*)[^;]+",
+                rf"\g<1>{new_value}",
+                root_block,
+            )
+            return updated
+
+        updated = re.sub(r":root\s*\{[^}]+\}", replace_in_root, css, flags=re.DOTALL)
+
+        # Fallback: replace anywhere in file if not found in :root
+        if updated == css:
+            updated = re.sub(
+                rf"({re.escape(var_name)}\s*:\s*)[^;]+",
+                rf"\g<1>{new_value}",
+                css,
+            )
+
+        return updated
+
+    def _apply_text_change(self, html: str, op: Dict[str, Any]) -> str:
+        """Replace text content in HTML. Tries exact match then fuzzy."""
+        current = op.get("current_value", "").strip()
+        new_val = op.get("new_value", "").strip()
+        if not current or not new_val:
+            return html
+
+        # 1. Exact substring match (case-insensitive)
+        idx = html.lower().find(current.lower())
+        if idx != -1:
+            return html[:idx] + new_val + html[idx + len(current):]
+
+        # 2. Fuzzy: collapse whitespace and try again
+        normalized_current = re.sub(r'\s+', ' ', current)
+        pattern = re.sub(r'\s+', r'\\s+', re.escape(normalized_current))
+        match = re.search(pattern, html, re.IGNORECASE | re.DOTALL)
+        if match:
+            return html[:match.start()] + new_val + html[match.end():]
+
+        return html
+
+    def _apply_css_rule_change(self, css: str, op: Dict[str, Any]) -> str:
+        """Change a hardcoded CSS property value in a rule (not a variable)."""
+        selector = op.get("selector", "").strip()
+        prop = op.get("property", "").strip()
+        new_value = op.get("new_value", "").strip()
+        current_value = op.get("current_value", "").strip()
+
+        if not prop or not new_value:
+            return css
+
+        if selector:
+            # Target change within selector block
+            def replace_in_selector(m: re.Match) -> str:
+                block = m.group(0)
+                if current_value:
+                    return block.replace(current_value, new_value, 1)
+                return re.sub(
+                    rf"({re.escape(prop)}\s*:\s*)[^;]+",
+                    rf"\g<1>{new_value}",
+                    block,
+                )
+            escaped_sel = re.escape(selector)
+            css = re.sub(
+                rf"{escaped_sel}\s*\{{[^}}]+\}}",
+                replace_in_selector,
+                css,
+                flags=re.DOTALL,
+            )
+        elif current_value:
+            css = css.replace(current_value, new_value, 1)
+
+        return css
+
+    async def _apply_complex_op_with_ai(
+        self,
+        html: str,
+        css: str,
+        op: Dict[str, Any],
+    ) -> Tuple[str, str]:
+        """
+        For complex operations (section_add, section_remove, image_change),
+        use an AI call with ONLY the relevant section of HTML, not the full file.
+        """
+        op_type = op.get("type", "")
+        op_json = json.dumps(op, indent=2)
+
+        # Extract relevant section to minimize tokens sent
+        relevant_html = self._extract_relevant_section(html, op)
+
+        prompt = f"""You are a professional web developer. Apply EXACTLY this one edit operation to the website section below.
+
+OPERATION:
+{op_json}
+
+RELEVANT HTML SECTION:
+{relevant_html[:8000]}
+
+RULES:
+- Make ONLY the change described in the operation
+- Return the updated HTML section ONLY (no explanation, no full page)
+- Preserve all existing classes, IDs, and attributes
+- If you cannot make the change cleanly, return the HTML UNCHANGED
+
+Return ONLY the updated HTML section:"""
+
         try:
-            # Use streaming to handle large responses (64k tokens) without timeout
-            async with self._client.messages.stream(
+            response = await self._client.messages.create(
                 model=self.MODEL,
-                max_tokens=64000,
+                max_tokens=8000,
                 temperature=0.1,
                 messages=[{"role": "user", "content": prompt}],
-            ) as stream:
-                raw = await stream.get_final_text()
+            )
+            updated_section = response.content[0].text.strip()
 
-            updated_html = html_content
-            updated_css = css_content
-
-            if "=== HTML ===" in raw:
-                html_start = raw.find("=== HTML ===") + len("=== HTML ===")
-                html_end = raw.find("=== CSS ===")
-                if html_end == -1:
-                    html_end = len(raw)
-                updated_html = raw[html_start:html_end].strip()
-
-            if "=== CSS ===" in raw:
-                css_start = raw.find("=== CSS ===") + len("=== CSS ===")
-                updated_css = raw[css_start:].strip()
-
-            return updated_html, updated_css
+            # If the operation affected HTML, splice back the updated section
+            if op_type in ("section_add", "section_remove", "image_change"):
+                if relevant_html and relevant_html in html and updated_section != relevant_html:
+                    html = html.replace(relevant_html, updated_section, 1)
 
         except Exception as e:
-            logger.error(f"[SiteEditProcessor] Stage 3 error: {e}")
-            return html_content, css_content
+            logger.error(f"[SiteEditProcessor] AI complex op error: {e}")
+
+        return html, css
+
+    def _extract_relevant_section(self, html: str, op: Dict[str, Any]) -> str:
+        """Extract the most relevant HTML section for a complex operation."""
+        op_type = op.get("type", "")
+        location = op.get("location", "").lower()
+
+        if "hero" in location or "header" in location or "top" in location:
+            # Extract the hero/header section
+            match = re.search(
+                r'(<(?:section|div|header)[^>]*(?:hero|header|banner)[^>]*>.*?</(?:section|div|header)>)',
+                html, re.DOTALL | re.IGNORECASE
+            )
+            if match:
+                return match.group(1)
+
+        if "footer" in location:
+            match = re.search(r'(<footer[^>]*>.*?</footer>)', html, re.DOTALL | re.IGNORECASE)
+            if match:
+                return match.group(1)
+
+        # Default: return first 5KB of body
+        body_match = re.search(r'<body[^>]*>(.*)', html, re.DOTALL | re.IGNORECASE)
+        if body_match:
+            return body_match.group(1)[:5000]
+        return html[:5000]
 
     # ── Helper: create preview SiteVersion ────────────────────────────────
 
@@ -368,7 +632,7 @@ Return ONLY in this format (no explanation):
         )
         version_count = count_result.scalar() or 0
 
-        # Build updated generation_context
+        # Build updated generation_context (reflect css var changes)
         new_ctx: Dict[str, Any] = dict(current_version.generation_context or {})
         new_css_vars: Dict[str, str] = dict(new_ctx.get("css_variables", {}))
         for op in edit_operations:
