@@ -80,11 +80,18 @@ class SiteEditProcessor:
         logger.info(f"[SiteEditProcessor] Stage 1: extracting context for site {ticket.site_id}")
         context = await self._stage1_extract_context(db, ticket.site_id)
 
-        # Stage 2: Decompose customer request
-        logger.info(f"[SiteEditProcessor] Stage 2: decomposing request: {ticket.description[:100]!r}")
+        # Stage 2: Decompose customer request.
+        # element_context is set when the customer used the visual element picker.
+        element_context = ticket.element_context  # Optional[Dict] from JSONB column
+        has_pin = bool(element_context and element_context.get("css_selector"))
+        logger.info(
+            f"[SiteEditProcessor] Stage 2: decomposing request: {ticket.description[:100]!r} "
+            f"{'(with pinned element: ' + element_context.get('css_selector','?') + ')' if has_pin else '(no element pin)'}"
+        )
         decomposition = await self._stage2_decompose_request(
             edit_request=ticket.description,
             site_context=context,
+            element_context=element_context,
         )
 
         if decomposition.get("error"):
@@ -269,14 +276,17 @@ class SiteEditProcessor:
         self,
         edit_request: str,
         site_context: Dict[str, Any],
+        element_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Use Claude to map the customer's natural-language request to a structured
-        list of edit operations. Provides rich CSS context so the LLM can
-        correctly identify which variables/selectors control the requested element.
+        list of edit operations.
+
+        When element_context is provided (customer used the visual picker), the LLM
+        receives the exact CSS selector, current styles, and HTML of the target element.
+        This eliminates all ambiguity about *which* element to change.
         """
         css_vars = site_context.get("css_variables", {})
-        css_root_block = site_context.get("css_root_block", "")
         key_section_rules = site_context.get("key_section_rules", "")
         sections = site_context.get("sections", [])
         body_preview = site_context.get("body_preview", "")
@@ -286,10 +296,34 @@ class SiteEditProcessor:
         ) or "  (none found)"
         sections_summary = "\n".join(f"  - {s}" for s in sections) or "  (none found)"
 
+        # ── Element context block ─────────────────────────────────────────────
+        if element_context:
+            styles = element_context.get("computed_styles", {})
+            styles_formatted = "\n".join(
+                f"    {k}: {v}" for k, v in styles.items() if v
+            )
+            element_block = f"""
+=== PINNED ELEMENT (customer clicked this exact element) ===
+CSS selector : {element_context.get('css_selector', 'unknown')}
+Tag          : <{element_context.get('tag', '?')}>
+DOM path     : {element_context.get('dom_path', '')}
+Text content : "{element_context.get('text_content', '')[:200]}"
+HTML snippet :
+  {element_context.get('html', '')[:400]}
+Current computed styles:
+{styles_formatted}
+
+IMPORTANT: The customer has PINNED this specific element.
+Your edit operations MUST target this element using the CSS selector above.
+Do NOT guess which element they mean — they told you exactly.
+"""
+        else:
+            element_block = ""
+
         prompt = f"""You are a website editing assistant. A customer has submitted a change request for their website.
 You must figure out EXACTLY which CSS variable or HTML element needs to change to satisfy their request.
 The customer is NOT technical — they describe things visually, not by code.
-
+{element_block}
 === AVAILABLE CSS VARIABLES (:root) ===
 {css_vars_summary}
 
@@ -307,7 +341,7 @@ The customer is NOT technical — they describe things visually, not by code.
 
 === YOUR TASK ===
 1. Read the customer request carefully. Interpret their visual/plain-language description.
-2. Match their description to the actual CSS rules and variables shown above.
+{'2. The customer PINNED AN ELEMENT — use its CSS selector and current styles to target the change precisely.' if element_context else '2. Match their description to the actual CSS rules and variables shown above.'}
    - "the top section" / "the banner" / "the header" usually means .hero or nav
    - "background color" means a `background` or `background-color` CSS property
    - "the black one" means find which variable is dark/black (e.g. #0a0a0f, #000)
@@ -331,6 +365,14 @@ The customer is NOT technical — they describe things visually, not by code.
       "current_value": "exact current text here",
       "new_value": "exact new text here",
       "reason": "Customer asked to change heading"
+    }},
+    {{
+      "type": "css_rule_change",
+      "css_selector": "section.hero > h1",
+      "property": "font-size",
+      "current_value": "48px",
+      "new_value": "60px",
+      "reason": "Customer pinned this h1 and asked for larger text"
     }}
   ],
   "complexity": "simple",
@@ -338,15 +380,17 @@ The customer is NOT technical — they describe things visually, not by code.
 }}
 
 Operation types:
-- css_var_change: change a CSS custom property in :root (best for color/font/spacing)
-- text_change: change visible text content (headings, paragraphs, phone numbers, CTAs)
-- css_rule_change: change a CSS property that is NOT a variable (inline style, hardcoded color in a rule)
-- section_add: add a new page section
-- section_remove: remove an existing section
-- image_change: swap an image src
+- css_var_change  : change a CSS custom property in :root (best for color/font/spacing)
+- text_change     : change visible text content (headings, paragraphs, phone numbers, CTAs)
+- css_rule_change : change a CSS property that is NOT a variable — use the exact selector
+- section_add     : add a new page section
+- section_remove  : remove an existing section
+- image_change    : swap an image src
 
-For css_var_change, target_variable MUST be one of the variables listed in AVAILABLE CSS VARIABLES above.
-For text_change, current_value must be as close to the exact text as possible.
+Rules:
+- For css_var_change, target_variable MUST be one of the variables listed in AVAILABLE CSS VARIABLES.
+- For text_change, current_value must be as close to the exact text as possible.
+- For css_rule_change with a pinned element, use the css_selector from the PINNED ELEMENT block exactly.
 """
         try:
             response = await self._client.messages.create(

@@ -1,0 +1,187 @@
+/**
+ * ElementPickerCard Styles
+ *
+ * The annotation card that appears inside the ticket form after the customer
+ * has clicked an element on their site.
+ */
+
+/* ── Card container ───────────────────────────────────────────────────────── */
+
+.picker-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--color-primary-50, #eef2ff);
+  border: 1.5px solid var(--color-primary-300, #a5b4fc);
+  border-radius: var(--border-radius-md, 10px);
+  position: relative;
+  animation: picker-card-in 200ms ease;
+}
+
+@keyframes picker-card-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Header row ───────────────────────────────────────────────────────────── */
+
+.picker-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.picker-card__header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.picker-card__pin-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.picker-card__title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.picker-card__tag-badge {
+  font-family: var(--font-family-mono, 'Courier New', monospace);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 7px;
+  background: var(--color-primary-100, #e0e7ff);
+  color: var(--color-primary-700, #4338ca);
+  border-radius: 4px;
+  border: 1px solid var(--color-primary-200, #c7d2fe);
+}
+
+.picker-card__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary-700, #4338ca);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Remove button ────────────────────────────────────────────────────────── */
+
+.picker-card__remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--color-primary-200, #c7d2fe);
+  border-radius: 50%;
+  color: var(--color-primary-400, #818cf8);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+  flex-shrink: 0;
+}
+
+.picker-card__remove:hover {
+  background: var(--color-danger-50, #fee2e2);
+  border-color: var(--color-danger-300, #fca5a5);
+  color: var(--error-color, #ef4444);
+}
+
+/* ── CSS selector ─────────────────────────────────────────────────────────── */
+
+.picker-card__selector {
+  font-family: var(--font-family-mono, 'Courier New', monospace);
+  font-size: 12px;
+  color: var(--color-primary-800, #3730a3);
+  background: var(--color-primary-100, #e0e7ff);
+  padding: 6px 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+}
+
+/* ── Text content preview ─────────────────────────────────────────────────── */
+
+.picker-card__text-preview {
+  font-size: 13px;
+  color: var(--text-secondary, #64748b);
+  font-style: italic;
+  margin: 0;
+  line-height: 1.5;
+  padding: 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Computed styles pills ────────────────────────────────────────────────── */
+
+.picker-card__styles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.picker-card__style-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: white;
+  border: 1px solid var(--color-primary-200, #c7d2fe);
+  border-radius: 100px;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.picker-card__style-label {
+  color: var(--text-secondary, #64748b);
+  font-weight: 500;
+}
+
+.picker-card__style-value {
+  color: var(--text-primary, #1e293b);
+  font-family: var(--font-family-mono, 'Courier New', monospace);
+  font-weight: 600;
+}
+
+/* ── Colour swatch ────────────────────────────────────────────────────────── */
+
+.picker-card__color-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  flex-shrink: 0;
+}
+
+/* ── DOM path breadcrumb ──────────────────────────────────────────────────── */
+
+.picker-card__dom-path {
+  font-family: var(--font-family-mono, 'Courier New', monospace);
+  font-size: 11px;
+  color: var(--color-primary-400, #818cf8);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Hint footer ──────────────────────────────────────────────────────────── */
+
+.picker-card__hint {
+  font-size: 12px;
+  color: var(--color-primary-500, #6366f1);
+  margin: 0;
+  border-top: 1px solid var(--color-primary-200, #c7d2fe);
+  padding-top: 8px;
+  line-height: 1.5;
+}

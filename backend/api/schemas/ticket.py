@@ -9,13 +9,40 @@ from uuid import UUID
 from datetime import datetime
 
 
+class ElementContextSchema(BaseModel):
+    """
+    Snapshot of a DOM element captured by the visual element picker.
+    Attached to site_edit tickets to give the AI pipeline a precise target.
+    """
+    css_selector: str
+    tag: str
+    id: Optional[str] = None
+    classes: List[str] = []
+    text_content: str = ""
+    html: str = ""
+    dom_path: str = ""
+    computed_styles: Dict[str, Any] = {}
+    bounding_box: Dict[str, Any] = {}
+    captured_at: Optional[str] = None
+
+
 class TicketCreateRequest(BaseModel):
     """Request schema for creating a new ticket."""
-    
+
     subject: str = Field(..., min_length=5, max_length=255, description="Ticket subject")
     description: str = Field(..., min_length=10, description="Detailed description of the issue")
-    category: str = Field(..., description="Ticket category (billing, technical_support, site_edit, question, other)")
+    category: str = Field(
+        ...,
+        description="Ticket category (billing, technical_support, site_edit, question, other)",
+    )
     site_id: Optional[UUID] = Field(None, description="Optional site ID if ticket is site-specific")
+    element_context: Optional[ElementContextSchema] = Field(
+        None,
+        description=(
+            "DOM element snapshot from the visual element picker. "
+            "Only meaningful for site_edit tickets."
+        ),
+    )
 
 
 class TicketMessageCreate(BaseModel):
@@ -76,6 +103,7 @@ class TicketResponse(BaseModel):
     customer_satisfaction_rating: Optional[str] = None
     internal_notes: Optional[str] = None
     tags: Optional[List[str]] = None
+    element_context: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
     messages: List[TicketMessageResponse] = []
