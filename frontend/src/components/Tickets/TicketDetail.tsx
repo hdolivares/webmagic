@@ -79,14 +79,15 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onUpdate }) => {
   }
 
   const formatDate = (dateString: string): string => {
-    const date = new Date(dateString)
-    return date.toLocaleString(undefined, {
+    return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'America/Chicago',
+    }).format(new Date(dateString))
   }
 
   const formatCategory = (category: string): string => {
@@ -109,18 +110,8 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onUpdate }) => {
     return statusColors[status] || 'status-default'
   }
 
-  // Combine description with messages
-  const allMessages = [
-    {
-      id: 'initial',
-      message: ticket.description,
-      message_type: 'customer',
-      ai_generated: false,
-      created_at: ticket.created_at,
-      customer_user_id: 'customer'
-    },
-    ...ticket.messages
-  ]
+  // Messages come from the backend already including the initial customer message
+  const allMessages = ticket.messages
 
   return (
     <div className="ticket-detail">
