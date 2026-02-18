@@ -8,14 +8,15 @@
  */
 import { useState } from 'react'
 import { Card } from '@/components/ui'
-import { User, Key, Bot, MessageSquare, Link2 } from 'lucide-react'
+import { User, Key, Bot, MessageSquare, Link2, Bell } from 'lucide-react'
 import { AccountSettings } from './AccountSettings'
 import { AISettingsTab } from './AISettingsTab'
 import { PromptsSettings } from './PromptsSettings'
 import { MessagingSettings } from './MessagingSettings'
 import { ShortenerSettings } from './ShortenerSettings'
+import { NotificationSettings } from './NotificationSettings'
 
-type SettingsTab = 'account' | 'ai' | 'prompts' | 'messaging' | 'shortener'
+type SettingsTab = 'account' | 'ai' | 'prompts' | 'messaging' | 'shortener' | 'notifications'
 
 export const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('account')
@@ -50,6 +51,12 @@ export const SettingsPage = () => {
       label: 'URL Shortener',
       icon: Link2,
       description: 'Configure short URLs for SMS campaigns',
+    },
+    {
+      id: 'notifications' as SettingsTab,
+      label: 'Notifications',
+      icon: Bell,
+      description: 'Configure support ticket email alerts',
     },
   ]
 
@@ -89,6 +96,7 @@ export const SettingsPage = () => {
         {activeTab === 'messaging' && <MessagingSettings />}
         {activeTab === 'prompts' && <PromptsSettings />}
         {activeTab === 'shortener' && <ShortenerSettings />}
+        {activeTab === 'notifications' && <NotificationSettings />}
       </div>
     </div>
   )

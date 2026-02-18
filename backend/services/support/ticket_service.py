@@ -18,6 +18,7 @@ from core.exceptions import NotFoundError, ValidationError, ForbiddenError
 from anthropic import AsyncAnthropic
 from core.config import get_settings
 from services.emails.email_service import get_email_service
+from services.system_settings_service import SystemSettingsService
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -25,7 +26,17 @@ settings = get_settings()
 
 class TicketService:
     """Service for managing support tickets."""
-    
+
+    @staticmethod
+    async def _get_admin_email(db: AsyncSession) -> str:
+        """
+        Return the support notification email address.
+        Checks the DB first (support_admin_email key, category notifications),
+        falls back to SUPPORT_ADMIN_EMAIL from .env / config defaults.
+        """
+        db_value = await SystemSettingsService.get_setting(db, "support_admin_email")
+        return db_value or settings.SUPPORT_ADMIN_EMAIL
+
     # Ticket categories
     CATEGORIES = [
         "billing",
@@ -151,11 +162,10 @@ class TicketService:
         # Email admin: new ticket notification
         try:
             email_service = get_email_service()
-            admin_link = (
-                f"{settings.FRONTEND_URL}/tickets/{ticket.id}"
-            )
+            admin_email = await TicketService._get_admin_email(db)
+            admin_link = f"{settings.FRONTEND_URL}/tickets/{ticket.id}"
             await email_service.send_new_ticket_admin_notification(
-                admin_email=settings.SUPPORT_ADMIN_EMAIL,
+                admin_email=admin_email,
                 ticket_number=ticket.ticket_number,
                 customer_name=customer.full_name or customer.email,
                 customer_email=customer.email,
@@ -387,6 +397,7 @@ Respond in JSON format:
         # Email notifications (failures must not break the reply)
         try:
             email_service = get_email_service()
+            admin_email = await TicketService._get_admin_email(db)
             portal_link = f"{settings.FRONTEND_URL}/customer/tickets/{ticket.id}"
             admin_link = f"{settings.FRONTEND_URL}/tickets/{ticket.id}"
 
@@ -417,7 +428,7 @@ Respond in JSON format:
                 customer_name = replying_customer.full_name or replying_customer.email if replying_customer else "Customer"
                 customer_email_addr = replying_customer.email if replying_customer else ""
                 await email_service.send_customer_reply_admin_notification(
-                    admin_email=settings.SUPPORT_ADMIN_EMAIL,
+                    admin_email=admin_email,
                     ticket_number=ticket.ticket_number,
                     customer_name=customer_name,
                     customer_email=customer_email_addr,
