@@ -13,7 +13,7 @@ import logging
 
 from core.database import get_db
 from models.site import GeneratedSite
-from models.site_models import Site
+from models.site_models import Site, SiteVersion
 import re
 
 router = APIRouter(tags=["generated-preview"])
@@ -38,78 +38,49 @@ async def view_generated_site(
     db: AsyncSession = Depends(get_db)
 ) -> HTMLResponse:
     """
-    Serve generated site HTML content.
+    Serve site HTML content (from generated_sites OR sites table).
+    
+    Handles both:
+    1. Generated sites (from generated_sites table) - like 'marshall-campbell-co-cpas-la'
+    2. Purchase preview sites (from sites table) - like 'test-cpa-site'
     
     Args:
-        subdomain: Site subdomain/slug (e.g., 'mayfair-plumbers-1770254203251-83b6e7b8')
+        subdomain: Site subdomain/slug
         db: Database session
     
     Returns:
         HTMLResponse with complete site HTML
     """
     try:
-        # Query generated_sites table
-        query = select(GeneratedSite).where(
-            GeneratedSite.subdomain == subdomain
+        # First, try generated_sites table (most common case)
+        gen_query = select(GeneratedSite).where(GeneratedSite.subdomain == subdomain)
+        gen_result = await db.execute(gen_query)
+        gen_site = gen_result.scalar_one_or_none()
+        
+        if gen_site:
+            # Handle generated site
+            return await _serve_generated_site(db, gen_site, subdomain)
+        
+        # If not found, try sites table (purchase preview sites)
+        site_query = select(Site).where(Site.slug == subdomain)
+        site_result = await db.execute(site_query)
+        purchase_site = site_result.scalar_one_or_none()
+        
+        if purchase_site:
+            # Handle purchase preview site
+            return await _serve_purchase_site(db, purchase_site, subdomain)
+        
+        # Not found in either table
+        logger.warning(f"Site not found in any table: {subdomain}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Site not found: {subdomain}"
         )
-        result = await db.execute(query)
-        site = result.scalar_one_or_none()
-        
-        if not site:
-            logger.warning(f"Generated site not found: {subdomain}")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Site not found: {subdomain}"
-            )
-        
-        # Check if site has content
-        if not site.html_content:
-            logger.warning(f"Site {subdomain} has no HTML content (status: {site.status})")
-            
-            # Return a friendly message if site is still generating
-            if site.status == "generating":
-                return HTMLResponse(content=_build_generating_page(site.subdomain))
-            elif site.status == "failed":
-                return HTMLResponse(content=_build_error_page(subdomain, "Site generation failed"))
-            else:
-                return HTMLResponse(content=_build_error_page(subdomain, "Site content not available"))
-        
-        # Check if this site has been purchased (check sites table by business_id)
-        is_owned = False
-        if site.business_id:
-            purchase_query = select(Site).where(
-                Site.business_id == site.business_id,
-                Site.status == 'owned'
-            )
-            purchase_result = await db.execute(purchase_query)
-            purchased_site = purchase_result.scalar_one_or_none()
-            is_owned = purchased_site is not None
-            
-            if is_owned:
-                logger.info(f"Site {subdomain} is owned (purchase record: {purchased_site.slug})")
-        
-        # Get HTML content
-        html_content = site.html_content
-        
-        # Remove claim bar if site is owned
-        if is_owned:
-            html_content = _remove_claim_bar(html_content)
-            logger.info(f"Removed claim bar from owned site: {subdomain}")
-        
-        # Build complete HTML with inline CSS and JS
-        complete_html = _build_complete_html(
-            html=html_content,
-            css=site.css_content,
-            js=site.js_content
-        )
-        
-        logger.info(f"Serving generated site: {subdomain} (status: {site.status}, owned: {is_owned})")
-        return HTMLResponse(content=complete_html)
     
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error serving generated site {subdomain}: {e}", exc_info=True)
+        logger.error(f"Error serving site {subdomain}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while loading the site"
@@ -119,6 +90,95 @@ async def view_generated_site(
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
+
+async def _serve_generated_site(
+    db: AsyncSession,
+    site: GeneratedSite,
+    subdomain: str
+) -> HTMLResponse:
+    """Serve a site from generated_sites table."""
+    # Check if site has content
+    if not site.html_content:
+        logger.warning(f"Site {subdomain} has no HTML content (status: {site.status})")
+        
+        if site.status == "generating":
+            return HTMLResponse(content=_build_generating_page(site.subdomain))
+        elif site.status == "failed":
+            return HTMLResponse(content=_build_error_page(subdomain, "Site generation failed"))
+        else:
+            return HTMLResponse(content=_build_error_page(subdomain, "Site content not available"))
+    
+    # Check if this site has been purchased (check sites table by business_id)
+    is_owned = False
+    if site.business_id:
+        purchase_query = select(Site).where(
+            Site.business_id == site.business_id,
+            Site.status == 'owned'
+        )
+        purchase_result = await db.execute(purchase_query)
+        purchased_site = purchase_result.scalar_one_or_none()
+        is_owned = purchased_site is not None
+        
+        if is_owned:
+            logger.info(f"Generated site {subdomain} is owned (purchase: {purchased_site.slug})")
+    
+    # Get HTML content
+    html_content = site.html_content
+    
+    # Remove claim bar if site is owned
+    if is_owned:
+        html_content = _remove_claim_bar(html_content)
+        logger.info(f"Removed claim bar from owned generated site: {subdomain}")
+    
+    # Build complete HTML
+    complete_html = _build_complete_html(
+        html=html_content,
+        css=site.css_content,
+        js=site.js_content
+    )
+    
+    logger.info(f"Serving generated site: {subdomain} (status: {site.status}, owned: {is_owned})")
+    return HTMLResponse(content=complete_html)
+
+
+async def _serve_purchase_site(
+    db: AsyncSession,
+    site: Site,
+    slug: str
+) -> HTMLResponse:
+    """Serve a site from sites table (purchase preview sites)."""
+    # Get current version
+    if not site.current_version_id:
+        logger.warning(f"Purchase site {slug} has no current version")
+        return HTMLResponse(content=_build_error_page(slug, "Site content not available"))
+    
+    version_query = select(SiteVersion).where(SiteVersion.id == site.current_version_id)
+    version_result = await db.execute(version_query)
+    version = version_result.scalar_one_or_none()
+    
+    if not version or not version.html_content:
+        logger.warning(f"Purchase site {slug} version has no HTML content")
+        return HTMLResponse(content=_build_error_page(slug, "Site content not available"))
+    
+    # Get HTML content
+    html_content = version.html_content
+    
+    # Remove claim bar if site is owned
+    is_owned = site.status == 'owned'
+    if is_owned:
+        html_content = _remove_claim_bar(html_content)
+        logger.info(f"Removed claim bar from owned purchase site: {slug}")
+    
+    # Build complete HTML
+    complete_html = _build_complete_html(
+        html=html_content,
+        css=version.css_content,
+        js=version.js_content
+    )
+    
+    logger.info(f"Serving purchase site: {slug} (status: {site.status})")
+    return HTMLResponse(content=complete_html)
+
 
 def _remove_claim_bar(html: str) -> str:
     """
