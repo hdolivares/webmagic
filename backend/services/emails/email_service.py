@@ -267,6 +267,174 @@ class EmailService:
             logger.error(f"Failed to send purchase confirmation to {to_email}: {e}")
             return False
     
+    async def send_abandoned_cart_email(
+        self,
+        to_email: str,
+        customer_name: str,
+        site_slug: str,
+        checkout_url: str,
+        discount_code: str,
+        purchase_amount: float,
+        monthly_amount: float
+    ) -> bool:
+        """
+        Send abandoned cart recovery email with 10% discount.
+        
+        Args:
+            to_email: Customer email
+            customer_name: Customer's name
+            site_slug: Slug of the site they started purchasing
+            checkout_url: Recurrente checkout URL to complete purchase
+            discount_code: 10% discount code
+            purchase_amount: Original one-time amount
+            monthly_amount: Monthly subscription amount
+        
+        Returns:
+            True if sent successfully
+        """
+        try:
+            site_preview_url = f"{settings.FRONTEND_URL}/site-preview/{site_slug}"
+            discounted_amount = purchase_amount * 0.9  # 10% off
+            
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Complete Your Website Purchase - 10% Off!</title>
+            </head>
+            <body style="margin: 0; padding: 0; background-color: #f4f4f7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+                <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 0; padding: 20px 0;">
+                    <tr>
+                        <td align="center">
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow: hidden;">
+                                
+                                <!-- Header -->
+                                <tr>
+                                    <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+                                        <h1 style="margin: 0; color: white; font-size: 32px; font-weight: 700;">💼 Don't Miss Out!</h1>
+                                        <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 18px;">Your website is waiting</p>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Body -->
+                                <tr>
+                                    <td style="padding: 40px 30px;">
+                                        <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #374151;">
+                                            Hi <strong>{customer_name}</strong>,
+                                        </p>
+                                        
+                                        <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #374151;">
+                                            We noticed you started the checkout process for your professional website but didn't complete it. 
+                                            We understand – sometimes life gets in the way!
+                                        </p>
+                                        
+                                        <!-- Special Offer Box -->
+                                        <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 20px; margin: 30px 0; border-radius: 8px;">
+                                            <h2 style="margin: 0 0 15px; font-size: 24px; color: #065f46;">🎁 Special 10% Discount - Just for You!</h2>
+                                            <p style="margin: 0 0 10px; font-size: 16px; color: #065f46;">
+                                                To help you get started, we're offering you <strong>10% off</strong> your first payment.
+                                            </p>
+                                            <div style="background: white; padding: 15px; border-radius: 6px; margin-top: 15px;">
+                                                <p style="margin: 0 0 5px; font-size: 14px; color: #6b7280;">Your discount code:</p>
+                                                <p style="margin: 0; font-size: 28px; font-weight: 700; color: #10b981; letter-spacing: 2px;">{discount_code}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Pricing -->
+                                        <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin: 25px 0;">
+                                            <table width="100%" cellpadding="8" cellspacing="0">
+                                                <tr>
+                                                    <td style="font-size: 15px; color: #6b7280;">Original Price:</td>
+                                                    <td align="right" style="font-size: 15px; color: #9ca3af; text-decoration: line-through;">${purchase_amount:.2f}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="font-size: 18px; color: #111827; font-weight: 600;">Your Price Today:</td>
+                                                    <td align="right" style="font-size: 22px; color: #10b981; font-weight: 700;">${discounted_amount:.2f}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="font-size: 14px; color: #6b7280; padding-top: 10px; border-top: 1px solid #e5e7eb;">Then Monthly:</td>
+                                                    <td align="right" style="font-size: 14px; color: #374151; padding-top: 10px; border-top: 1px solid #e5e7eb;">${monthly_amount:.2f}/month</td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                        
+                                        <!-- What's Included -->
+                                        <div style="margin: 30px 0;">
+                                            <h3 style="margin: 0 0 15px; font-size: 18px; color: #111827;">What you get:</h3>
+                                            <ul style="margin: 0; padding: 0; list-style: none;">
+                                                <li style="margin: 0 0 10px; padding-left: 30px; position: relative; font-size: 15px; color: #374151;">
+                                                    <span style="position: absolute; left: 0;">✅</span>
+                                                    Professional AI-generated website ready to launch
+                                                </li>
+                                                <li style="margin: 0 0 10px; padding-left: 30px; position: relative; font-size: 15px; color: #374151;">
+                                                    <span style="position: absolute; left: 0;">✅</span>
+                                                    Unlimited AI-powered customization and updates
+                                                </li>
+                                                <li style="margin: 0 0 10px; padding-left: 30px; position: relative; font-size: 15px; color: #374151;">
+                                                    <span style="position: absolute; left: 0;">✅</span>
+                                                    Custom domain support included
+                                                </li>
+                                                <li style="margin: 0 0 10px; padding-left: 30px; position: relative; font-size: 15px; color: #374151;">
+                                                    <span style="position: absolute; left: 0;">✅</span>
+                                                    SSL certificate & 24/7 hosting
+                                                </li>
+                                                <li style="margin: 0 0 10px; padding-left: 30px; position: relative; font-size: 15px; color: #374151;">
+                                                    <span style="position: absolute; left: 0;">✅</span>
+                                                    Dedicated support team
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        
+                                        <!-- CTA Button -->
+                                        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 35px 0;">
+                                            <tr>
+                                                <td align="center">
+                                                    <a href="{checkout_url}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 18px 50px; border-radius: 8px; font-size: 18px; font-weight: 600; box-shadow: 0 4px 6px rgba(102, 126, 234, 0.4);">
+                                                        Complete Your Purchase Now →
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        
+                                        <p style="margin: 30px 0 0; font-size: 14px; line-height: 1.6; color: #6b7280; text-align: center;">
+                                            <a href="{site_preview_url}" style="color: #667eea; text-decoration: none;">Preview your website again</a> · 
+                                            Questions? Just reply to this email!
+                                        </p>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Footer -->
+                                <tr>
+                                    <td style="background: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+                                        <p style="margin: 0 0 10px; font-size: 14px; color: #6b7280;">
+                                            This discount expires in <strong>48 hours</strong>. Don't miss out!
+                                        </p>
+                                        <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                                            © 2026 WebMagic by Lavish Solutions. All rights reserved.
+                                        </p>
+                                    </td>
+                                </tr>
+                                
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </body>
+            </html>
+            """
+            
+            return await self._send_email(
+                to_email=to_email,
+                subject=f"💼 Complete Your Purchase - Get 10% Off! ({site_slug})",
+                html_content=html_content
+            )
+        
+        except Exception as e:
+            logger.error(f"Failed to send abandoned cart email to {to_email}: {e}")
+            return False
+    
     async def _send_email(
         self,
         to_email: str,

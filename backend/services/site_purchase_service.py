@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from models.site_models import Site, CustomerUser, SiteVersion, CustomerSiteOwnership
+from models.checkout_session import CheckoutSession
 from services.payments.recurrente_client import RecurrenteClient
 from services.customer_auth_service import CustomerAuthService
 from services.site_service import get_site_service
@@ -127,6 +128,27 @@ class SitePurchaseService:
             f"(Amount: ${site.purchase_amount}. Subscription ${site.monthly_amount}/mo will auto-create on payment success)"
         )
         
+        # Create checkout session for abandoned cart tracking
+        checkout_session = CheckoutSession(
+            customer_email=customer_email,
+            customer_name=customer_name or "Unknown",
+            site_slug=slug,
+            site_id=site.id,
+            checkout_id=checkout.id,
+            checkout_url=checkout.checkout_url,
+            purchase_amount=site.purchase_amount,
+            monthly_amount=site.monthly_amount,
+            status='checkout_created'
+        )
+        db.add(checkout_session)
+        await db.commit()
+        await db.refresh(checkout_session)
+        
+        logger.info(
+            f"Created checkout session {checkout_session.session_id} for "
+            f"{customer_email} (site: {slug}, checkout: {checkout.id})"
+        )
+        
         return {
             "checkout_id": checkout.id,
             "checkout_url": checkout.checkout_url,
@@ -135,7 +157,8 @@ class SitePurchaseService:
             "amount": float(site.purchase_amount),  # Required by response schema
             "setup_amount": float(site.purchase_amount),  # Additional info
             "monthly_amount": float(site.monthly_amount),  # Additional info
-            "currency": "USD"
+            "currency": "USD",
+            "session_id": checkout_session.session_id  # For tracking
         }
     
     async def process_purchase_payment(
