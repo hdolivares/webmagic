@@ -190,16 +190,26 @@ async def handle_payment_succeeded(
         checkout = event_data.get('checkout', {})
         checkout_id = checkout.get('id')
         payment_method = checkout.get('payment', {}).get('payment_method', {})
+        customer = event_data.get('customer', {})
         
         logger.info(f"💰 Processing payment success: payment_id={payment_id}, checkout_id={checkout_id}")
         logger.info(f"💰 Checkout data: status={checkout.get('status')}, metadata keys={list(checkout.get('metadata', {}).keys())}")
+        logger.info(f"💰 Customer data: email={customer.get('email')}, name={customer.get('full_name')}")
         
-        # Process purchase - pass the checkout data (which contains metadata)
+        # Combine checkout and customer data for processing
+        payment_data = {
+            **checkout,  # Includes metadata
+            'id': payment_id,  # Payment ID from root
+            'user_email': customer.get('email'),  # Customer email from root
+            'user_name': customer.get('full_name'),  # Customer name from root
+        }
+        
+        # Process purchase
         purchase_service = get_site_purchase_service()
         result = await purchase_service.process_purchase_payment(
             db=db,
             checkout_id=checkout_id,
-            payment_data=checkout  # Pass checkout object which has metadata
+            payment_data=payment_data
         )
         
         # Mark checkout session as completed
@@ -230,9 +240,8 @@ async def handle_payment_succeeded(
         )
         
         # AUTO-CREATE SUBSCRIPTION if this was a setup payment
-        metadata = event_data.get('metadata', {})
+        metadata = checkout.get('metadata', {})
         auto_subscribe = metadata.get('auto_subscribe') == 'true'
-        payment_method = event_data.get('payment_method', {})
         payment_method_id = payment_method.get('id') if payment_method else None
         
         if auto_subscribe and payment_method_id:
