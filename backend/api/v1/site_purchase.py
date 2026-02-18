@@ -8,13 +8,16 @@ Author: WebMagic Team
 Date: January 21, 2026
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
+from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import logging
 from typing import Optional
 from uuid import UUID
 
 from core.database import get_db
 from core.customer_security import get_current_customer, get_optional_customer
+from core.config import get_settings
 from core.exceptions import NotFoundError, ValidationError
 from api.schemas.site_purchase import (
     PurchaseCheckoutRequest,
@@ -29,11 +32,14 @@ from api.schemas.customer_auth import (
     ErrorResponse
 )
 from models.site_models import CustomerUser, Site
+from models.checkout_session import CheckoutSession
 from services.site_purchase_service import get_site_purchase_service
 from services.site_service import get_site_service
 from services.customer_site_service import CustomerSiteService
+from services.payments.recurrente_client import RecurrenteClient
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 router = APIRouter(tags=["Site Purchase"])
 
@@ -182,6 +188,104 @@ async def create_purchase_checkout(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create checkout. Please try again."
         )
+
+
+@router.get(
+    "/sites/{slug}/subscription-setup",
+    summary="Subscription setup redirect (Step 2 of purchase flow)",
+    description=(
+        "Called by Recurrente after the one-time setup fee is paid. "
+        "Creates a monthly subscription checkout and redirects the customer to it."
+    ),
+    response_class=HTMLResponse
+)
+async def subscription_setup_redirect(
+    slug: str,
+    session: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Two-step purchase: Step 2.
+
+    After the one-time setup fee is paid Recurrente redirects here.
+    We create a subscription checkout and immediately redirect the customer
+    so they complete the monthly billing sign-up in the same flow.
+    """
+    # Fallback URL used on any error
+    fallback_url = f"{settings.FRONTEND_URL}/purchase-success?slug={slug}"
+
+    try:
+        # Look up checkout session by the pre-generated session_id
+        result = await db.execute(
+            select(CheckoutSession).where(CheckoutSession.session_id == session)
+        )
+        cs = result.scalar_one_or_none()
+
+        if not cs:
+            logger.error(f"subscription-setup: no checkout session found for session={session}")
+            return RedirectResponse(url=fallback_url)
+
+        customer_email = cs.customer_email
+        customer_name  = cs.customer_name
+        monthly_amount = float(cs.monthly_amount)
+        site_slug      = cs.site_slug or slug
+
+        logger.info(
+            f"subscription-setup: creating subscription checkout for "
+            f"{customer_email}, site={site_slug}, monthly=${monthly_amount}"
+        )
+
+        # Get Recurrente user so the subscription form is pre-populated
+        recurrente = RecurrenteClient()
+        recurrente_user = None
+        try:
+            recurrente_user = await recurrente.get_or_create_user(
+                email=customer_email,
+                full_name=customer_name
+            )
+        except Exception as e:
+            logger.warning(f"subscription-setup: could not get/create Recurrente user: {e}")
+
+        # Fetch the site to build metadata
+        site_result = await db.execute(select(Site).where(Site.slug == site_slug))
+        site = site_result.scalar_one_or_none()
+        site_id_str = str(site.id) if site else ""
+
+        # Create subscription checkout ($97/month)
+        sub_checkout = await recurrente.create_subscription_checkout(
+            name=f"Monthly Hosting - {site.site_title or site_slug}",
+            amount_cents=int(monthly_amount * 100),
+            billing_interval="month",
+            billing_interval_count=1,
+            currency="USD",
+            description=f"Monthly hosting for {site.site_title or site_slug}",
+            success_url=f"{settings.FRONTEND_URL}/purchase-success?slug={site_slug}",
+            cancel_url=f"{settings.FRONTEND_URL}/purchase-success?slug={site_slug}",
+            user_id=recurrente_user.id if recurrente_user else None,
+            metadata={
+                "site_id": site_id_str,
+                "site_slug": site_slug,
+                "purchase_type": "website_subscription",
+                "customer_email": customer_email,
+                "customer_name": customer_name,
+                "subscription_type": "monthly_hosting",
+                "setup_session_id": session
+            }
+        )
+
+        logger.info(
+            f"subscription-setup: created subscription checkout {sub_checkout.id} "
+            f"for {customer_email}. Redirecting to Recurrente."
+        )
+
+        # Redirect customer to the subscription checkout page
+        return RedirectResponse(url=sub_checkout.checkout_url, status_code=302)
+
+    except Exception as e:
+        logger.error(f"subscription-setup error: {e}", exc_info=True)
+        # On any failure just send them to the success page
+        # (site is already owned from the setup fee webhook)
+        return RedirectResponse(url=fallback_url, status_code=302)
 
 
 @router.get(

@@ -113,6 +113,17 @@ class SitePurchaseService:
         # Build site URL for metadata
         site_url = self.site_service.generate_site_url(slug)
         
+        # TWO-STEP PAYMENT FLOW:
+        # Step 1: One-time setup fee checkout ($497). On success, customer is
+        #         redirected to our /subscription-setup endpoint which creates
+        #         Step 2: A subscription checkout ($97/month).
+        # This avoids Recurrente's 422 error on mixed one_time + recurring checkouts.
+
+        # Pre-generate session_id so we can embed it in the success URL BEFORE
+        # creating the Recurrente checkout (chicken-and-egg problem).
+        import uuid as _uuid
+        pre_session_id = f"cs_{_uuid.uuid4().hex}"
+
         # Get or create Recurrente user (to prepopulate checkout form)
         recurrente_user = None
         if customer_email and customer_name:
@@ -124,42 +135,44 @@ class SitePurchaseService:
                 logger.info(f"Using Recurrente user: {recurrente_user.id} for checkout")
             except Exception as e:
                 logger.warning(f"Failed to create Recurrente user, continuing without: {e}")
-        
-        # IMPORTANT: Recurrente does NOT support mixed checkouts (one_time + recurring items).
-        # A mixed checkout creates successfully but returns 422 at payment fulfillment time.
-        # Solution: Use subscription-only checkout. The monthly_amount is the recurring charge.
-        # The purchase_amount (setup fee) is tracked in our DB and metadata but not separately
-        # charged via Recurrente — the subscription covers ongoing hosting.
-        checkout = await self.recurrente.create_subscription_checkout(
-            name=f"Website Hosting - {site.site_title or slug}",
-            amount_cents=int(site.monthly_amount * 100),  # $97.00 -> 9700 cents
-            billing_interval="month",
-            billing_interval_count=1,
+
+        # Step 1 checkout: one-time setup fee
+        # After payment, Recurrente redirects to our subscription-setup endpoint
+        subscription_setup_url = (
+            f"{settings.API_URL}/api/v1/sites/{slug}/subscription-setup"
+            f"?session={pre_session_id}"
+        )
+
+        checkout = await self.recurrente.create_one_time_checkout(
+            name=f"Website Setup - {site.site_title or slug}",
+            amount_cents=int(site.purchase_amount * 100),  # $497 -> 49700 cents
             currency="USD",
-            description=f"Monthly website hosting for {site.site_title or slug}. Setup fee: ${site.purchase_amount}",
-            success_url=success_url or f"{settings.FRONTEND_URL}/purchase-success?slug={slug}",
-            cancel_url=cancel_url or f"{settings.FRONTEND_URL}/site-preview/{slug}",
+            description=f"One-time setup fee for {site.site_title or slug}. Monthly hosting (${ site.monthly_amount}/mo) will be set up next.",
+            success_url=subscription_setup_url,
+            cancel_url=cancel_url or f"https://{settings.SITES_DOMAIN}/{slug}",
             user_id=recurrente_user.id if recurrente_user else None,
             metadata={
                 "site_id": str(site.id),
                 "site_slug": slug,
                 "site_url": site_url,
-                "purchase_type": "website_subscription",
+                "purchase_type": "website_setup",
                 "customer_email": customer_email,
                 "customer_name": customer_name,
                 "setup_amount_usd": str(site.purchase_amount),
                 "monthly_amount_usd": str(site.monthly_amount),
-                "subscription_type": "monthly_hosting"
+                "subscription_type": "monthly_hosting",
+                "session_id": pre_session_id
             }
         )
-        
+
         logger.info(
-            f"Created subscription checkout for site {slug}: {checkout.id} "
-            f"(Monthly: ${site.monthly_amount}/mo, Setup tracked: ${site.purchase_amount})"
+            f"Created STEP-1 setup checkout for site {slug}: {checkout.id} "
+            f"(Setup fee: ${site.purchase_amount}. Subscription step follows on success.)"
         )
-        
-        # Create checkout session for abandoned cart tracking
+
+        # Create checkout session record using the pre-generated session_id
         checkout_session = CheckoutSession(
+            session_id=pre_session_id,
             customer_email=customer_email,
             customer_name=customer_name or "Unknown",
             site_slug=slug,
@@ -239,7 +252,31 @@ class SitePurchaseService:
         
         if not site:
             raise NotFoundError(f"Site not found: {site_id}")
-        
+
+        # Determine payment type from metadata
+        purchase_type = payment_data.get("metadata", {}).get("purchase_type", "website_setup")
+
+        if site.status == "owned":
+            # This is a recurring subscription payment (step 2 of two-step flow or renewal).
+            # The site is already owned; subscription.create webhook will save the subscription ID.
+            logger.info(
+                f"Site {site.slug} already owned — skipping re-processing. "
+                f"purchase_type={purchase_type}. Subscription webhook will update subscription_id."
+            )
+            return {
+                "site_id": str(site.id),
+                "site_slug": site.slug,
+                "site_title": site.site_title or site.slug,
+                "site_url": self.site_service.generate_site_url(site.slug),
+                "customer_email": payment_data.get("user_email", ""),
+                "customer_name": payment_data.get("user_name", ""),
+                "purchase_amount": float(site.purchase_amount),
+                "transaction_id": payment_data.get("id"),
+                "purchased_at": site.purchased_at.isoformat() if site.purchased_at else None,
+                "already_owned": True,
+                "is_new_customer": False,
+            }
+
         if site.status != "preview":
             logger.warning(f"Attempted purchase of non-preview site: {site.slug} ({site.status})")
             raise ValidationError(f"Site is not available for purchase (status: {site.status})")

@@ -195,9 +195,14 @@ async def handle_payment_succeeded(
         payment_method = checkout.get('payment', {}).get('payment_method', {})
         customer = event_data.get('customer', {})
         
-        logger.info(f"💰 Processing payment success: payment_id={payment_id}, checkout_id={checkout_id}")
-        logger.info(f"💰 Checkout data: status={checkout.get('status')}, metadata keys={list(checkout.get('metadata', {}).keys())}")
+        metadata = checkout.get('metadata', {})
+        purchase_type = metadata.get('purchase_type', 'website_setup')
+
+        logger.info(f"💰 Processing payment success: payment_id={payment_id}, checkout_id={checkout_id}, purchase_type={purchase_type}")
+        logger.info(f"💰 Checkout data: status={checkout.get('status')}, metadata keys={list(metadata.keys())}")
         logger.info(f"💰 Customer data: email={customer.get('email')}, name={customer.get('full_name')}")
+
+        print(f"[WEBHOOK] 💰 payment_intent.succeeded — type={purchase_type}, payment={payment_id}, checkout={checkout_id}")
         
         # Combine checkout and customer data for processing
         payment_data = {
@@ -269,27 +274,14 @@ async def handle_payment_succeeded(
             print(f"[WEBHOOK] ❌ Error sending purchase confirmation email: {e}")
             logger.error(f"❌ Error sending purchase confirmation email: {e}", exc_info=True)
         
-        # NOTE: Subscription creation is handled automatically by Recurrente
-        # When we create a checkout with charge_type="recurring", Recurrente:
-        # 1. Processes the payment (sends payment_intent.succeeded)
-        # 2. Automatically creates a subscription (sends subscription.create)
-        # We handle the subscription.create webhook separately to save the real subscription ID
-        
-        metadata = checkout.get('metadata', {})
-        auto_subscribe = metadata.get('auto_subscribe') == 'true'
-        
-        if auto_subscribe:
-            logger.info(
-                f"Auto-subscribe flag detected. Recurrente will send subscription.create webhook "
-                f"with the subscription ID for site {result['site_id']}"
-            )
-            result['subscription_pending'] = True
-        else:
-            result['subscription_pending'] = False
-        
+        # Two-step payment flow:
+        # - purchase_type="website_setup"       → this handler (setup fee paid → site owned, email sent)
+        # - purchase_type="website_subscription" → recurring payment, just log (site already owned)
+        # The subscription.create webhook handles saving the real su_xxx subscription ID.
+
         logger.info(
             f"Purchase completed and confirmation sent: Site {result['site_slug']} "
-            f"by {result['customer_email']} (Subscription: {'✅' if result.get('subscription_created') else '❌'})"
+            f"by {result['customer_email']}"
         )
         
         # TODO: Trigger post-purchase tasks (Celery)
