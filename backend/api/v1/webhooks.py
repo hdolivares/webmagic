@@ -18,6 +18,7 @@ Date: January 21, 2026
 """
 from fastapi import APIRouter, Request, HTTPException, status, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import func
 import logging
 import json
 from typing import Dict, Any
@@ -177,6 +178,22 @@ async def handle_payment_succeeded(
             checkout_id=checkout_id,
             payment_data=event_data
         )
+        
+        # Mark checkout session as completed
+        from models.checkout_session import CheckoutSession
+        from sqlalchemy import update
+        
+        await db.execute(
+            update(CheckoutSession)
+            .where(CheckoutSession.checkout_id == checkout_id)
+            .values(
+                status='completed',
+                payment_intent_id=payment_id,
+                completed_at=func.now()
+            )
+        )
+        await db.commit()
+        logger.info(f"Marked checkout session as completed for checkout: {checkout_id}")
         
         # Send purchase confirmation email
         email_service = get_email_service()
