@@ -8,7 +8,7 @@ All templates use inline CSS for maximum email client compatibility.
 Author: WebMagic Team
 Date: January 21, 2026
 """
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 class EmailTemplates:
