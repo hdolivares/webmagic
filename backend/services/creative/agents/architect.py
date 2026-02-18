@@ -288,11 +288,11 @@ SPACING: {design_brief.get('spacing', 'comfortable')}
             <span style="font-size: 20px;">🏢</span>
             <div>
                 <p style="margin: 0; font-weight: 600; font-size: 15px;">Is this your business?</p>
-                <p style="margin: 0; font-size: 13px; opacity: 0.9;">Claim this website for only <strong>$495</strong> · Then just $99/month for hosting, maintenance & changes</p>
+                <p style="margin: 0; font-size: 13px; opacity: 0.9;">Claim this website for only <strong>$497</strong> · Then just $97/month for hosting, maintenance & changes</p>
             </div>
         </div>
-        <button onclick="alert('Contact us to claim this website! $495 one-time + $99/month')" style="background: #fbbf24; color: #1e3a5f; border: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; text-transform: uppercase;">
-            Claim for $495
+        <button onclick="alert('Contact us to claim this website! $497 one-time + $97/month')" style="background: #fbbf24; color: #1e3a5f; border: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; text-transform: uppercase;">
+            Claim for $497
         </button>
     </div>
 </div>
