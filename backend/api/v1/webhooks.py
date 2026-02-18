@@ -229,15 +229,28 @@ async def handle_payment_succeeded(
         logger.info(f"Marked checkout session as completed for checkout: {checkout_id}")
         
         # Send purchase confirmation email
-        email_service = get_email_service()
-        await email_service.send_purchase_confirmation_email(
-            to_email=result['customer_email'],
-            customer_name=result['customer_name'],
-            site_title=result['site_title'],
-            site_url=result['site_url'],
-            purchase_amount=result['purchase_amount'],
-            transaction_id=payment_id
-        )
+        logger.info(f"📧 Preparing to send purchase confirmation email to {result['customer_email']}")
+        logger.info(f"📧 Email params: customer_name={result['customer_name']}, site_title={result['site_title']}, amount=${result['purchase_amount']}")
+        
+        try:
+            email_service = get_email_service()
+            logger.info(f"📧 Email service initialized")
+            
+            email_sent = await email_service.send_purchase_confirmation_email(
+                to_email=result['customer_email'],
+                customer_name=result['customer_name'],
+                site_title=result['site_title'],
+                site_url=result['site_url'],
+                purchase_amount=result['purchase_amount'],
+                transaction_id=payment_id
+            )
+            
+            if email_sent:
+                logger.info(f"✅ Purchase confirmation email sent successfully to {result['customer_email']}")
+            else:
+                logger.error(f"❌ Failed to send purchase confirmation email to {result['customer_email']}")
+        except Exception as e:
+            logger.error(f"❌ Error sending purchase confirmation email: {e}", exc_info=True)
         
         # AUTO-CREATE SUBSCRIPTION if this was a setup payment
         metadata = checkout.get('metadata', {})
