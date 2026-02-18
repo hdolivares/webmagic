@@ -673,6 +673,99 @@ class EmailService:
         return True
 
 
+    async def send_new_ticket_admin_notification(
+        self,
+        admin_email: str,
+        ticket_number: str,
+        customer_name: str,
+        customer_email: str,
+        category: str,
+        priority: str,
+        subject: str,
+        description: str,
+        admin_link: str,
+    ) -> bool:
+        """Notify admin when a new support ticket is created."""
+        try:
+            html_content = self.templates.render_new_ticket_admin_notification(
+                ticket_number=ticket_number,
+                customer_name=customer_name,
+                customer_email=customer_email,
+                category=category,
+                priority=priority,
+                subject=subject,
+                description=description,
+                admin_link=admin_link,
+            )
+            return await self._send_email(
+                to_email=admin_email,
+                subject=f"[{priority.upper()}] New Ticket {ticket_number}: {subject}",
+                html_content=html_content,
+            )
+        except Exception as e:
+            logger.error(f"Failed to send new-ticket admin notification: {e}")
+            return False
+
+    async def send_ticket_reply_to_customer(
+        self,
+        customer_email: str,
+        customer_name: str,
+        ticket_number: str,
+        subject: str,
+        reply_message: str,
+        portal_link: str,
+        is_ai_reply: bool = False,
+    ) -> bool:
+        """Email customer when staff or AI has replied to their ticket."""
+        try:
+            html_content = self.templates.render_ticket_reply_to_customer(
+                customer_name=customer_name,
+                ticket_number=ticket_number,
+                subject=subject,
+                reply_message=reply_message,
+                portal_link=portal_link,
+                is_ai_reply=is_ai_reply,
+            )
+            sender_label = "AI Assistant" if is_ai_reply else "Support Team"
+            return await self._send_email(
+                to_email=customer_email,
+                subject=f"Re: [{ticket_number}] {subject} — {sender_label} Reply",
+                html_content=html_content,
+            )
+        except Exception as e:
+            logger.error(f"Failed to send ticket reply email to customer {customer_email}: {e}")
+            return False
+
+    async def send_customer_reply_admin_notification(
+        self,
+        admin_email: str,
+        ticket_number: str,
+        customer_name: str,
+        customer_email: str,
+        subject: str,
+        reply_message: str,
+        admin_link: str,
+    ) -> bool:
+        """Notify admin when a customer replies to an existing ticket."""
+        try:
+            html_content = self.templates.render_customer_reply_admin_notification(
+                ticket_number=ticket_number,
+                customer_name=customer_name,
+                customer_email=customer_email,
+                subject=subject,
+                reply_message=reply_message,
+                admin_link=admin_link,
+            )
+            return await self._send_email(
+                to_email=admin_email,
+                subject=f"[Customer Reply] {ticket_number}: {subject}",
+                html_content=html_content,
+            )
+        except Exception as e:
+            logger.error(f"Failed to send customer-reply admin notification: {e}")
+            return False
+
+
 def get_email_service() -> EmailService:
     """Get email service instance."""
     return EmailService()

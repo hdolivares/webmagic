@@ -537,7 +537,10 @@ class SitePurchaseService:
         site_description: Optional[str] = None,
         business_id: Optional[UUID] = None,
         business_data: Optional[Dict[str, Any]] = None,
-        html_content: Optional[str] = None
+        html_content: Optional[str] = None,
+        css_content: Optional[str] = None,
+        js_content: Optional[str] = None,
+        generation_context: Optional[Dict[str, Any]] = None
     ) -> Site:
         """
         Create a new site record with proper CRM integration.
@@ -635,6 +638,9 @@ class SitePurchaseService:
                 site_id=site.id,
                 version_number=1,
                 html_content=html_content,
+                css_content=css_content,
+                js_content=js_content,
+                generation_context=generation_context,
                 change_description="Initial site generation",
                 change_type="initial",
                 created_by_type="admin",

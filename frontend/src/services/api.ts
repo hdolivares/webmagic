@@ -1207,6 +1207,50 @@ class ApiClient {
     const response = await this.client.delete(`/shortener/links/${linkId}`)
     return response.data
   }
+
+  // ============================================
+  // ADMIN SUPPORT TICKETS
+  // ============================================
+
+  async getAdminTickets(params?: {
+    status?: string
+    category?: string
+    priority?: string
+    site_slug?: string
+    search?: string
+    limit?: number
+    offset?: number
+  }): Promise<{ tickets: any[]; total: number; limit: number; offset: number }> {
+    const response = await this.client.get('/admin/tickets/', { params })
+    return response.data
+  }
+
+  async getAdminTicket(ticketId: string): Promise<any> {
+    const response = await this.client.get(`/admin/tickets/${ticketId}`)
+    return response.data
+  }
+
+  async replyToTicket(ticketId: string, message: string): Promise<any> {
+    const response = await this.client.post(`/admin/tickets/${ticketId}/messages`, { message })
+    return response.data
+  }
+
+  async updateAdminTicketStatus(ticketId: string, status: string): Promise<any> {
+    const response = await this.client.patch(`/admin/tickets/${ticketId}/status`, { status })
+    return response.data
+  }
+
+  async assignTicket(ticketId: string, adminUserId: string | null): Promise<any> {
+    const response = await this.client.patch(`/admin/tickets/${ticketId}/assign`, {
+      admin_user_id: adminUserId,
+    })
+    return response.data
+  }
+
+  async applyTicketSiteEdit(ticketId: string): Promise<any> {
+    const response = await this.client.post(`/admin/tickets/${ticketId}/apply-edit`)
+    return response.data
+  }
 }
 
 // Export singleton instance

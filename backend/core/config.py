@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     EMAIL_PROVIDER: str = "brevo"
     EMAIL_FROM: str = "hello@lavish.solutions"
     EMAIL_FROM_NAME: str = "WebMagic"
+    SUPPORT_ADMIN_EMAIL: str = "admin@lavish.solutions"
     
     # Stripe Webhooks
     STRIPE_WEBHOOK_SECRET: Optional[str] = None

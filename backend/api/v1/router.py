@@ -25,7 +25,8 @@ from api.v1 import (
     edit_requests,  # Phase 4: AI-powered edits
     preview,  # Phase 4: Preview system
     domains,  # Phase 5: Custom domains
-    tickets,  # Phase 6: Support tickets
+    tickets,  # Phase 6: Support tickets (customer-facing)
+    admin_tickets,  # Phase 6: Support tickets (admin)
     validation,  # Playwright website validation
     shortener,  # URL Shortener admin API
 )
@@ -43,7 +44,8 @@ api_router.include_router(subscriptions.router)  # Subscriptions (Phase 3)
 api_router.include_router(edit_requests.router)  # AI-powered edits (Phase 4)
 api_router.include_router(preview.router)  # Preview system (Phase 4)
 api_router.include_router(domains.router)  # Custom domains (Phase 5)
-api_router.include_router(tickets.router)  # Support tickets (Phase 6)
+api_router.include_router(tickets.router)  # Support tickets customer-facing (Phase 6)
+api_router.include_router(admin_tickets.router)  # Support tickets admin (Phase 6)
 api_router.include_router(webhooks.router)  # Webhooks (Phase 2)
 api_router.include_router(telnyx.router)  # SMS webhooks - Telnyx (Phase 7)
 api_router.include_router(messages.router)  # SMS Messages inbox (Phase 7)

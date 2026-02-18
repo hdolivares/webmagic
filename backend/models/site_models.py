@@ -363,6 +363,9 @@ class SiteVersion(BaseModel):
     js_content = Column(Text, nullable=True)
     assets = Column(JSONB, nullable=True)
     
+    # Structured context for the edit pipeline (CSS variables, sections, design brief summary)
+    generation_context = Column(JSONB, nullable=True)
+    
     # Metadata
     change_description = Column(Text, nullable=True)
     change_type = Column(String(50), nullable=True)  # initial, edit, major_update

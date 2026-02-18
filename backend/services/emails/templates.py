@@ -528,3 +528,128 @@ class EmailTemplates:
 </body>
 </html>
 """
+
+    # ── Support Ticket Email Templates ──────────────────────────────────────
+
+    def _base_layout(self, header_html: str, body_html: str, footer_html: str = "") -> str:
+        """Shared layout wrapper for ticket notification emails."""
+        footer_row = ""
+        if footer_html:
+            footer_row = (
+                f'<tr><td style="background:{self.bg_light};padding:24px 40px;border-top:1px solid #e5e7eb;'
+                f'text-align:center;font-size:13px;color:{self.text_light};">{footer_html}</td></tr>'
+            )
+        return (
+            '<!DOCTYPE html><html lang="en"><head>'
+            '<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">'
+            '</head>'
+            f'<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,\'Helvetica Neue\',Arial,sans-serif;background-color:{self.bg_light};">'
+            f'<table width="100%" cellpadding="0" cellspacing="0" style="background-color:{self.bg_light};padding:40px 20px;">'
+            '<tr><td align="center">'
+            '<table width="600" cellpadding="0" cellspacing="0" '
+            'style="background-color:#ffffff;border-radius:12px;box-shadow:0 4px 6px rgba(0,0,0,0.07);overflow:hidden;">'
+            f'<tr><td style="background:linear-gradient(135deg,{self.brand_color} 0%,{self.brand_color_dark} 100%);padding:32px 40px;text-align:center;">'
+            f'{header_html}</td></tr>'
+            f'<tr><td style="padding:36px 40px;">{body_html}</td></tr>'
+            f'{footer_row}'
+            '</table></td></tr></table></body></html>'
+        )
+
+    def _cta_button(self, url: str, label: str) -> str:
+        return (
+            '<table width="100%" cellpadding="0" cellspacing="0">'
+            '<tr><td align="center" style="padding:8px 0 24px;">'
+            f'<a href="{url}" style="display:inline-block;background-color:{self.brand_color};color:#ffffff;'
+            f'text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;">'
+            f'{label}</a></td></tr></table>'
+        )
+
+    def render_new_ticket_admin_notification(
+        self,
+        ticket_number: str,
+        customer_name: str,
+        customer_email: str,
+        category: str,
+        priority: str,
+        subject: str,
+        description: str,
+        admin_link: str,
+    ) -> str:
+        """Admin alert when a new support ticket is created."""
+        priority_colors = {
+            "urgent": "#ef4444",
+            "high": "#f97316",
+            "medium": "#eab308",
+            "low": "#6b7280",
+        }
+        priority_color = priority_colors.get(priority, "#6b7280")
+        category_label = category.replace("_", " ").title()
+
+        header = '<h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">&#128203; New Support Ticket</h1>'
+        body = (
+            f'<p style="margin:0 0 20px;font-size:16px;color:{self.text_color};">A new ticket has been submitted and needs attention.</p>'
+            f'<table width="100%" cellpadding="10" cellspacing="0" style="background:{self.bg_light};border-radius:8px;margin-bottom:24px;">'
+            f'<tr><td style="width:140px;font-size:13px;color:{self.text_light};font-weight:600;">Ticket #</td>'
+            f'<td style="font-size:15px;color:{self.text_color};font-weight:700;">{ticket_number}</td></tr>'
+            f'<tr><td style="font-size:13px;color:{self.text_light};font-weight:600;">Customer</td>'
+            f'<td style="font-size:15px;color:{self.text_color};">{customer_name} &lt;{customer_email}&gt;</td></tr>'
+            f'<tr><td style="font-size:13px;color:{self.text_light};font-weight:600;">Category</td>'
+            f'<td style="font-size:15px;color:{self.text_color};">{category_label}</td></tr>'
+            f'<tr><td style="font-size:13px;color:{self.text_light};font-weight:600;">Priority</td>'
+            f'<td><span style="background:{priority_color};color:#fff;padding:2px 10px;border-radius:12px;'
+            f'font-size:13px;font-weight:600;">{priority.upper()}</span></td></tr>'
+            f'<tr><td style="font-size:13px;color:{self.text_light};font-weight:600;">Subject</td>'
+            f'<td style="font-size:15px;color:{self.text_color};">{subject}</td></tr>'
+            f'</table>'
+            f'<p style="font-size:14px;color:{self.text_light};margin:0 0 6px;font-weight:600;">Customer Message:</p>'
+            f'<div style="background:#f3f4f6;border-left:4px solid {self.brand_color};padding:14px 16px;'
+            f'border-radius:4px;font-size:15px;color:{self.text_color};line-height:1.6;margin-bottom:24px;">{description}</div>'
+            + self._cta_button(admin_link, 'View &amp; Respond to Ticket &rarr;')
+        )
+        return self._base_layout(header, body)
+
+    def render_ticket_reply_to_customer(
+        self,
+        customer_name: str,
+        ticket_number: str,
+        subject: str,
+        reply_message: str,
+        portal_link: str,
+        is_ai_reply: bool = False,
+    ) -> str:
+        """Email customer when staff or AI has replied to their ticket."""
+        sender_label = "AI Assistant" if is_ai_reply else "Support Team"
+        header = '<h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">&#128172; Reply to Your Support Ticket</h1>'
+        body = (
+            f'<p style="margin:0 0 20px;font-size:16px;color:{self.text_color};">Hi <strong>{customer_name}</strong>,</p>'
+            f'<p style="margin:0 0 24px;font-size:16px;color:{self.text_color};">Our {sender_label} has replied to your support ticket <strong>{ticket_number}</strong>.</p>'
+            f'<p style="font-size:13px;color:{self.text_light};margin:0 0 6px;font-weight:600;">Subject: {subject}</p>'
+            f'<div style="background:#f0f4ff;border-left:4px solid {self.brand_color};padding:16px;border-radius:4px;'
+            f'font-size:15px;color:{self.text_color};line-height:1.7;margin-bottom:24px;">{reply_message}</div>'
+            f'<p style="font-size:14px;color:{self.text_light};margin:0 0 20px;">You can reply directly in your customer portal.</p>'
+            + self._cta_button(portal_link, 'View Your Ticket &rarr;')
+        )
+        footer = "&copy; 2026 WebMagic by Lavish Solutions. You are receiving this because you have an open support ticket."
+        return self._base_layout(header, body, footer)
+
+    def render_customer_reply_admin_notification(
+        self,
+        ticket_number: str,
+        customer_name: str,
+        customer_email: str,
+        subject: str,
+        reply_message: str,
+        admin_link: str,
+    ) -> str:
+        """Admin alert when a customer has replied to an existing ticket."""
+        header = '<h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">&#128276; Customer Replied to Ticket</h1>'
+        body = (
+            f'<p style="margin:0 0 24px;font-size:16px;color:{self.text_color};">'
+            f'<strong>{customer_name}</strong> (<a href="mailto:{customer_email}" style="color:{self.brand_color};">{customer_email}</a>) '
+            f'has replied to ticket <strong>{ticket_number}</strong>.</p>'
+            f'<p style="font-size:13px;color:{self.text_light};margin:0 0 6px;font-weight:600;">Subject: {subject}</p>'
+            f'<div style="background:#f3f4f6;border-left:4px solid {self.brand_color};padding:14px 16px;'
+            f'border-radius:4px;font-size:15px;color:{self.text_color};line-height:1.6;margin-bottom:24px;">{reply_message}</div>'
+            + self._cta_button(admin_link, 'Reply to Customer &rarr;')
+        )
+        return self._base_layout(header, body)
