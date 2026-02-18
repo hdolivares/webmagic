@@ -25,9 +25,11 @@ export function formatCurrency(value: number | undefined | null): string {
   }).format(value)
 }
 
+const CST_TIMEZONE = 'America/Chicago'
+
 /**
- * Format a date as a localized string
- * @example formatDate("2024-01-22T10:30:00Z") => "Jan 22, 2024"
+ * Format a date as a localized string in CST
+ * @example formatDate("2024-01-22T18:30:00Z") => "Jan 22, 2024"
  */
 export function formatDate(date: string | Date | undefined | null): string {
   if (!date) return 'N/A'
@@ -38,12 +40,13 @@ export function formatDate(date: string | Date | undefined | null): string {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
+    timeZone: CST_TIMEZONE,
   }).format(dateObj)
 }
 
 /**
- * Format a date with time
- * @example formatDateTime("2024-01-22T10:30:00Z") => "Jan 22, 2024 at 10:30 AM"
+ * Format a date with time in CST
+ * @example formatDateTime("2024-01-22T18:30:00Z") => "Jan 22, 2024 at 12:30 PM CST"
  */
 export function formatDateTime(date: string | Date | undefined | null): string {
   if (!date) return 'N/A'
@@ -57,6 +60,28 @@ export function formatDateTime(date: string | Date | undefined | null): string {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
+    timeZone: CST_TIMEZONE,
+    timeZoneName: 'short',
+  }).format(dateObj)
+}
+
+/**
+ * Format a date with time in CST (short form, no timezone suffix)
+ * @example formatDateTimeShort("2024-01-22T18:30:00Z") => "Jan 22, 2024, 12:30 PM"
+ */
+export function formatDateTimeShort(date: string | Date | undefined | null): string {
+  if (!date) return 'N/A'
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date
+  
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: CST_TIMEZONE,
   }).format(dateObj)
 }
 

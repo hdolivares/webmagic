@@ -69,10 +69,11 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleString('en-US', {
+  return new Intl.DateTimeFormat('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
+    hour: 'numeric', minute: '2-digit', hour12: true,
+    timeZone: 'America/Chicago',
+  }).format(new Date(dateStr))
 }
 
 // ── Message bubble ─────────────────────────────────────────────────────────────

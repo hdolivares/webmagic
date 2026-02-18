@@ -319,13 +319,14 @@ Return ONLY in this format (no explanation):
 [complete updated CSS]
 """
         try:
-            response = await self._client.messages.create(
+            # Use streaming to handle large responses (64k tokens) without timeout
+            async with self._client.messages.stream(
                 model=self.MODEL,
                 max_tokens=64000,
                 temperature=0.1,
                 messages=[{"role": "user", "content": prompt}],
-            )
-            raw = response.content[0].text
+            ) as stream:
+                raw = await stream.get_final_text()
 
             updated_html = html_content
             updated_css = css_content

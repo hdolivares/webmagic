@@ -223,6 +223,8 @@ JSON format:
 
 async def _run_site_edit_pipeline(db, ticket) -> None:
     """Run the 3-stage site edit processor for site_edit tickets."""
+    from models.support_ticket import TicketMessage
+
     try:
         from services.support.site_edit_processor import SiteEditProcessor
 
@@ -232,24 +234,49 @@ async def _run_site_edit_pipeline(db, ticket) -> None:
         current_notes = ticket.ai_processing_notes or {}
         current_notes.update(edit_result)
         ticket.ai_processing_notes = current_notes
+
+        preview_id = edit_result.get("preview_version_id")
+        edit_summary = edit_result.get("edit_summary", "your requested changes")
+
+        # Post visible AI status message to the ticket thread
+        if preview_id:
+            status_text = (
+                f"✅ We've analysed your request and prepared a preview of the changes.\n\n"
+                f"**Edit summary:** {edit_summary}\n\n"
+                "Our team is reviewing the proposed edits and will apply them shortly. "
+                "You'll receive another notification once the changes are live on your website."
+            )
+        else:
+            status_text = (
+                "We've received your site edit request and our team is reviewing it. "
+                "We'll get back to you shortly with an update."
+            )
+
+        status_message = TicketMessage(
+            ticket_id=ticket.id,
+            message=status_text,
+            message_type="ai",
+            ai_generated=True,
+            ai_model="claude-sonnet-4-5",
+        )
+        db.add(status_message)
+        ticket.last_staff_message_at = datetime.now(timezone.utc)
+        if not ticket.first_response_at:
+            ticket.first_response_at = datetime.now(timezone.utc)
+
         await db.commit()
 
         logger.info(
             f"[TicketTask][SiteEdit] Completed for {ticket.ticket_number}: "
-            f"summary={edit_result.get('edit_summary')}, "
-            f"preview_id={edit_result.get('preview_version_id')}"
+            f"summary={edit_summary}, preview_id={preview_id}"
         )
 
-        # Notify customer that the edit is being reviewed
-        if ticket.customer_user and edit_result.get("preview_version_id"):
+        # Email customer
+        if ticket.customer_user:
             await _email_customer_reply(
                 customer=ticket.customer_user,
                 ticket=ticket,
-                reply_message=(
-                    "We've analysed your site edit request and prepared a preview of the changes. "
-                    "Our team is reviewing the proposed edits and will apply them shortly. "
-                    "You'll receive another notification once the changes are live."
-                ),
+                reply_message=status_text,
                 is_ai_reply=True,
             )
 
