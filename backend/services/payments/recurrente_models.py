@@ -3,7 +3,7 @@ Pydantic models for Recurrente API requests and responses.
 These models ensure type safety and proper data structure for Recurrente integration.
 """
 from typing import Optional, Dict, Any, List, Literal
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from decimal import Decimal
 
 
@@ -49,17 +49,15 @@ class CheckoutItem(BaseModel):
         description="Number of free trial periods (0 = no trial)"
     )
     
-    @field_validator("charge_type")
-    @classmethod
-    def validate_subscription_fields(cls, v, info):
+    @model_validator(mode='after')
+    def validate_subscription_fields(self):
         """Ensure subscription items have required billing fields."""
-        if v == "recurring":
-            data = info.data
-            if not data.get("billing_interval"):
+        if self.charge_type == "recurring":
+            if not self.billing_interval:
                 raise ValueError("billing_interval is required for recurring charges")
-            if not data.get("billing_interval_count"):
+            if not self.billing_interval_count:
                 raise ValueError("billing_interval_count is required for recurring charges")
-        return v
+        return self
 
 
 class CheckoutRequest(BaseModel):
