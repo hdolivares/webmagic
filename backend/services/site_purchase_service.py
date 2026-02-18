@@ -154,8 +154,9 @@ class SitePurchaseService:
             "checkout_url": checkout.checkout_url,
             "site_slug": slug,
             "site_title": site.site_title,
-            "setup_amount": float(site.purchase_amount),
-            "monthly_amount": float(site.monthly_amount),
+            "amount": float(site.purchase_amount),  # Required by response schema
+            "setup_amount": float(site.purchase_amount),  # Additional info
+            "monthly_amount": float(site.monthly_amount),  # Additional info
             "currency": "USD"
         }
     
