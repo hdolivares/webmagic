@@ -47,7 +47,7 @@ class Site(BaseModel):
     
     # Purchase info
     purchased_at = Column(DateTime(timezone=True), nullable=True)
-    purchase_amount = Column(Numeric(10, 2), default=495.00)
+    purchase_amount = Column(Numeric(10, 2), default=497.00)
     purchase_transaction_id = Column(String(255), nullable=True)
     
     # Subscription info
@@ -55,7 +55,7 @@ class Site(BaseModel):
     subscription_id = Column(String(255), nullable=True)
     subscription_started_at = Column(DateTime(timezone=True), nullable=True)
     subscription_ends_at = Column(DateTime(timezone=True), nullable=True)
-    monthly_amount = Column(Numeric(10, 2), default=99.00)  # Updated to $99
+    monthly_amount = Column(Numeric(10, 2), default=97.00)  # Updated to $97
     next_billing_date = Column(Date, nullable=True)
     grace_period_ends = Column(DateTime(timezone=True), nullable=True)
     

@@ -384,11 +384,11 @@ document.addEventListener('DOMContentLoaded', () => {
             <span style="font-size: 20px;">🏢</span>
             <div>
                 <p style="margin: 0; font-weight: 600; font-size: 15px;">Is this your business?</p>
-                <p style="margin: 0; font-size: 13px; opacity: 0.9;">Claim this website for only <strong>$495</strong> · Then just $99/month for hosting, maintenance & changes</p>
+                <p style="margin: 0; font-size: 13px; opacity: 0.9;">Claim this website for only <strong>$497</strong> · Then just $97/month for hosting, maintenance & changes</p>
             </div>
         </div>
         <button id="webmagic-claim-btn" style="background: #fbbf24; color: #1e3a5f; border: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px;">
-            Claim for $495
+            Claim for $497
         </button>
     </div>
 </div>
@@ -449,11 +449,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
                             <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
                                 <span style="color: #475569;">One-time setup</span>
-                                <span style="font-weight: 700; color: #1e3a5f;">$495</span>
+                                <span style="font-weight: 700; color: #1e3a5f;">$497</span>
                             </div>
                             <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 1px solid #e2e8f0;">
                                 <span style="color: #475569;">Monthly (hosting + changes)</span>
-                                <span style="font-weight: 700; color: #1e3a5f;">$99/mo</span>
+                                <span style="font-weight: 700; color: #1e3a5f;">$97/mo</span>
                             </div>
                         </div>
                         
