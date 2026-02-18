@@ -47,7 +47,7 @@ class Site(BaseModel):
     
     # Purchase info
     purchased_at = Column(DateTime(timezone=True), nullable=True)
-    purchase_amount = Column(Numeric(10, 2), default=497.00)
+    purchase_amount = Column(Numeric(10, 2), default=400.00)
     purchase_transaction_id = Column(String(255), nullable=True)
     
     # Subscription info
