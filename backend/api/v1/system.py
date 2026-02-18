@@ -145,3 +145,54 @@ async def get_settings_by_category(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get settings: {str(e)}")
+
+
+# ── Notification Settings ─────────────────────────────────────────────────────
+
+from core.config import get_settings as get_app_settings
+from pydantic import EmailStr
+
+class NotificationSettingsResponse(BaseModel):
+    support_admin_email: str
+    config_default: str  # The .env fallback value, shown as placeholder
+
+
+class NotificationSettingsUpdate(BaseModel):
+    support_admin_email: str
+
+
+@router.get("/notifications", response_model=NotificationSettingsResponse)
+async def get_notification_settings(
+    current_user: AdminUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get notification settings (support email address, etc.)."""
+    app_settings = get_app_settings()
+    db_value = await SystemSettingsService.get_setting(db, "support_admin_email")
+    return NotificationSettingsResponse(
+        support_admin_email=db_value or app_settings.SUPPORT_ADMIN_EMAIL,
+        config_default=app_settings.SUPPORT_ADMIN_EMAIL,
+    )
+
+
+@router.put("/notifications", response_model=NotificationSettingsResponse)
+async def update_notification_settings(
+    request: NotificationSettingsUpdate,
+    current_user: AdminUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Save notification settings to the database."""
+    app_settings = get_app_settings()
+    await SystemSettingsService.set_setting(
+        db=db,
+        key="support_admin_email",
+        value=request.support_admin_email,
+        value_type="string",
+        category="notifications",
+        label="Support Notification Email",
+        description="Admin email address that receives new ticket and customer reply alerts.",
+    )
+    return NotificationSettingsResponse(
+        support_admin_email=request.support_admin_email,
+        config_default=app_settings.SUPPORT_ADMIN_EMAIL,
+    )

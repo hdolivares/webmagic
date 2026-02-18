@@ -624,6 +624,16 @@ class ApiClient {
     return response.data
   }
 
+  async getNotificationSettings(): Promise<{ support_admin_email: string; config_default: string }> {
+    const response = await this.client.get('/system/notifications')
+    return response.data
+  }
+
+  async updateNotificationSettings(support_admin_email: string): Promise<{ support_admin_email: string; config_default: string }> {
+    const response = await this.client.put('/system/notifications', { support_admin_email })
+    return response.data
+  }
+
   // ============================================
   // EDIT REQUESTS METHODS (Phase 4)
   // ============================================
