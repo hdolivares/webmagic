@@ -252,9 +252,11 @@ class SitePurchaseService:
             return {
                 "site_id": str(site.id),
                 "site_slug": site.slug,
+                "site_title": site.site_title or site.slug,
                 "site_url": self.site_service.generate_site_url(site.slug),
                 "customer_id": str(customer_user.id),
                 "customer_email": customer_user.email,
+                "customer_name": customer_user.full_name or "Customer",
                 "purchase_amount": float(site.purchase_amount),
                 "transaction_id": transaction_id,
                 "purchased_at": site.purchased_at.isoformat() if site.purchased_at else None,
