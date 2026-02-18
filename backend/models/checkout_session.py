@@ -60,7 +60,7 @@ class CheckoutSession(Base):
     
     # Site Information
     site_slug = Column(String(255), nullable=False, index=True)
-    site_id = Column(Integer, nullable=True)  # FK to sites table
+    site_id = Column(PGUUID(as_uuid=True), nullable=True)  # FK to sites table (UUID type)
     
     # Recurrente Details
     checkout_id = Column(String(255), nullable=True, index=True)
