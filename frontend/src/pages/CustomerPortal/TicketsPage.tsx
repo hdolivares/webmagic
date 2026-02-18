@@ -4,19 +4,39 @@
  * Main page for viewing and managing support tickets
  */
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../../services/api'
 import { CreateTicketForm, TicketList } from '../../components/Tickets'
 import './TicketsPage.css'
 
 const TicketsPage: React.FC = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [tickets, setTickets] = useState<any[]>([])
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [preselectedSiteSlug, setPreselectedSiteSlug] = useState<string | undefined>()
+  const [preselectedSiteId, setPreselectedSiteId] = useState<string | undefined>()
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [categoryFilter, setCategoryFilter] = useState<string>('')
+
+  // If navigated here with ?create=true&site=<slug>, auto-open the form
+  useEffect(() => {
+    const create = searchParams.get('create')
+    const siteSlug = searchParams.get('site')
+    if (create === 'true') {
+      setShowCreateForm(true)
+      if (siteSlug) {
+        setPreselectedSiteSlug(siteSlug)
+        // Resolve slug → site_id from the customer's sites
+        api.getMySites().then((res) => {
+          const match = res.sites?.find((s: any) => s.slug === siteSlug)
+          if (match) setPreselectedSiteId(match.site_id)
+        }).catch(() => {})
+      }
+    }
+  }, [])
 
   useEffect(() => {
     loadData()
@@ -105,10 +125,20 @@ const TicketsPage: React.FC = () => {
 
       {showCreateForm && (
         <div className="create-ticket-section">
-          <h2>Create New Ticket</h2>
+          <h2>
+            Create New Ticket
+            {preselectedSiteSlug && (
+              <span className="create-ticket-site-label"> — {preselectedSiteSlug.replace(/-/g, ' ')}</span>
+            )}
+          </h2>
           <CreateTicketForm
+            siteId={preselectedSiteId}
             onSuccess={handleTicketCreated}
-            onCancel={() => setShowCreateForm(false)}
+            onCancel={() => {
+              setShowCreateForm(false)
+              setPreselectedSiteSlug(undefined)
+              setPreselectedSiteId(undefined)
+            }}
           />
         </div>
       )}

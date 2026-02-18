@@ -246,7 +246,7 @@ const MySitesPage: React.FC = () => {
                 className="btn btn-sm btn-primary"
                 onClick={(e) => {
                   e.stopPropagation()
-                  navigate(`/customer/tickets/new?site=${site.site_id}`)
+                  navigate(`/customer/tickets?create=true&site=${site.slug}`)
                 }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
