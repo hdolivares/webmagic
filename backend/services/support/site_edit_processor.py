@@ -82,11 +82,11 @@ class SiteEditProcessor:
 
         # Stage 2: Decompose customer request.
         # element_context is set when the customer used the visual element picker.
-        element_context = ticket.element_context  # Optional[Dict] from JSONB column
-        has_pin = bool(element_context and element_context.get("css_selector"))
+        element_context = ticket.element_context  # Optional[List[Dict] | Dict] from JSONB column
+        pin_count = len(element_context) if isinstance(element_context, list) else (1 if element_context else 0)
         logger.info(
             f"[SiteEditProcessor] Stage 2: decomposing request: {ticket.description[:100]!r} "
-            f"{'(with pinned element: ' + element_context.get('css_selector','?') + ')' if has_pin else '(no element pin)'}"
+            f"({pin_count} pinned element(s))"
         )
         decomposition = await self._stage2_decompose_request(
             edit_request=ticket.description,
@@ -297,26 +297,36 @@ class SiteEditProcessor:
         sections_summary = "\n".join(f"  - {s}" for s in sections) or "  (none found)"
 
         # ── Element context block ─────────────────────────────────────────────
-        if element_context:
-            styles = element_context.get("computed_styles", {})
-            styles_formatted = "\n".join(
-                f"    {k}: {v}" for k, v in styles.items() if v
-            )
-            element_block = f"""
-=== PINNED ELEMENT (customer clicked this exact element) ===
-CSS selector : {element_context.get('css_selector', 'unknown')}
-Tag          : <{element_context.get('tag', '?')}>
-DOM path     : {element_context.get('dom_path', '')}
-Text content : "{element_context.get('text_content', '')[:200]}"
-HTML snippet :
-  {element_context.get('html', '')[:400]}
-Current computed styles:
-{styles_formatted}
+        # element_context may be a list (multi-pin) or a single dict (legacy).
+        pin_list: List[Dict[str, Any]] = []
+        if isinstance(element_context, list):
+            pin_list = element_context
+        elif isinstance(element_context, dict):
+            pin_list = [element_context]
 
-IMPORTANT: The customer has PINNED this specific element.
-Your edit operations MUST target this element using the CSS selector above.
-Do NOT guess which element they mean — they told you exactly.
-"""
+        if pin_list:
+            pin_sections = []
+            for idx, pin in enumerate(pin_list, start=1):
+                styles = pin.get("computed_styles", {})
+                styles_formatted = "\n".join(
+                    f"      {k}: {v}" for k, v in styles.items() if v
+                )
+                pin_sections.append(
+                    f"  Pin {idx}:\n"
+                    f"    CSS selector : {pin.get('css_selector', 'unknown')}\n"
+                    f"    Tag          : <{pin.get('tag', '?')}>\n"
+                    f"    DOM path     : {pin.get('dom_path', '')}\n"
+                    f"    Text content : \"{pin.get('text_content', '')[:150]}\"\n"
+                    f"    HTML snippet : {pin.get('html', '')[:300]}\n"
+                    f"    Computed styles:\n{styles_formatted}"
+                )
+            element_block = (
+                "\n=== PINNED ELEMENTS (customer clicked these exact elements) ===\n"
+                + "\n\n".join(pin_sections)
+                + "\n\nIMPORTANT: The customer PINNED these specific elements.\n"
+                + "Each edit operation MUST target one of these selectors.\n"
+                + "Do NOT guess which element they mean — they told you exactly.\n"
+            )
         else:
             element_block = ""
 
@@ -341,7 +351,7 @@ The customer is NOT technical — they describe things visually, not by code.
 
 === YOUR TASK ===
 1. Read the customer request carefully. Interpret their visual/plain-language description.
-{'2. The customer PINNED AN ELEMENT — use its CSS selector and current styles to target the change precisely.' if element_context else '2. Match their description to the actual CSS rules and variables shown above.'}
+{'2. The customer PINNED ' + str(len(pin_list)) + ' ELEMENT(S) — use their CSS selectors and current styles to target each change precisely.' if pin_list else '2. Match their description to the actual CSS rules and variables shown above.'}
    - "the top section" / "the banner" / "the header" usually means .hero or nav
    - "background color" means a `background` or `background-color` CSS property
    - "the black one" means find which variable is dark/black (e.g. #0a0a0f, #000)

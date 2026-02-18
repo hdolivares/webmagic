@@ -1,62 +1,98 @@
 /**
- * useElementPicker — state management hook for the visual element picker.
+ * useElementPicker — multi-element selection hook.
  *
- * Encapsulates all picker lifecycle:
- *   • open / close the overlay
- *   • listen for postMessage from the iframe
- *   • store / clear the captured ElementContext
- *
- * The component layer stays declarative; all side-effects live here.
+ * Manages the full lifecycle of the visual element picker:
+ *   • Stores up to MAX_SELECTIONS pinned elements
+ *   • Injects the inspector script once the iframe loads
+ *   • Syncs the current pin count back into the iframe so its badge stays current
+ *   • Exposes stable siteUrl so the overlay always renders with the correct URL
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ElementContext, InspectorMessage } from './types'
 
+/** Hard cap on elements per ticket. Keeps LLM scope tight. */
+export const MAX_SELECTIONS = 3
+
 export interface UseElementPickerReturn {
-  /** Whether the iframe overlay is currently visible */
+  /** Whether the iframe panel is currently visible */
   isOpen: boolean
 
-  /** The most recently captured element, or null if none yet */
-  selectedElement: ElementContext | null
+  /** The URL currently loaded in the iframe (null when picker is closed) */
+  siteUrl: string | null
 
-  /** Open the picker overlay for a given site URL */
-  openPicker: (siteUrl: string) => void
+  /** Ordered list of pinned elements (max MAX_SELECTIONS) */
+  selectedElements: ElementContext[]
 
-  /** Close the overlay without keeping a selection */
+  /** True when selectedElements.length < MAX_SELECTIONS */
+  canAddMore: boolean
+
+  /** Open the picker panel for a given site URL */
+  openPicker: (url: string) => void
+
+  /** Close the panel (does not clear selections) */
   closePicker: () => void
 
-  /** Clear the captured element (user removed the annotation) */
-  clearSelection: () => void
+  /** Remove a pinned element by index */
+  removeElement: (index: number) => void
 
-  /** Ref to attach to the <iframe> so we can inject the script on load */
+  /** Clear all pinned elements */
+  clearAll: () => void
+
+  /** Ref to attach to the <iframe> element */
   iframeRef: React.RefObject<HTMLIFrameElement>
 }
 
 export function useElementPicker(): UseElementPickerReturn {
   const [isOpen, setIsOpen] = useState(false)
   const [siteUrl, setSiteUrl] = useState<string | null>(null)
-  const [selectedElement, setSelectedElement] = useState<ElementContext | null>(null)
+  const [selectedElements, setSelectedElements] = useState<ElementContext[]>([])
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
-  // ── Inject the inspector script once the iframe finishes loading ──────────
+  const canAddMore = selectedElements.length < MAX_SELECTIONS
+
+  // ── Inject inspector script when iframe loads ─────────────────────────────
   const handleIframeLoad = useCallback(() => {
     const iframe = iframeRef.current
     if (!iframe) return
 
     try {
       const doc = iframe.contentDocument
-      if (!doc) return
+      if (!doc || !doc.body) return
 
-      // Dynamically import the script builder to keep the main bundle lean
       import('./inspectorScript').then(({ buildInspectorScript }) => {
         const script = doc.createElement('script')
         script.textContent = buildInspectorScript()
         doc.body.appendChild(script)
       })
     } catch (err) {
-      // Same-origin access denied (shouldn't happen for our own sites)
       console.error('[ElementPicker] Could not inject inspector script:', err)
     }
   }, [])
+
+  // ── Sync pin count into the iframe whenever it changes ───────────────────
+  const syncCountToIframe = useCallback(
+    (elements: ElementContext[]) => {
+      const iframe = iframeRef.current
+      if (!iframe || !isOpen) return
+      try {
+        iframe.contentWindow?.postMessage(
+          {
+            type: 'WEBMAGIC_PIN_COUNT',
+            count: elements.length,
+            max: MAX_SELECTIONS,
+          },
+          '*',
+        )
+      } catch {
+        // Cross-origin guard; shouldn't happen for same-origin sites
+      }
+    },
+    [isOpen],
+  )
+
+  useEffect(() => {
+    if (isOpen) syncCountToIframe(selectedElements)
+  }, [selectedElements, isOpen, syncCountToIframe])
 
   // ── Listen for postMessage from the iframe ────────────────────────────────
   useEffect(() => {
@@ -64,11 +100,18 @@ export function useElementPicker(): UseElementPickerReturn {
 
     function handleMessage(event: MessageEvent) {
       const data = event.data as InspectorMessage | { type: string }
-      if (!data || !data.type) return
+      if (!data?.type) return
 
       if (data.type === 'WEBMAGIC_ELEMENT_SELECTED') {
-        setSelectedElement((data as InspectorMessage).payload)
-        setIsOpen(false)
+        const incoming = (data as InspectorMessage).payload
+        setSelectedElements(prev => {
+          if (prev.length >= MAX_SELECTIONS) return prev
+          const updated = [...prev, incoming]
+          // Sync count immediately (state closure)
+          setTimeout(() => syncCountToIframe(updated), 0)
+          return updated
+        })
+        // Do NOT close — user continues selecting
       }
 
       if (data.type === 'WEBMAGIC_INSPECTOR_CANCELLED') {
@@ -78,9 +121,9 @@ export function useElementPicker(): UseElementPickerReturn {
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [isOpen])
+  }, [isOpen, syncCountToIframe])
 
-  // ── Attach iframe load listener whenever the overlay opens ────────────────
+  // ── Attach iframe load listener whenever picker opens ─────────────────────
   useEffect(() => {
     const iframe = iframeRef.current
     if (!iframe || !isOpen) return
@@ -89,7 +132,7 @@ export function useElementPicker(): UseElementPickerReturn {
     return () => iframe.removeEventListener('load', handleIframeLoad)
   }, [isOpen, handleIframeLoad])
 
-  // ── Public API ─────────────────────────────────────────────────────────────
+  // ── Public API ────────────────────────────────────────────────────────────
   const openPicker = useCallback((url: string) => {
     setSiteUrl(url)
     setIsOpen(true)
@@ -99,16 +142,23 @@ export function useElementPicker(): UseElementPickerReturn {
     setIsOpen(false)
   }, [])
 
-  const clearSelection = useCallback(() => {
-    setSelectedElement(null)
+  const removeElement = useCallback((index: number) => {
+    setSelectedElements(prev => prev.filter((_, i) => i !== index))
+  }, [])
+
+  const clearAll = useCallback(() => {
+    setSelectedElements([])
   }, [])
 
   return {
     isOpen,
-    selectedElement,
+    siteUrl,
+    selectedElements,
+    canAddMore,
     openPicker,
     closePicker,
-    clearSelection,
+    removeElement,
+    clearAll,
     iframeRef,
   }
 }
