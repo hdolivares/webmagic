@@ -130,6 +130,9 @@ async def recurrente_webhook(
         elif event_type == 'payment_intent.failed':
             await handle_payment_failed(db, event_data)
         
+        elif event_type == 'subscription.create':
+            await handle_subscription_created(db, event_data)
+        
         elif event_type == 'subscription.activated' or event_type == 'setup_intent.succeeded':
             await handle_subscription_activated(db, event_data)
         
@@ -258,45 +261,23 @@ async def handle_payment_succeeded(
             print(f"[WEBHOOK] ❌ Error sending purchase confirmation email: {e}")
             logger.error(f"❌ Error sending purchase confirmation email: {e}", exc_info=True)
         
-        # AUTO-CREATE SUBSCRIPTION if this was a setup payment
+        # NOTE: Subscription creation is handled automatically by Recurrente
+        # When we create a checkout with charge_type="recurring", Recurrente:
+        # 1. Processes the payment (sends payment_intent.succeeded)
+        # 2. Automatically creates a subscription (sends subscription.create)
+        # We handle the subscription.create webhook separately to save the real subscription ID
+        
         metadata = checkout.get('metadata', {})
         auto_subscribe = metadata.get('auto_subscribe') == 'true'
-        payment_method_id = payment_method.get('id') if payment_method else None
         
-        if auto_subscribe and payment_method_id:
+        if auto_subscribe:
             logger.info(
-                f"Auto-subscribe flag detected. Creating subscription for site {result['site_id']} "
-                f"using payment method {payment_method_id}"
+                f"Auto-subscribe flag detected. Recurrente will send subscription.create webhook "
+                f"with the subscription ID for site {result['site_id']}"
             )
-            
-            try:
-                from services.subscription_service import get_subscription_service
-                
-                subscription_service = get_subscription_service()
-                subscription_result = await subscription_service.create_subscription_with_tokenized_payment(
-                    db=db,
-                    site_id=result['site_id'],
-                    payment_method_id=payment_method_id,
-                    customer_email=result['customer_email'],
-                    customer_name=result.get('customer_name')
-                )
-                
-                logger.info(
-                    f"✅ Subscription auto-created! Site: {result['site_slug']}, "
-                    f"Subscription ID: {subscription_result.get('subscription_id')}, "
-                    f"Monthly: ${subscription_result['monthly_amount']}, Starts: {subscription_result['start_date']}"
-                )
-                
-                result['subscription_created'] = True
-                result['subscription_id'] = subscription_result.get('subscription_id')
-                result['monthly_amount'] = subscription_result['monthly_amount']
-                result['billing_starts'] = subscription_result['start_date']
-                
-            except Exception as sub_error:
-                logger.error(f"⚠️ Failed to auto-create subscription: {sub_error}", exc_info=True)
-                result['subscription_created'] = False
+            result['subscription_pending'] = True
         else:
-            result['subscription_created'] = False
+            result['subscription_pending'] = False
         
         logger.info(
             f"Purchase completed and confirmation sent: Site {result['site_slug']} "
@@ -333,6 +314,104 @@ async def handle_payment_failed(
     
     # No site status changes for preview sites
     # Customer can retry purchase
+
+
+async def handle_subscription_created(
+    db: AsyncSession,
+    event_data: Dict[str, Any]
+) -> None:
+    """
+    Handle subscription.create webhook from Recurrente.
+    
+    This webhook is sent when Recurrente creates a subscription after a successful
+    payment with charge_type="recurring".
+    
+    Event structure:
+    {
+        "event_type": "subscription.create",
+        "id": "su_xxx",  ← This is the REAL subscription ID
+        "customer_email": "user@example.com",
+        "product": {
+            "metadata": {
+                "site_id": "...",
+                "site_slug": "..."
+            }
+        }
+    }
+    
+    Actions:
+    1. Extract subscription ID from webhook
+    2. Find site from metadata
+    3. Update site with real subscription ID
+    """
+    try:
+        subscription_id = event_data.get('id')
+        customer_email = event_data.get('customer_email')
+        product = event_data.get('product', {})
+        metadata = product.get('metadata', {})
+        
+        print(f"[WEBHOOK] 🔔 Subscription created: {subscription_id}")
+        print(f"[WEBHOOK] 🔔 Customer: {customer_email}")
+        print(f"[WEBHOOK] 🔔 Metadata: {metadata}")
+        
+        logger.info(f"🔔 Subscription created: {subscription_id} for {customer_email}")
+        logger.info(f"🔔 Metadata: {metadata}")
+        
+        # Extract site info from metadata
+        site_slug = metadata.get('site_slug')
+        site_id = metadata.get('site_id')
+        
+        if not site_slug and not site_id:
+            logger.error("❌ No site_slug or site_id in subscription metadata")
+            return
+        
+        # Find and update site
+        from models.site_models import Site
+        from sqlalchemy import select, update
+        from uuid import UUID
+        from datetime import datetime, timedelta
+        
+        # Query site
+        if site_id:
+            result = await db.execute(
+                select(Site).where(Site.id == UUID(site_id))
+            )
+        else:
+            result = await db.execute(
+                select(Site).where(Site.slug == site_slug)
+            )
+        
+        site = result.scalar_one_or_none()
+        
+        if not site:
+            logger.error(f"❌ Site not found for subscription: site_id={site_id}, site_slug={site_slug}")
+            return
+        
+        # Update site with REAL subscription ID
+        next_billing = (datetime.utcnow() + timedelta(days=30)).date()
+        
+        await db.execute(
+            update(Site)
+            .where(Site.id == site.id)
+            .values(
+                subscription_id=subscription_id,
+                subscription_status='active',
+                subscription_started_at=datetime.utcnow(),
+                next_billing_date=next_billing
+            )
+        )
+        await db.commit()
+        
+        print(f"[WEBHOOK] ✅ Site updated with subscription ID: {subscription_id}")
+        logger.info(
+            f"✅ Site {site.slug} updated with subscription: {subscription_id}, "
+            f"next billing: {next_billing}"
+        )
+        
+    except Exception as e:
+        print(f"[WEBHOOK] ❌ Error processing subscription.create: {e}")
+        logger.error(f"❌ Error processing subscription.create: {e}", exc_info=True)
+        raise
 
 
 async def handle_subscription_activated(
