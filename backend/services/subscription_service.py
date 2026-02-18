@@ -100,26 +100,39 @@ class SubscriptionService:
         )
         
         try:
-            # Create subscription using Recurrente's subscription API
-            # Note: We'll use create_subscription_checkout but with a future start date
-            subscription = await self.recurrente.create_subscription_checkout(
-                name=f"Monthly Hosting - {site.site_title or site.slug}",
-                amount_cents=int(site.monthly_amount * 100),  # $97.00 -> 9700 cents
-                billing_interval="month",
-                billing_interval_count=1,
-                currency="USD",
-                description="Monthly hosting, maintenance, and unlimited AI-powered updates",
-                periods_before_cancellation=None,  # Never auto-cancel
-                free_trial_interval_count=0,  # No trial
-                metadata={
+            # Create subscription using Recurrente's tokenized payment API
+            # This uses the saved payment_method_id to create an active subscription immediately
+            subscription_data = {
+                "payment_method_id": payment_method_id,
+                "items": [{
+                    "name": f"Monthly Hosting - {site.site_title or site.slug}",
+                    "amount_in_cents": int(site.monthly_amount * 100),
+                    "currency": "USD",
+                    "quantity": 1,
+                    "description": "Monthly hosting, maintenance, and unlimited AI-powered updates",
+                    "charge_type": "recurring",
+                    "billing_interval": "month",
+                    "billing_interval_count": 1
+                }],
+                "metadata": {
                     "site_id": site_id,
                     "site_slug": site.slug,
                     "subscription_type": "monthly_hosting",
                     "customer_email": customer_email,
-                    "payment_method_id": payment_method_id,
                     "start_date": sub_start_date.isoformat()
                 }
+            }
+            
+            # Use tokenized checkout API to create immediate subscription
+            subscription = await self.recurrente._request(
+                "POST",
+                "/checkouts",
+                data=subscription_data
             )
+            
+            # Extract subscription ID from response
+            subscription_id = subscription.get('id')
+            subscription_status = subscription.get('status', 'active')
             
             # Update site with subscription info
             await db.execute(
@@ -127,6 +140,7 @@ class SubscriptionService:
                 .where(Site.id == UUID(site_id))
                 .values(
                     subscription_status="active",
+                    subscription_id=subscription_id,
                     subscription_started_at=datetime.utcnow(),
                     next_billing_date=sub_start_date.date()
                 )
@@ -134,17 +148,17 @@ class SubscriptionService:
             await db.commit()
             
             logger.info(
-                f"Subscription created successfully for site {site.slug}: "
-                f"checkout_id={subscription.id}"
+                f"✅ Subscription created successfully for site {site.slug}: "
+                f"subscription_id={subscription_id}, status={subscription_status}, "
+                f"first_charge_date={sub_start_date.date()}"
             )
             
             return {
-                "subscription_checkout_id": subscription.id,
-                "subscription_checkout_url": subscription.checkout_url,
+                "subscription_id": subscription_id,
                 "monthly_amount": float(site.monthly_amount),
                 "start_date": sub_start_date.isoformat(),
                 "billing_interval": "monthly",
-                "status": "pending_activation",
+                "status": subscription_status,
                 "site_id": site_id,
                 "site_slug": site.slug
             }
