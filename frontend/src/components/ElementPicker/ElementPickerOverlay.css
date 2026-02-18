@@ -1,0 +1,103 @@
+/**
+ * ElementPickerOverlay Styles
+ *
+ * Full-screen modal that wraps the customer's site in an iframe.
+ * Uses semantic CSS variables consistent with the project design system.
+ */
+
+/* ── Overlay backdrop ─────────────────────────────────────────────────────── */
+
+.picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-index-modal, 9000);
+  display: flex;
+  flex-direction: column;
+  background: var(--background-default, #f8fafc);
+  animation: picker-overlay-in 180ms ease;
+}
+
+@keyframes picker-overlay-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────────────────── */
+
+.picker-overlay__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: var(--color-primary-900, #1e1b4b);
+  color: #e0e7ff;
+  flex-shrink: 0;
+  gap: var(--spacing-md, 16px);
+}
+
+.picker-overlay__toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.picker-overlay__icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.picker-overlay__instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.picker-overlay__instructions strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e7ff;
+}
+
+.picker-overlay__instructions span {
+  font-size: 12px;
+  color: #a5b4fc;
+}
+
+/* ── Close / cancel button ────────────────────────────────────────────────── */
+
+.picker-overlay__close {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--border-radius-md, 8px);
+  color: #e0e7ff;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+  flex-shrink: 0;
+}
+
+.picker-overlay__close:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* ── Iframe ───────────────────────────────────────────────────────────────── */
+
+.picker-overlay__iframe {
+  flex: 1;
+  border: none;
+  width: 100%;
+  cursor: crosshair;
+}

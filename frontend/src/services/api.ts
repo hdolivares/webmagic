@@ -759,6 +759,7 @@ class ApiClient {
     description: string
     category: string
     site_id?: string
+    element_context?: Record<string, any> | null
   }): Promise<any> {
     const response = await this.client.post('/tickets/', data)
     return response.data

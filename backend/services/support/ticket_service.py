@@ -79,7 +79,8 @@ class TicketService:
         subject: str,
         description: str,
         category: str,
-        site_id: Optional[UUID] = None
+        site_id: Optional[UUID] = None,
+        element_context: Optional[Dict[str, Any]] = None,
     ) -> SupportTicket:
         """
         Create a new support ticket.
@@ -145,7 +146,8 @@ class TicketService:
             category=category,
             priority="medium",  # Default, will be updated by AI
             status="new",
-            last_customer_message_at=datetime.now(timezone.utc)
+            last_customer_message_at=datetime.now(timezone.utc),
+            element_context=element_context,
         )
         
         db.add(ticket)

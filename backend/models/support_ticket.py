@@ -76,6 +76,12 @@ class SupportTicket(BaseModel):
     customer_satisfaction_rating = Column(String(20), nullable=True)  # satisfied, neutral, unsatisfied
     internal_notes = Column(Text, nullable=True)
     tags = Column(JSONB, nullable=True)  # Flexible tagging system
+
+    # Visual element annotation — populated when customer uses the element picker.
+    # Stores: css_selector, tag, classes, text_content, html, dom_path,
+    #         computed_styles, bounding_box, captured_at.
+    # Consumed by SiteEditProcessor Stage 2 to target changes with precision.
+    element_context = Column(JSONB, nullable=True)
     
     # Relationships
     customer_user = relationship("CustomerUser", back_populates="support_tickets")

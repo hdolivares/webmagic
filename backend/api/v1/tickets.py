@@ -150,14 +150,18 @@ async def create_ticket(
                 detail="You don't own this site"
             )
         
-        # Create the ticket
+        # Create the ticket — include element_context when provided
+        element_context = (
+            request.element_context.model_dump() if request.element_context else None
+        )
         ticket = await TicketService.create_ticket(
             db=db,
             customer_user_id=current_customer.id,
             subject=request.subject,
             description=request.description,
             category=request.category,
-            site_id=site_id
+            site_id=site_id,
+            element_context=element_context,
         )
         
         logger.info(
