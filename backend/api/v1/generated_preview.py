@@ -13,6 +13,8 @@ import logging
 
 from core.database import get_db
 from models.site import GeneratedSite
+from models.site_models import Site
+import re
 
 router = APIRouter(tags=["generated-preview"])
 logger = logging.getLogger(__name__)
@@ -72,14 +74,36 @@ async def view_generated_site(
             else:
                 return HTMLResponse(content=_build_error_page(subdomain, "Site content not available"))
         
+        # Check if this site has been purchased (check sites table by business_id)
+        is_owned = False
+        if site.business_id:
+            purchase_query = select(Site).where(
+                Site.business_id == site.business_id,
+                Site.status == 'owned'
+            )
+            purchase_result = await db.execute(purchase_query)
+            purchased_site = purchase_result.scalar_one_or_none()
+            is_owned = purchased_site is not None
+            
+            if is_owned:
+                logger.info(f"Site {subdomain} is owned (purchase record: {purchased_site.slug})")
+        
+        # Get HTML content
+        html_content = site.html_content
+        
+        # Remove claim bar if site is owned
+        if is_owned:
+            html_content = _remove_claim_bar(html_content)
+            logger.info(f"Removed claim bar from owned site: {subdomain}")
+        
         # Build complete HTML with inline CSS and JS
         complete_html = _build_complete_html(
-            html=site.html_content,
+            html=html_content,
             css=site.css_content,
             js=site.js_content
         )
         
-        logger.info(f"Serving generated site: {subdomain} (status: {site.status})")
+        logger.info(f"Serving generated site: {subdomain} (status: {site.status}, owned: {is_owned})")
         return HTMLResponse(content=complete_html)
     
     except HTTPException:
@@ -95,6 +119,44 @@ async def view_generated_site(
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
+
+def _remove_claim_bar(html: str) -> str:
+    """
+    Remove the WebMagic claim bar from HTML.
+    
+    Removes the claim bar that was injected during site generation.
+    This is called when a site has been purchased (status='owned').
+    
+    Args:
+        html: HTML content with claim bar
+    
+    Returns:
+        HTML content without claim bar
+    """
+    # Remove the claim bar div and all its content
+    # Pattern matches the entire claim bar div with id="webmagic-claim-bar"
+    patterns = [
+        # Official claim bar (with comment)
+        r'<!-- WebMagic Claim Bar(?:\s*-\s*Official)?\s*-->.*?<div\s+id=["\']webmagic-claim-bar["\'][^>]*>.*?</div>',
+        # Just the div without comment
+        r'<div\s+id=["\']webmagic-claim-bar["\'][^>]*>.*?</div>',
+        # Alternative patterns the LLM might have generated
+        r'<div[^>]*id=["\']?claim[^>]*>.*?</div>',
+    ]
+    
+    for pattern in patterns:
+        html = re.sub(pattern, '', html, flags=re.DOTALL | re.IGNORECASE)
+    
+    # Remove claim bar JavaScript handler if present
+    claim_js_pattern = r'//\s*WebMagic Claim Bar Handler.*?}\)\(\);'
+    html = re.sub(claim_js_pattern, '', html, flags=re.DOTALL)
+    
+    # Remove claim bar CSS if present
+    claim_css_pattern = r'/\*\s*WebMagic Claim Bar Styles\s*\*/.*?(?=(/\*|</style>|$))'
+    html = re.sub(claim_css_pattern, '', html, flags=re.DOTALL)
+    
+    return html
+
 
 def _build_complete_html(
     html: str,
