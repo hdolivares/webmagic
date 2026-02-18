@@ -471,20 +471,26 @@ Respond in JSON format:
         Returns:
             SupportTicket instance with messages
         """
-        stmt = select(SupportTicket).where(SupportTicket.id == ticket_id).options(
-            selectinload(SupportTicket.messages)
+        stmt = (
+            select(SupportTicket)
+            .where(SupportTicket.id == ticket_id)
+            .options(
+                selectinload(SupportTicket.messages),
+                selectinload(SupportTicket.customer_user),
+                selectinload(SupportTicket.site),
+            )
         )
-        
+
         # Add customer filter if provided
         if customer_user_id:
             stmt = stmt.where(SupportTicket.customer_user_id == customer_user_id)
-        
+
         result = await db.execute(stmt)
         ticket = result.scalar_one_or_none()
-        
+
         if not ticket:
             raise NotFoundError("Ticket not found")
-        
+
         return ticket
     
     @staticmethod
