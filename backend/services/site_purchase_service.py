@@ -125,34 +125,18 @@ class SitePurchaseService:
             except Exception as e:
                 logger.warning(f"Failed to create Recurrente user, continuing without: {e}")
         
-        # Create checkout with BOTH one-time setup fee AND recurring subscription
-        # This creates a single checkout with 2 items:
-        # 1. One-time setup payment
-        # 2. Recurring monthly subscription
-        from services.payments.recurrente_models import CheckoutItem
-        
-        setup_item = CheckoutItem(
-            name=f"Website Setup - {site.site_title or slug}",
-            amount_in_cents=int(site.purchase_amount * 100),  # $497.00 -> 49700 cents
-            currency="USD",
-            quantity=1,
-            description=f"One-time website setup fee",
-            charge_type="one_time"
-        )
-        
-        subscription_item = CheckoutItem(
-            name=f"Monthly Hosting - {site.site_title or slug}",
-            amount_in_cents=int(site.monthly_amount * 100),  # $97.00 -> 9700 cents
-            currency="USD",
-            quantity=1,
-            description=f"Monthly hosting and maintenance",
-            charge_type="recurring",
+        # IMPORTANT: Recurrente does NOT support mixed checkouts (one_time + recurring items).
+        # A mixed checkout creates successfully but returns 422 at payment fulfillment time.
+        # Solution: Use subscription-only checkout. The monthly_amount is the recurring charge.
+        # The purchase_amount (setup fee) is tracked in our DB and metadata but not separately
+        # charged via Recurrente — the subscription covers ongoing hosting.
+        checkout = await self.recurrente.create_subscription_checkout(
+            name=f"Website Hosting - {site.site_title or slug}",
+            amount_cents=int(site.monthly_amount * 100),  # $97.00 -> 9700 cents
             billing_interval="month",
-            billing_interval_count=1
-        )
-        
-        checkout = await self.recurrente.create_checkout(
-            items=[setup_item, subscription_item],
+            billing_interval_count=1,
+            currency="USD",
+            description=f"Monthly website hosting for {site.site_title or slug}. Setup fee: ${site.purchase_amount}",
             success_url=success_url or f"{settings.FRONTEND_URL}/purchase-success?slug={slug}",
             cancel_url=cancel_url or f"{settings.FRONTEND_URL}/site-preview/{slug}",
             user_id=recurrente_user.id if recurrente_user else None,
@@ -160,7 +144,7 @@ class SitePurchaseService:
                 "site_id": str(site.id),
                 "site_slug": slug,
                 "site_url": site_url,
-                "purchase_type": "website_setup_subscription",
+                "purchase_type": "website_subscription",
                 "customer_email": customer_email,
                 "customer_name": customer_name,
                 "setup_amount_usd": str(site.purchase_amount),
@@ -170,8 +154,8 @@ class SitePurchaseService:
         )
         
         logger.info(
-            f"Created checkout for site {slug}: {checkout.id} "
-            f"(Setup: ${site.purchase_amount} + Subscription: ${site.monthly_amount}/mo)"
+            f"Created subscription checkout for site {slug}: {checkout.id} "
+            f"(Monthly: ${site.monthly_amount}/mo, Setup tracked: ${site.purchase_amount})"
         )
         
         # Create checkout session for abandoned cart tracking
