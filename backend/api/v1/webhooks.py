@@ -113,26 +113,24 @@ async def recurrente_webhook(
     logger.info(f"📦 Full webhook payload: {json.dumps(webhook_data, indent=2)}")
     logger.info(f"📦 Webhook keys: {list(webhook_data.keys())}")
     
-    # Try multiple possible field names for event type
-    event_type = (
-        webhook_data.get('event') or 
-        webhook_data.get('type') or
-        webhook_data.get('event_type') or
-        webhook_data.get('eventType')
-    )
-    event_data = webhook_data.get('data', webhook_data)  # Some webhooks put data at root
+    # Recurrente uses 'event_type' field (not 'event')
+    event_type = webhook_data.get('event_type')
     
-    logger.info(f"Received Recurrente webhook: {event_type}")
+    # Event data is at root level in Recurrente webhooks
+    event_data = webhook_data
+    
+    logger.info(f"✅ Received Recurrente webhook: {event_type}")
     
     try:
         # Route to appropriate handler
-        if event_type == 'payment.succeeded':
+        # Recurrente event types: payment_intent.succeeded, payment_intent.failed, etc.
+        if event_type == 'payment_intent.succeeded':
             await handle_payment_succeeded(db, event_data)
         
-        elif event_type == 'payment.failed':
+        elif event_type == 'payment_intent.failed':
             await handle_payment_failed(db, event_data)
         
-        elif event_type == 'subscription.activated':
+        elif event_type == 'subscription.activated' or event_type == 'setup_intent.succeeded':
             await handle_subscription_activated(db, event_data)
         
         elif event_type == 'subscription.cancelled':
