@@ -384,11 +384,11 @@ document.addEventListener('DOMContentLoaded', () => {
             <span style="font-size: 20px;">🏢</span>
             <div>
                 <p style="margin: 0; font-weight: 600; font-size: 15px;">Is this your business?</p>
-                <p style="margin: 0; font-size: 13px; opacity: 0.9;">Claim this website for only <strong>$497</strong> · Then just $97/month for hosting, maintenance & changes</p>
+                <p style="margin: 0; font-size: 13px; opacity: 0.9;">Claim this website — <strong>$400 one-time setup</strong> · then just <strong>$97/month</strong> for hosting, maintenance & updates</p>
             </div>
         </div>
         <button id="webmagic-claim-btn" style="background: #fbbf24; color: #1e3a5f; border: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px;">
-            Claim for $497
+            Get Started – $400
         </button>
     </div>
 </div>
@@ -448,18 +448,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         
                         <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
                             <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                                <span style="color: #475569;">One-time setup</span>
-                                <span style="font-weight: 700; color: #1e3a5f;">$497</span>
+                                <span style="color: #475569;">Premium Design & Launch (one-time)</span>
+                                <span style="font-weight: 700; color: #1e3a5f;">$400</span>
                             </div>
                             <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 1px solid #e2e8f0;">
-                                <span style="color: #475569;">Monthly (hosting + changes)</span>
+                                <span style="color: #475569;">Hosting, Maintenance & Updates</span>
                                 <span style="font-weight: 700; color: #1e3a5f;">$97/mo</span>
                             </div>
                         </div>
                         
                         <p style="font-size: 13px; color: #64748b; margin: 0 0 20px;">
-                            ✓ Professional website ready to go<br>
-                            ✓ Unlimited text & image changes<br>
+                            ✓ Premium custom website design & development<br>
+                            ✓ Monthly content & image updates<br>
                             ✓ Fast, secure hosting included<br>
                             ✓ SEO optimization included<br>
                             ✓ Cancel anytime

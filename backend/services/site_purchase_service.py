@@ -96,7 +96,7 @@ class SitePurchaseService:
                     slug=slug,
                     business_id=gen_site.business_id,
                     status="preview",
-                    purchase_amount=497.00,
+                    purchase_amount=400.00,   # $400 setup + $97/mo = $497 first month
                     monthly_amount=97.00,
                     site_title=f"Professional Website - {slug}",
                     site_description="AI-generated professional website"
@@ -148,7 +148,7 @@ class SitePurchaseService:
         # customer.  Step 1's success_url points DIRECTLY at Step 2's Recurrente
         # checkout URL — no intermediate server round-trip needed.
         #
-        #   Customer → [Step 1: $497 setup] ──(pays)──► [Step 2: $97/mo subscription]
+        #   Customer → [Step 1: $400 setup] ──(pays)──► [Step 2: $97/mo subscription]
         #                       (Recurrente URL)                  (Recurrente URL, pre-created)
         #                                                                    │
         #                                                          (pays) ──►  success page
@@ -161,12 +161,15 @@ class SitePurchaseService:
 
         # Step 2 — subscription checkout (created FIRST so we have its URL)
         subscription_checkout = await self.recurrente.create_subscription_checkout(
-            name=f"Monthly Hosting – {site_title}",
+            name=f"Website Care Plan – {site_title}",
             amount_cents=int(site.monthly_amount * 100),
             billing_interval="month",
             billing_interval_count=1,
             currency="USD",
-            description=f"${site.monthly_amount}/month website hosting for {site_title}",
+            description=(
+                f"Monthly hosting, security, maintenance & content updates for {site_title}. "
+                f"Keeps your site fast, secure, and continuously improved. Priority support included."
+            ),
             success_url=success_url or f"{settings.FRONTEND_URL}/purchase-success?slug={slug}",
             cancel_url=site_cancel_url,
             user_id=recurrente_user_id,
@@ -176,12 +179,14 @@ class SitePurchaseService:
 
         # Step 1 — setup fee checkout; its success_url IS the subscription checkout URL
         setup_checkout = await self.recurrente.create_one_time_checkout(
-            name=f"Website Setup – {site_title}",
+            name=f"Premium Website Design & Launch – {site_title}",
             amount_cents=int(site.purchase_amount * 100),
             currency="USD",
             description=(
-                f"One-time setup fee for {site_title}. "
-                f"Monthly hosting (${site.monthly_amount}/mo) begins after this step."
+                f"Custom-designed, professionally built website for {site_title} — "
+                f"delivered and live the same day. Includes premium design, full development, "
+                f"and on-brand copywriting. Monthly care plan (${site.monthly_amount}/mo) "
+                f"activates in the next step."
             ),
             success_url=subscription_checkout.checkout_url,  # Direct Recurrente → Recurrente
             cancel_url=site_cancel_url,
