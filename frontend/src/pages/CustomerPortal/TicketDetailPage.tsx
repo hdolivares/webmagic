@@ -30,7 +30,8 @@ const TicketDetailPage: React.FC = () => {
       const data = await api.getTicket(ticketId!)
       setTicket(data)
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load ticket')
+      const detail = err.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : 'Failed to load ticket')
     } finally {
       setLoading(false)
     }
