@@ -104,16 +104,19 @@ class CustomerAuthService:
         if existing:
             raise ValidationError("Email already registered")
         
-        # Create user
+        # Create user (site_id is not a CustomerUser field, use primary_site_id instead if needed)
         user = CustomerUser(
             email=email.lower(),
             password_hash=CustomerAuthService.hash_password(password),
             full_name=full_name,
             phone=phone,
-            site_id=site_id,
             email_verification_token=CustomerAuthService.generate_token(),
             is_active=True
         )
+        
+        # Set primary site if provided
+        if site_id:
+            user.primary_site_id = site_id
         
         db.add(user)
         await db.commit()
