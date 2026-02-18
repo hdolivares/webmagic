@@ -164,27 +164,42 @@ async def handle_payment_succeeded(
     event_data: Dict[str, Any]
 ) -> None:
     """
-    Handle successful payment webhook.
+    Handle successful payment webhook from Recurrente.
+    
+    Event structure:
+    {
+        "id": "pa_xxx",
+        "event_type": "payment_intent.succeeded",
+        "checkout": {
+            "id": "ch_xxx",
+            "status": "paid",
+            "metadata": {...}
+        }
+    }
     
     Actions:
     1. Extract site info from metadata
     2. Create/update customer user
     3. Update site status to 'owned'
     4. Send welcome email
-    5. Log transaction
+    5. Auto-create subscription
     """
     try:
-        checkout_id = event_data.get('checkout_id')
+        # Extract from Recurrente's structure
         payment_id = event_data.get('id')
+        checkout = event_data.get('checkout', {})
+        checkout_id = checkout.get('id')
+        payment_method = checkout.get('payment', {}).get('payment_method', {})
         
-        logger.info(f"Processing payment success: {payment_id}")
+        logger.info(f"💰 Processing payment success: payment_id={payment_id}, checkout_id={checkout_id}")
+        logger.info(f"💰 Checkout data: status={checkout.get('status')}, metadata keys={list(checkout.get('metadata', {}).keys())}")
         
-        # Process purchase
+        # Process purchase - pass the checkout data (which contains metadata)
         purchase_service = get_site_purchase_service()
         result = await purchase_service.process_purchase_payment(
             db=db,
             checkout_id=checkout_id,
-            payment_data=event_data
+            payment_data=checkout  # Pass checkout object which has metadata
         )
         
         # Mark checkout session as completed
