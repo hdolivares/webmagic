@@ -25,7 +25,12 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:8000",
-    ] if settings.DEBUG else ["https://admin.webmagic.com"],
+        "http://localhost:5173",  # Vite dev server
+    ] if settings.DEBUG else [
+        "https://admin.webmagic.com",
+        "https://web.lavish.solutions",
+        "https://sites.lavish.solutions",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
