@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 from models.support_ticket import SupportTicket, TicketMessage, TicketTemplate
 from models.site_models import CustomerUser, Site, SiteVersion, CustomerSiteOwnership
 from core.exceptions import NotFoundError, ValidationError, ForbiddenError
+from core.html_utils import strip_claim_bar, strip_claim_bar_css
 from anthropic import AsyncAnthropic
 from core.config import get_settings
 from services.emails.email_service import get_email_service
@@ -770,15 +771,17 @@ Respond in JSON format:
 
         await db.flush()
 
-        # Deploy to disk
+        # Deploy to disk — strip claim bar since this is an owned/purchased site
         try:
             site_slug = ticket.site.slug if ticket.site else None
             if site_slug:
                 file_service = FileSiteService()
+                deploy_html = strip_claim_bar(preview_version.html_content or "")
+                deploy_css = strip_claim_bar_css(preview_version.css_content or "")
                 file_service.deploy_site(
                     slug=site_slug,
-                    html_content=preview_version.html_content,
-                    css_content=preview_version.css_content,
+                    html_content=deploy_html,
+                    css_content=deploy_css,
                     js_content=preview_version.js_content,
                     overwrite=True,
                 )

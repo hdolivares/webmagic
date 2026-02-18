@@ -172,6 +172,9 @@ class SiteService:
                 css_dir.mkdir(parents=True, exist_ok=True)
                 css_path = css_dir / "main.css"
                 css_path.write_text(css_content, encoding='utf-8')
+                # Also write at root as styles.css so any HTML with
+                # <link href="styles.css"> works regardless of generation path
+                (site_path / "styles.css").write_text(css_content, encoding='utf-8')
                 logger.info(f"Deployed CSS for {slug}")
             
             # Deploy JavaScript if provided
