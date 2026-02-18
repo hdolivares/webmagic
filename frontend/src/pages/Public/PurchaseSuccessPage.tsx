@@ -10,25 +10,9 @@ import { CheckCircle, Mail, Lock, ExternalLink, ArrowRight } from 'lucide-react'
 export default function PurchaseSuccessPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const [countdown, setCountdown] = useState(10)
   const slug = searchParams.get('slug')
 
-  // Countdown redirect
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer)
-          // Redirect to customer login after countdown
-          window.location.href = 'https://web.lavish.solutions/customer/login'
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [])
+  // No auto-redirect - user controls when to proceed
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-success-500 to-success-700 flex items-center justify-center px-4">
@@ -126,8 +110,8 @@ export default function PurchaseSuccessPage() {
               <ArrowRight className="w-5 h-5" />
             </button>
 
-            <p className="text-sm text-text-tertiary">
-              Redirecting automatically in <span className="font-semibold">{countdown}</span> seconds...
+            <p className="text-sm text-text-secondary italic">
+              Click the button above when you're ready to access your dashboard
             </p>
           </div>
 
