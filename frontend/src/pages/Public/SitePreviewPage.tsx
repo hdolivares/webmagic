@@ -71,8 +71,21 @@ export default function SitePreviewPage() {
 
   // Handle purchase/claim
   const handleClaim = async () => {
-    if (!email || !name) {
-      alert('Please enter your name and email')
+    // Validate required fields
+    if (!name || name.trim().length === 0) {
+      alert('Please enter your full name')
+      return
+    }
+    
+    if (!email || email.trim().length === 0) {
+      alert('Please enter your email address')
+      return
+    }
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      alert('Please enter a valid email address')
       return
     }
 
@@ -287,7 +300,7 @@ export default function SitePreviewPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-text-secondary mb-2">
-                      Full Name
+                      Full Name <span className="text-error-600">*</span>
                     </label>
                     <input
                       type="text"
@@ -296,12 +309,13 @@ export default function SitePreviewPage() {
                       placeholder="John Doe"
                       className="w-full px-4 py-3 border border-border-default rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       disabled={purchaseLoading}
+                      required
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-text-secondary mb-2">
-                      Email Address
+                      Email Address <span className="text-error-600">*</span>
                     </label>
                     <input
                       type="email"
@@ -310,6 +324,7 @@ export default function SitePreviewPage() {
                       placeholder="john@example.com"
                       className="w-full px-4 py-3 border border-border-default rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       disabled={purchaseLoading}
+                      required
                     />
                   </div>
 

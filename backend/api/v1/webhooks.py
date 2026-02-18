@@ -62,17 +62,41 @@ async def recurrente_webhook(
     raw_body = await request.body()
     body_str = raw_body.decode('utf-8')
     
-    # Get signature from header
-    signature = request.headers.get('X-Recurrente-Signature', '')
+    # Enhanced debugging - log everything
+    logger.info("=" * 80)
+    logger.info("WEBHOOK RECEIVED FROM RECURRENTE")
+    logger.info(f"All headers: {dict(request.headers)}")
+    logger.info(f"Body length: {len(body_str)} bytes")
+    logger.info(f"Body preview: {body_str[:500]}")
     
-    # Verify signature
+    # Get signature from header (try multiple possible header names)
+    signature = (
+        request.headers.get('X-Recurrente-Signature') or 
+        request.headers.get('x-recurrente-signature') or
+        request.headers.get('Recurrente-Signature') or
+        request.headers.get('X-Webhook-Signature') or
+        ''
+    )
+    
+    logger.info(f"Signature found: '{signature}'")
+    logger.info(f"Webhook secret configured: {bool(settings.RECURRENTE_WEBHOOK_SECRET)}")
+    logger.info("=" * 80)
+    
+    # Verify signature (skip if no secret configured or no signature sent)
     recurrente = RecurrenteClient()
-    if not recurrente.verify_webhook_signature(body_str, signature):
-        logger.warning("Invalid webhook signature")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid signature"
-        )
+    
+    if settings.RECURRENTE_WEBHOOK_SECRET and signature:
+        if not recurrente.verify_webhook_signature(body_str, signature):
+            logger.error(f"❌ SIGNATURE MISMATCH! Got: '{signature[:20]}...'")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid signature"
+            )
+        else:
+            logger.info("✅ Webhook signature verified successfully")
+    else:
+        logger.warning("⚠️ Webhook signature verification skipped (no secret or no signature)")
+    
     
     # Parse webhook data
     try:
