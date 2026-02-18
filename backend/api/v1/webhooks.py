@@ -232,10 +232,17 @@ async def handle_payment_succeeded(
         logger.info(f"Marked checkout session as completed for checkout: {checkout_id}")
         
         # Send purchase confirmation email
+        temp_password = result.get('temp_password')
+        is_new_customer = result.get('is_new_customer', False)
+        
         print(f"[WEBHOOK] 📧 Preparing to send purchase confirmation email to {result['customer_email']}")
-        print(f"[WEBHOOK] 📧 Email params: customer_name={result['customer_name']}, site_title={result['site_title']}, amount=${result['purchase_amount']}")
+        print(f"[WEBHOOK] 📧 Email params: customer_name={result['customer_name']}, site_title={result['site_title']}, amount=${result['purchase_amount']}, new_customer={is_new_customer}")
         logger.info(f"📧 Preparing to send purchase confirmation email to {result['customer_email']}")
-        logger.info(f"📧 Email params: customer_name={result['customer_name']}, site_title={result['site_title']}, amount=${result['purchase_amount']}")
+        logger.info(f"📧 Email params: customer_name={result['customer_name']}, site_title={result['site_title']}, amount=${result['purchase_amount']}, new_customer={is_new_customer}")
+        
+        if is_new_customer and temp_password:
+            print(f"[WEBHOOK] 🔑 New customer - including credentials in email")
+            logger.info(f"🔑 New customer - including credentials in email")
         
         try:
             email_service = get_email_service()
@@ -248,7 +255,8 @@ async def handle_payment_succeeded(
                 site_title=result['site_title'],
                 site_url=result['site_url'],
                 purchase_amount=result['purchase_amount'],
-                transaction_id=payment_id
+                transaction_id=payment_id,
+                site_password=temp_password  # Pass password if available
             )
             
             if email_sent:

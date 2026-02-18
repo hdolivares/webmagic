@@ -125,13 +125,34 @@ class SitePurchaseService:
             except Exception as e:
                 logger.warning(f"Failed to create Recurrente user, continuing without: {e}")
         
-        # Create ONE-TIME PAYMENT checkout only
-        # Subscription will be created automatically after successful payment via webhook
-        checkout = await self.recurrente.create_one_time_checkout(
+        # Create checkout with BOTH one-time setup fee AND recurring subscription
+        # This creates a single checkout with 2 items:
+        # 1. One-time setup payment
+        # 2. Recurring monthly subscription
+        from services.payments.recurrente_models import CheckoutItem
+        
+        setup_item = CheckoutItem(
             name=f"Website Setup - {site.site_title or slug}",
-            amount_cents=int(site.purchase_amount * 100),  # $497.00 -> 49700 cents
+            amount_in_cents=int(site.purchase_amount * 100),  # $497.00 -> 49700 cents
             currency="USD",
-            description=f"Professional website setup and first month hosting for {site.site_title or slug}",
+            quantity=1,
+            description=f"One-time website setup fee",
+            charge_type="one_time"
+        )
+        
+        subscription_item = CheckoutItem(
+            name=f"Monthly Hosting - {site.site_title or slug}",
+            amount_in_cents=int(site.monthly_amount * 100),  # $97.00 -> 9700 cents
+            currency="USD",
+            quantity=1,
+            description=f"Monthly hosting and maintenance",
+            charge_type="recurring",
+            billing_interval="month",
+            billing_interval_count=1
+        )
+        
+        checkout = await self.recurrente.create_checkout(
+            items=[setup_item, subscription_item],
             success_url=success_url or f"{settings.FRONTEND_URL}/purchase-success?slug={slug}",
             cancel_url=cancel_url or f"{settings.FRONTEND_URL}/site-preview/{slug}",
             user_id=recurrente_user.id if recurrente_user else None,
@@ -139,19 +160,18 @@ class SitePurchaseService:
                 "site_id": str(site.id),
                 "site_slug": slug,
                 "site_url": site_url,
-                "purchase_type": "website_setup",
+                "purchase_type": "website_setup_subscription",
                 "customer_email": customer_email,
                 "customer_name": customer_name,
                 "setup_amount_usd": str(site.purchase_amount),
                 "monthly_amount_usd": str(site.monthly_amount),
-                "auto_subscribe": "true",  # Flag to trigger subscription creation in webhook
-                "monthly_billing_starts": (datetime.utcnow() + timedelta(days=30)).date().isoformat()
+                "subscription_type": "monthly_hosting"
             }
         )
         
         logger.info(
-            f"Created ONE-TIME checkout for site {slug}: {checkout.id} "
-            f"(Amount: ${site.purchase_amount}. Subscription ${site.monthly_amount}/mo will auto-create on payment success)"
+            f"Created checkout for site {slug}: {checkout.id} "
+            f"(Setup: ${site.purchase_amount} + Subscription: ${site.monthly_amount}/mo)"
         )
         
         # Create checkout session for abandoned cart tracking
@@ -243,6 +263,7 @@ class SitePurchaseService:
         # Create or get customer user
         customer_user = await CustomerAuthService.get_customer_by_email(db, customer_email)
         is_new_customer = customer_user is None
+        temp_password = None
         
         if not customer_user:
             # Generate a temporary password (customer will set their own via email)
@@ -261,7 +282,7 @@ class SitePurchaseService:
             # Set this as their primary site
             customer_user.primary_site_id = site.id
             
-            logger.info(f"Created new customer user: {customer_email}")
+            logger.info(f"Created new customer user: {customer_email} with temp password")
         else:
             logger.info(f"Existing customer purchasing additional site: {customer_email}")
         
@@ -338,7 +359,7 @@ class SitePurchaseService:
         
         logger.info(f"Site purchased: {site.slug} by {customer_email}")
         
-        return {
+        result = {
             "site_id": str(site.id),
             "site_slug": site.slug,
             "site_title": site.site_title or site.slug,
@@ -348,8 +369,16 @@ class SitePurchaseService:
             "customer_name": customer_user.full_name or "Customer",
             "purchase_amount": float(site.purchase_amount),
             "transaction_id": transaction_id,
-            "purchased_at": site.purchased_at.isoformat()
+            "purchased_at": site.purchased_at.isoformat(),
+            "is_new_customer": is_new_customer
         }
+        
+        # Include password only for new customers
+        if is_new_customer and temp_password:
+            result["temp_password"] = temp_password
+            logger.info(f"Including temp password in result for new customer {customer_email}")
+        
+        return result
     
     async def activate_subscription(
         self,
