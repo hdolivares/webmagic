@@ -223,6 +223,12 @@ export function buildInspectorScript(): string {
 
   document.addEventListener('mousemove', onMouseMove, { passive: true });
   document.addEventListener('click', onClick, true);
+
+  // Signal to the parent that the inspector is fully initialised.
+  // SiteEditPanel waits for this before announcing the active slot, so the
+  // WEBMAGIC_ACTIVE_SLOT message is guaranteed to arrive after the listener
+  // is registered — not before it.
+  window.parent.postMessage({ type: 'WEBMAGIC_INSPECTOR_READY' }, '*');
 })();
 `
 }

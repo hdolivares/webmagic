@@ -42,6 +42,12 @@ export interface UseElementPickerReturn {
 export function useElementPicker(opts?: {
   /** Called when the user presses Esc inside the iframe */
   onCancel?: () => void
+  /**
+   * Called once the inspector script has fully initialised inside the iframe.
+   * Use this to send the initial WEBMAGIC_ACTIVE_SLOT message, since any
+   * message sent before this point would be lost (the listener wasn't ready).
+   */
+  onReady?: () => void
 }): UseElementPickerReturn {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [lastCaptured, setLastCaptured] = useState<ElementContext | null>(null)
@@ -80,6 +86,10 @@ export function useElementPicker(opts?: {
 
       if (data.type === 'WEBMAGIC_ELEMENT_SELECTED') {
         setLastCaptured((data as InspectorMessage).payload)
+      }
+
+      if (data.type === 'WEBMAGIC_INSPECTOR_READY') {
+        opts?.onReady?.()
       }
 
       if (data.type === 'WEBMAGIC_INSPECTOR_CANCELLED') {
