@@ -455,10 +455,6 @@ async def preview_sms_message(
         custom_template=custom_template,
     )
     
-    # Commit the short link if one was created
-    if url_to_use != site_url:
-        await db.commit()
-    
     # Calculate metrics
     char_count = len(sms_body)
     segment_count = SMSGenerator.estimate_segments(sms_body)
