@@ -11,6 +11,9 @@ import { useState, useEffect } from 'react'
 import { api } from '@/services/api'
 import './DomainManagement.css'
 
+// Must match SERVER_IP in backend/services/platform/nginx_provisioning.py
+const SERVER_IP = '104.251.211.183'
+
 interface DomainManagementProps {
   siteId: string
   /** Called after the domain is successfully disconnected so the parent can switch views. */
@@ -120,13 +123,18 @@ export function DomainManagement({ siteId, onDisconnected }: DomainManagementPro
     try {
       const response = await api.verifyDomain(siteId, domainStatus.domain)
       if (response.verified) {
-        setVerifyResult({ success: true, message: 'Domain verified successfully! SSL provisioning will begin shortly.' })
-        // Refresh status to show verified state
+        setVerifyResult({
+          success: true,
+          message: response.message ||
+            'Domain verified! Your Nginx server block and SSL certificate have been provisioned.',
+        })
         await fetchDomainStatus()
       } else {
         setVerifyResult({
           success: false,
-          message: 'DNS record not found yet. DNS changes can take up to 24 hours to propagate — please try again later.',
+          // The backend now sends a specific, actionable message based on what failed.
+          message: response.message ||
+            'Verification failed. Please check both DNS records and try again.',
         })
       }
     } catch (err: any) {
@@ -226,42 +234,105 @@ export function DomainManagement({ siteId, onDisconnected }: DomainManagementPro
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <div>
-              <h3 className="dns-instructions-title">Add This DNS Record</h3>
+              <h3 className="dns-instructions-title">Add These DNS Records</h3>
               <p className="dns-instructions-subtitle">
-                Log in to your domain registrar and add the following record. DNS propagation can take up to 24 hours.
+                Log in to your domain registrar and add <strong>both</strong> records below. DNS propagation can take up to 24 hours.
               </p>
             </div>
           </div>
 
-          <div className="dns-record-table">
+          {/* Step 1: TXT ownership record */}
+          <div className="dns-record-group">
+            <div className="dns-record-group-label">
+              <span className="dns-step-badge">Step 1</span>
+              Prove ownership
+            </div>
+            <div className="dns-record-table">
+              {[
+                { label: 'Type', value: dnsRecord.type },
+                { label: 'Host / Name', value: dnsRecord.host },
+                { label: 'Value', value: dnsRecord.value },
+                { label: 'TTL', value: String(dnsRecord.ttl) },
+              ].map(({ label, value }) => (
+                <div key={label} className="dns-record-row">
+                  <span className="dns-record-label">{label}</span>
+                  <div className="dns-record-value-wrap">
+                    <code className="dns-record-value">{value}</code>
+                    <button className="btn-copy" onClick={() => copyToClipboard(value, `step1-${label}`)} title="Copy">
+                      {copiedField === `step1-${label}` ? (
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Step 2: A record pointing to server */}
+          <div className="dns-record-group">
+            <div className="dns-record-group-label">
+              <span className="dns-step-badge">Step 2</span>
+              Point domain to this server (repeat for both @ and www)
+            </div>
             {[
-              { label: 'Type', value: dnsRecord.type },
-              { label: 'Host / Name', value: dnsRecord.host },
-              { label: 'Value', value: dnsRecord.value },
-              { label: 'TTL', value: String(dnsRecord.ttl) },
-            ].map(({ label, value }) => (
-              <div key={label} className="dns-record-row">
-                <span className="dns-record-label">{label}</span>
-                <div className="dns-record-value-wrap">
-                  <code className="dns-record-value">{value}</code>
-                  <button
-                    className="btn-copy"
-                    onClick={() => copyToClipboard(value, label)}
-                    title="Copy to clipboard"
-                  >
-                    {copiedField === label ? (
-                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    )}
-                  </button>
+              { host: '@', label: 'bare domain' },
+              { host: 'www', label: 'www subdomain' },
+            ].map(({ host, label }) => (
+              <div key={host} className="dns-record-table dns-record-table--compact">
+                <div className="dns-record-row">
+                  <span className="dns-record-label">Type</span>
+                  <div className="dns-record-value-wrap"><code className="dns-record-value">A</code></div>
+                </div>
+                <div className="dns-record-row">
+                  <span className="dns-record-label">Host / Name ({label})</span>
+                  <div className="dns-record-value-wrap">
+                    <code className="dns-record-value">{host}</code>
+                    <button className="btn-copy" onClick={() => copyToClipboard(host, `a-host-${host}`)} title="Copy">
+                      {copiedField === `a-host-${host}` ? (
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+                <div className="dns-record-row">
+                  <span className="dns-record-label">Value (IP address)</span>
+                  <div className="dns-record-value-wrap">
+                    <code className="dns-record-value">{SERVER_IP}</code>
+                    <button className="btn-copy" onClick={() => copyToClipboard(SERVER_IP, `a-ip-${host}`)} title="Copy">
+                      {copiedField === `a-ip-${host}` ? (
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+                <div className="dns-record-row">
+                  <span className="dns-record-label">TTL</span>
+                  <div className="dns-record-value-wrap"><code className="dns-record-value">3600</code></div>
                 </div>
               </div>
             ))}
+            <p className="dns-cloudflare-note">
+              Using Cloudflare? Set the A records to <strong>DNS only</strong> (grey cloud, not orange) so our server can issue your SSL certificate.
+            </p>
           </div>
 
           {/* Verify button + result */}

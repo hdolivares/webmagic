@@ -501,6 +501,63 @@ async def _assert_site_ownership(
         )
 
 
+def _build_verify_message(verified: bool, dns_info: dict) -> str:
+    """
+    Return a clear, customer-facing message explaining what passed and what failed.
+    dns_info.error is set by DomainService._check_dns_records() when verification fails.
+    """
+    if verified:
+        return (
+            "Domain verified successfully! "
+            "Your Nginx server block and SSL certificate are being provisioned — "
+            "the domain should be fully live within a few minutes."
+        )
+
+    error = dns_info.get("error", "")
+
+    if error == "ownership_failed":
+        ownership = dns_info.get("ownership", {})
+        hint = ownership.get("hint", "")
+        sub_error = ownership.get("error", "")
+        if sub_error == "record_not_found":
+            return (
+                "Step 1 failed: The TXT verification record was not found. "
+                "Make sure you added the TXT record exactly as shown, then try again. "
+                "DNS changes can take up to 24 hours to propagate."
+            )
+        if sub_error == "token_mismatch":
+            return (
+                "Step 1 failed: A TXT record was found but the value does not match. "
+                "Please copy the value exactly — no extra spaces or characters."
+            )
+        return f"Step 1 failed: {hint}" if hint else "Ownership verification failed. Check your TXT record."
+
+    if error == "a_record_not_pointing_to_server":
+        a = dns_info.get("a_record", {})
+        hint = a.get("hint", "")
+        sub_error = a.get("error", "")
+        if sub_error == "record_not_found":
+            return (
+                "Step 1 passed ✓  |  Step 2 failed: No A record found for your domain. "
+                "Add an A record pointing to our server IP as shown in Step 2 of the instructions."
+            )
+        if sub_error == "ip_mismatch":
+            resolved = ", ".join(a.get("resolved_ips", []))
+            expected = a.get("expected_ip", "")
+            return (
+                f"Step 1 passed ✓  |  Step 2 failed: Your domain points to {resolved} "
+                f"instead of {expected}. "
+                "Update your A record. If you are using Cloudflare, turn the proxy "
+                "OFF (grey cloud) so the IP is visible to our servers."
+            )
+        return f"Step 1 passed ✓  |  Step 2 failed: {hint}" if hint else "A record check failed."
+
+    if error == "dns_library_unavailable":
+        return "DNS verification is temporarily unavailable. Please try again shortly."
+
+    return "Verification failed. Please double-check both DNS records and try again."
+
+
 @router.get(
     "/domain/status",
     response_model=Optional[DomainStatusResponse],
@@ -610,16 +667,13 @@ async def customer_verify_domain(
         verified, dns_info = await domain_service.verify_domain(
             db=db, site_id=site_id, domain=record.domain
         )
+        message = _build_verify_message(verified, dns_info)
         return DomainVerifyResponse(
             verified=verified,
             domain=record.domain,
             ssl_status="provisioning" if verified else None,
             estimated_time="5-10 minutes" if verified else None,
-            message=(
-                "Domain verified successfully! SSL certificate provisioning will begin shortly."
-                if verified
-                else "Domain verification failed. Please check your DNS records."
-            ),
+            message=message,
             dns_found=dns_info,
         )
     except HTTPException:

@@ -33,6 +33,10 @@ NGINX_ENABLED = "/etc/nginx/sites-enabled"
 # Read from environment so this works across deployments without code changes.
 CERTBOT_EMAIL = os.getenv("CERTBOT_EMAIL", "admin@lavish.solutions")
 
+# Public IP of this server — used both for Nginx provisioning checks and for
+# the A-record validation step in DomainService. Keep in sync via env var.
+SERVER_IP = os.getenv("SERVER_IP", "104.251.211.183")
+
 # ── Nginx server block template ───────────────────────────────────────────────
 
 _VHOST_TEMPLATE = """\

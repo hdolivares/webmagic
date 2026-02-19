@@ -14,6 +14,7 @@ Author: WebMagic Team
 Date: January 21, 2026
 """
 import logging
+import os
 import secrets
 import string
 from typing import Optional, Dict, Any, List
@@ -30,7 +31,7 @@ from core.exceptions import (
     ValidationError,
     ForbiddenError
 )
-from services.platform.nginx_provisioning import NginxProvisioningService
+from services.platform.nginx_provisioning import NginxProvisioningService, SERVER_IP
 
 logger = logging.getLogger(__name__)
 
@@ -417,99 +418,209 @@ class DomainService:
     async def _check_dns_records(
         domain: str,
         token: str,
-        method: str
+        method: str,
     ) -> tuple[bool, Dict[str, Any]]:
         """
-        Check if DNS records are correctly configured.
-        
-        This is a placeholder implementation. In production, use dnspython.
-        
-        Args:
-            domain: Domain to check
-            token: Expected token
-            method: Verification method
-            
+        Two-phase DNS verification:
+
+        Phase 1 — Ownership check
+            Verify the TXT (or CNAME) record that proves the customer controls the domain.
+
+        Phase 2 — A-record check
+            Verify that the bare domain's A record resolves to this server's public IP
+            (SERVER_IP). This ensures Nginx can serve the domain AND certbot can issue
+            an SSL certificate via the HTTP-01 ACME challenge.
+
+        Both phases must pass for the overall verification to succeed.
+
         Returns:
-            Tuple of (verified: bool, dns_info: dict)
+            (verified: bool, dns_info: dict)
+            dns_info always contains:
+                ownership  – result dict for phase 1
+                a_record   – result dict for phase 2 (or {"checked": False} if phase 1 failed)
+                error      – machine-readable failure reason, if any
         """
-        # TODO: Implement actual DNS checking with dnspython
-        # For now, return mock response for development
-        
         try:
             import dns.resolver
-            
-            if method == "dns_txt":
-                # Check for TXT record
-                try:
-                    answers = dns.resolver.resolve(
-                        f"_webmagic-verify.{domain}",
-                        'TXT'
-                    )
-                    for rdata in answers:
-                        txt_value = str(rdata).strip('"')
-                        if f"webmagic-verification={token}" in txt_value:
-                            return True, {
-                                "found": True,
-                                "record_type": "TXT",
-                                "value": txt_value
-                            }
-                    return False, {
-                        "found": True,
-                        "record_type": "TXT",
-                        "value": "Found TXT record but token mismatch",
-                        "expected": f"webmagic-verification={token}"
-                    }
-                except dns.resolver.NXDOMAIN:
-                    return False, {
-                        "found": False,
-                        "error": "DNS record not found",
-                        "hint": "Make sure you've added the TXT record"
-                    }
-                except Exception as e:
-                    logger.error(f"DNS TXT check failed: {e}")
-                    return False, {
-                        "found": False,
-                        "error": str(e)
-                    }
-            
-            else:  # dns_cname
-                # Check for CNAME record
-                try:
-                    answers = dns.resolver.resolve(domain, 'CNAME')
-                    for rdata in answers:
-                        cname_value = str(rdata).rstrip('.')
-                        expected = f"verify-{token[:16]}.sites.lavish.solutions"
-                        if cname_value == expected:
-                            return True, {
-                                "found": True,
-                                "record_type": "CNAME",
-                                "value": cname_value
-                            }
-                    return False, {
-                        "found": True,
-                        "record_type": "CNAME",
-                        "value": "Found CNAME but value mismatch",
-                        "expected": expected
-                    }
-                except dns.resolver.NXDOMAIN:
-                    return False, {
-                        "found": False,
-                        "error": "DNS record not found"
-                    }
-                except Exception as e:
-                    logger.error(f"DNS CNAME check failed: {e}")
-                    return False, {
-                        "found": False,
-                        "error": str(e)
-                    }
-        
         except ImportError:
-            # dnspython not installed, return mock for development
-            logger.warning("dnspython not installed, using mock DNS verification")
+            logger.warning("dnspython not installed — DNS verification unavailable")
             return False, {
+                "ownership": {"checked": False},
+                "a_record": {"checked": False},
+                "error": "dns_library_unavailable",
+            }
+
+        bare = domain.removeprefix("www.")
+
+        # ── Phase 1: Ownership record ────────────────────────────────────────
+        ownership_ok, ownership_info = DomainService._check_ownership_record(
+            domain=domain,
+            token=token,
+            method=method,
+            resolver=dns.resolver,
+        )
+
+        if not ownership_ok:
+            return False, {
+                "ownership": ownership_info,
+                "a_record": {"checked": False},
+                "error": "ownership_failed",
+            }
+
+        # ── Phase 2: A record must point to our server ───────────────────────
+        a_ok, a_info = DomainService._check_a_record(
+            bare_domain=bare,
+            expected_ip=SERVER_IP,
+            resolver=dns.resolver,
+        )
+
+        if not a_ok:
+            return False, {
+                "ownership": ownership_info,
+                "a_record": a_info,
+                "error": "a_record_not_pointing_to_server",
+            }
+
+        return True, {
+            "ownership": ownership_info,
+            "a_record": a_info,
+        }
+
+    # ── DNS sub-checks ────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _check_ownership_record(
+        domain: str,
+        token: str,
+        method: str,
+        resolver,
+    ) -> tuple[bool, Dict[str, Any]]:
+        """Check TXT or CNAME ownership record synchronously."""
+        if method == "dns_txt":
+            txt_host = f"_webmagic-verify.{domain}"
+            try:
+                answers = resolver.resolve(txt_host, "TXT")
+                expected = f"webmagic-verification={token}"
+                for rdata in answers:
+                    txt_value = str(rdata).strip('"')
+                    if expected in txt_value:
+                        return True, {
+                            "checked": True,
+                            "found": True,
+                            "record_type": "TXT",
+                            "value": txt_value,
+                        }
+                return False, {
+                    "checked": True,
+                    "found": True,
+                    "record_type": "TXT",
+                    "error": "token_mismatch",
+                    "hint": f"Found a TXT record at {txt_host} but the value does not match. "
+                            f"Make sure you copied the value exactly.",
+                }
+            except resolver.NXDOMAIN:
+                return False, {
+                    "checked": True,
+                    "found": False,
+                    "record_type": "TXT",
+                    "error": "record_not_found",
+                    "hint": f"No TXT record found at {txt_host}. "
+                            "Add the TXT record and wait for DNS propagation (up to 24 hours).",
+                }
+            except Exception as exc:
+                logger.error(f"DNS TXT check error for {domain}: {exc}")
+                return False, {
+                    "checked": True,
+                    "found": False,
+                    "record_type": "TXT",
+                    "error": "lookup_error",
+                    "hint": str(exc),
+                }
+        else:  # dns_cname
+            expected_cname = f"verify-{token[:16]}.sites.lavish.solutions"
+            try:
+                answers = resolver.resolve(domain, "CNAME")
+                for rdata in answers:
+                    cname_value = str(rdata).rstrip(".")
+                    if cname_value == expected_cname:
+                        return True, {
+                            "checked": True,
+                            "found": True,
+                            "record_type": "CNAME",
+                            "value": cname_value,
+                        }
+                return False, {
+                    "checked": True,
+                    "found": True,
+                    "record_type": "CNAME",
+                    "error": "cname_mismatch",
+                    "hint": "Found a CNAME record but the value does not match.",
+                }
+            except resolver.NXDOMAIN:
+                return False, {
+                    "checked": True,
+                    "found": False,
+                    "record_type": "CNAME",
+                    "error": "record_not_found",
+                    "hint": "No CNAME record found. Add the CNAME record and wait for propagation.",
+                }
+            except Exception as exc:
+                logger.error(f"DNS CNAME check error for {domain}: {exc}")
+                return False, {
+                    "checked": True,
+                    "found": False,
+                    "record_type": "CNAME",
+                    "error": "lookup_error",
+                    "hint": str(exc),
+                }
+
+    @staticmethod
+    def _check_a_record(
+        bare_domain: str,
+        expected_ip: str,
+        resolver,
+    ) -> tuple[bool, Dict[str, Any]]:
+        """
+        Verify that the bare domain's A record resolves to expected_ip.
+        We only check the bare domain (not www) since certbot needs it to reach
+        this server for the HTTP-01 ACME challenge.
+        """
+        try:
+            answers = resolver.resolve(bare_domain, "A")
+            found_ips = [str(r) for r in answers]
+            if expected_ip in found_ips:
+                return True, {
+                    "checked": True,
+                    "found": True,
+                    "record_type": "A",
+                    "value": found_ips,
+                }
+            return False, {
+                "checked": True,
+                "found": True,
+                "record_type": "A",
+                "resolved_ips": found_ips,
+                "expected_ip": expected_ip,
+                "error": "ip_mismatch",
+                "hint": (
+                    f"Your domain resolves to {', '.join(found_ips)} instead of "
+                    f"{expected_ip}. Update your A record to point to {expected_ip}. "
+                    "If you are using Cloudflare, make sure the proxy (orange cloud) "
+                    "is turned OFF (grey cloud) so the IP is visible."
+                ),
+            }
+        except Exception as exc:
+            logger.error(f"DNS A-record check error for {bare_domain}: {exc}")
+            return False, {
+                "checked": True,
                 "found": False,
-                "error": "DNS verification not available (dnspython not installed)",
-                "hint": "Install dnspython for DNS verification"
+                "record_type": "A",
+                "expected_ip": expected_ip,
+                "error": "record_not_found",
+                "hint": (
+                    f"No A record found for {bare_domain}. "
+                    f"Add an A record pointing to {expected_ip}."
+                ),
             }
 
 
