@@ -54,13 +54,17 @@ const queryClient = new QueryClient({
 
 // Protected route wrapper
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, isLoading, fetchUser } = useAuth()
+  const { isAuthenticated, user, fetchUser } = useAuth()
 
+  // Fetch user profile once when authenticated (e.g. after page refresh).
+  // Only depend on `isAuthenticated` — NOT on `isLoading` or `fetchUser` —
+  // to avoid an infinite loop where fetchUser toggling isLoading re-triggers
+  // the effect on every completion.
   useEffect(() => {
-    if (isAuthenticated && !isLoading) {
+    if (isAuthenticated && !user) {
       fetchUser()
     }
-  }, [isAuthenticated, isLoading, fetchUser])
+  }, [isAuthenticated]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />

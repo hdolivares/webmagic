@@ -595,12 +595,22 @@ async def customer_verify_domain(
     await _assert_site_ownership(db, current_customer, site_id)
     try:
         domain_service = get_domain_service()
+
+        # Look up the actual stored domain by site_id so we verify the correct
+        # record regardless of how the user typed the domain (www prefix, etc.)
+        record = await domain_service.get_domain_status(db=db, site_id=site_id)
+        if not record:
+            raise HTTPException(
+                status_code=404,
+                detail="No pending domain found for this site. Please connect a domain first."
+            )
+
         verified, dns_info = await domain_service.verify_domain(
-            db=db, site_id=site_id, domain=request.domain
+            db=db, site_id=site_id, domain=record.domain
         )
         return DomainVerifyResponse(
             verified=verified,
-            domain=request.domain,
+            domain=record.domain,
             ssl_status="provisioning" if verified else None,
             estimated_time="5-10 minutes" if verified else None,
             message=(
@@ -610,8 +620,8 @@ async def customer_verify_domain(
             ),
             dns_found=dns_info,
         )
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"[CustomerDomain] verify_domain error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to verify domain.")
