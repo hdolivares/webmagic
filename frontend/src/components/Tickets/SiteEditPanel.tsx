@@ -54,7 +54,13 @@ export function SiteEditPanel({ siteUrl, siteName, onSubmit, onClose }: SiteEdit
     clearLastCaptured,
     announceActiveSlot,
     announceSlotCount,
-  } = useElementPicker({ onCancel: onClose })
+  } = useElementPicker({
+    onCancel: onClose,
+    // Auto-activate the first slot AFTER the inspector is ready.
+    // Doing it here (not on mount) guarantees the WEBMAGIC_ACTIVE_SLOT
+    // message arrives after the inspector's listener is registered.
+    onReady: () => setActiveChange(changes[0]?.id ?? null),
+  })
 
   const {
     changes,
@@ -69,10 +75,6 @@ export function SiteEditPanel({ siteUrl, siteName, onSubmit, onClose }: SiteEdit
     pinnedCount,
     isValid,
   } = useTicketChanges()
-
-  // ── Auto-activate the first slot so users can click immediately ───────────
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { setActiveChange(changes[0]?.id ?? null) }, [])
 
   // ── Route captured element to active slot ──────────────────────────────────
   useEffect(() => {
