@@ -233,77 +233,86 @@ export function DomainSetup({ siteId, onComplete, onCancel }: DomainSetupProps) 
     </div>
   )
 
+  const SERVER_IP = '104.251.211.183'
+
+  const renderDnsField = (label: string, value: string, copyable = true) => (
+    <div className="dns-field">
+      <label className="dns-field-label">{label}</label>
+      <div className="dns-field-value">
+        <code className={label === 'Value' ? 'dns-value-long' : ''}>{value}</code>
+        {copyable && (
+          <button className="btn-copy" onClick={() => copyToClipboard(value)} title="Copy to clipboard">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+  )
+
   const renderInstructions = () => (
     <div className="wizard-content">
       <h2 className="wizard-title">Add DNS Records</h2>
       <p className="wizard-description">
-        Add the following DNS record to your domain's DNS settings. This verifies that you own the domain.
+        You need to add <strong>two</strong> DNS records: one to verify ownership, and one to point your domain to this server.
       </p>
 
-      <div className="dns-record-card">
-        <div className="dns-record-header">
-          <span className="dns-record-type">{dnsRecord?.record_type}</span>
-          <span className="dns-domain">{domain}</span>
+      {/* ── Record 1: Ownership verification ─────────────────────────────── */}
+      <div className="dns-record-section">
+        <div className="dns-record-section-label">
+          <span className="dns-step-badge">Step 1</span>
+          Verify domain ownership
         </div>
-
-        <div className="dns-record-fields">
-          <div className="dns-field">
-            <label className="dns-field-label">Host/Name</label>
-            <div className="dns-field-value">
-              <code>{dnsRecord?.host}</code>
-              <button
-                className="btn-copy"
-                onClick={() => copyToClipboard(dnsRecord?.host || '')}
-                title="Copy to clipboard"
-              >
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </button>
-            </div>
+        <div className="dns-record-card">
+          <div className="dns-record-header">
+            <span className="dns-record-type">{dnsRecord?.record_type}</span>
+            <span className="dns-domain">{domain}</span>
           </div>
-
-          <div className="dns-field">
-            <label className="dns-field-label">Type</label>
-            <div className="dns-field-value">
-              <code>{dnsRecord?.record_type}</code>
-            </div>
-          </div>
-
-          <div className="dns-field">
-            <label className="dns-field-label">Value</label>
-            <div className="dns-field-value">
-              <code className="dns-value-long">{dnsRecord?.value}</code>
-              <button
-                className="btn-copy"
-                onClick={() => copyToClipboard(dnsRecord?.value || '')}
-                title="Copy to clipboard"
-              >
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <div className="dns-field">
-            <label className="dns-field-label">TTL</label>
-            <div className="dns-field-value">
-              <code>{dnsRecord?.ttl} (1 hour)</code>
-            </div>
+          <div className="dns-record-fields">
+            {renderDnsField('Type', dnsRecord?.record_type || '')}
+            {renderDnsField('Host / Name', dnsRecord?.host || '')}
+            {renderDnsField('Value', dnsRecord?.value || '')}
+            {renderDnsField('TTL', `${dnsRecord?.ttl ?? 3600} (1 hour)`, false)}
           </div>
         </div>
       </div>
 
-      <div className="instructions-box">
-        <h3>Step-by-Step Instructions:</h3>
-        <ol>
-          <li>Log in to your domain registrar (GoDaddy, Namecheap, etc.)</li>
-          <li>Find the DNS management or DNS settings page</li>
-          <li>Add a new {dnsRecord?.record_type} record with the values shown above</li>
-          <li>Save the changes (may take up to 24 hours to propagate)</li>
-          <li>Return here and click "Verify Domain" to complete setup</li>
-        </ol>
+      {/* ── Record 2: A record pointing to our server ─────────────────────── */}
+      <div className="dns-record-section">
+        <div className="dns-record-section-label">
+          <span className="dns-step-badge">Step 2</span>
+          Point your domain to this server
+        </div>
+        <p className="dns-record-section-note">
+          Add <strong>two</strong> A records (one for the bare domain, one for www):
+        </p>
+        <div className="dns-record-card">
+          <div className="dns-record-header">
+            <span className="dns-record-type">A</span>
+            <span className="dns-domain">{domain} &amp; www.{domain}</span>
+          </div>
+          <div className="dns-record-fields">
+            {renderDnsField('Type', 'A', false)}
+            {renderDnsField('Host / Name (bare)', '@')}
+            {renderDnsField('Value (IP address)', SERVER_IP)}
+            {renderDnsField('TTL', '3600 (1 hour)', false)}
+          </div>
+          <div className="dns-record-fields dns-record-fields--second">
+            {renderDnsField('Type', 'A', false)}
+            {renderDnsField('Host / Name (www)', 'www')}
+            {renderDnsField('Value (IP address)', SERVER_IP)}
+            {renderDnsField('TTL', '3600 (1 hour)', false)}
+          </div>
+        </div>
+        <div className="info-box info-box--compact">
+          <svg className="info-icon" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>
+            <strong>Using Cloudflare?</strong> Set the A record proxy status to <em>DNS only</em> (grey cloud) while we issue your SSL certificate. You can re-enable the proxy afterward.
+          </span>
+        </div>
       </div>
 
       {error && (
@@ -339,7 +348,7 @@ export function DomainSetup({ siteId, onComplete, onCancel }: DomainSetupProps) 
               Verifying... (Attempt {verifyAttempts})
             </>
           ) : (
-            'Verify Domain'
+            'Check Ownership Verification'
           )}
         </button>
       </div>
@@ -349,8 +358,9 @@ export function DomainSetup({ siteId, onComplete, onCancel }: DomainSetupProps) 
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <div>
-          <strong>DNS Propagation:</strong> DNS changes can take anywhere from a few minutes to 24 hours to propagate globally. 
-          If verification fails, wait a while and try again.
+          <strong>DNS Propagation:</strong> Changes can take anywhere from a few minutes to 24 hours globally.
+          The "Check Ownership Verification" button only checks the Step 1 TXT record — once that passes,
+          your server block and SSL certificate are provisioned automatically. Make sure both records are in place!
         </div>
       </div>
     </div>
