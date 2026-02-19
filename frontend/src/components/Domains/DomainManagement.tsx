@@ -275,63 +275,77 @@ export function DomainManagement({ siteId, onDisconnected }: DomainManagementPro
             </div>
           </div>
 
-          {/* Step 2: A record pointing to server */}
+          {/* Step 2: A records pointing to server — one card per record */}
           <div className="dns-record-group">
             <div className="dns-record-group-label">
               <span className="dns-step-badge">Step 2</span>
-              Point domain to this server (repeat for both @ and www)
+              Point your domain to this server
             </div>
-            {[
-              { host: '@', label: 'bare domain' },
-              { host: 'www', label: 'www subdomain' },
-            ].map(({ host, label }) => (
-              <div key={host} className="dns-record-table dns-record-table--compact">
-                <div className="dns-record-row">
-                  <span className="dns-record-label">Type</span>
-                  <div className="dns-record-value-wrap"><code className="dns-record-value">A</code></div>
-                </div>
-                <div className="dns-record-row">
-                  <span className="dns-record-label">Host / Name ({label})</span>
+
+            {/* A record 1 — bare domain */}
+            <p className="dns-sub-record-title">A record 1 of 2 — bare domain</p>
+            <div className="dns-record-table">
+              {[
+                { label: 'Type', value: 'A', copyKey: '' },
+                { label: 'Host / Name', value: '@', copyKey: 'a1-host' },
+                { label: 'Value (IP address)', value: SERVER_IP, copyKey: 'a1-ip' },
+                { label: 'TTL', value: '3600', copyKey: '' },
+              ].map(({ label, value, copyKey }) => (
+                <div key={label} className="dns-record-row">
+                  <span className="dns-record-label">{label}</span>
                   <div className="dns-record-value-wrap">
-                    <code className="dns-record-value">{host}</code>
-                    <button className="btn-copy" onClick={() => copyToClipboard(host, `a-host-${host}`)} title="Copy">
-                      {copiedField === `a-host-${host}` ? (
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                      )}
-                    </button>
+                    <code className="dns-record-value">{value}</code>
+                    {copyKey && (
+                      <button className="btn-copy" onClick={() => copyToClipboard(value, copyKey)} title="Copy">
+                        {copiedField === copyKey ? (
+                          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div className="dns-record-row">
-                  <span className="dns-record-label">Value (IP address)</span>
+              ))}
+            </div>
+
+            {/* A record 2 — www subdomain */}
+            <p className="dns-sub-record-title">A record 2 of 2 — www subdomain</p>
+            <div className="dns-record-table">
+              {[
+                { label: 'Type', value: 'A', copyKey: '' },
+                { label: 'Host / Name', value: 'www', copyKey: 'a2-host' },
+                { label: 'Value (IP address)', value: SERVER_IP, copyKey: 'a2-ip' },
+                { label: 'TTL', value: '3600', copyKey: '' },
+              ].map(({ label, value, copyKey }) => (
+                <div key={label} className="dns-record-row">
+                  <span className="dns-record-label">{label}</span>
                   <div className="dns-record-value-wrap">
-                    <code className="dns-record-value">{SERVER_IP}</code>
-                    <button className="btn-copy" onClick={() => copyToClipboard(SERVER_IP, `a-ip-${host}`)} title="Copy">
-                      {copiedField === `a-ip-${host}` ? (
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                      )}
-                    </button>
+                    <code className="dns-record-value">{value}</code>
+                    {copyKey && (
+                      <button className="btn-copy" onClick={() => copyToClipboard(value, copyKey)} title="Copy">
+                        {copiedField === copyKey ? (
+                          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div className="dns-record-row">
-                  <span className="dns-record-label">TTL</span>
-                  <div className="dns-record-value-wrap"><code className="dns-record-value">3600</code></div>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+
             <p className="dns-cloudflare-note">
-              Using Cloudflare? Set the A records to <strong>DNS only</strong> (grey cloud, not orange) so our server can issue your SSL certificate.
+              Using Cloudflare? Set both A records to <strong>DNS only</strong> (grey cloud, not orange) so our server can issue your SSL certificate.
             </p>
           </div>
 

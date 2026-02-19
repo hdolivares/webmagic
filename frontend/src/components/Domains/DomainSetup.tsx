@@ -275,39 +275,52 @@ export function DomainSetup({ siteId, onComplete, onCancel }: DomainSetupProps) 
         </div>
       </div>
 
-      {/* ── Record 2: A record pointing to our server ─────────────────────── */}
+      {/* ── Record 2: A records pointing to our server — one card each ──────── */}
       <div className="dns-record-section">
         <div className="dns-record-section-label">
           <span className="dns-step-badge">Step 2</span>
           Point your domain to this server
         </div>
         <p className="dns-record-section-note">
-          Add <strong>two</strong> A records (one for the bare domain, one for www):
+          Add <strong>two</strong> A records — one for the bare domain, one for www:
         </p>
+
+        {/* A record 1 — bare domain */}
+        <p className="dns-sub-record-title">A record 1 of 2 — bare domain</p>
         <div className="dns-record-card">
           <div className="dns-record-header">
             <span className="dns-record-type">A</span>
-            <span className="dns-domain">{domain} &amp; www.{domain}</span>
+            <span className="dns-domain">{domain}</span>
           </div>
           <div className="dns-record-fields">
             {renderDnsField('Type', 'A', false)}
-            {renderDnsField('Host / Name (bare)', '@')}
-            {renderDnsField('Value (IP address)', SERVER_IP)}
-            {renderDnsField('TTL', '3600 (1 hour)', false)}
-          </div>
-          <div className="dns-record-fields dns-record-fields--second">
-            {renderDnsField('Type', 'A', false)}
-            {renderDnsField('Host / Name (www)', 'www')}
+            {renderDnsField('Host / Name', '@')}
             {renderDnsField('Value (IP address)', SERVER_IP)}
             {renderDnsField('TTL', '3600 (1 hour)', false)}
           </div>
         </div>
+
+        {/* A record 2 — www subdomain */}
+        <p className="dns-sub-record-title">A record 2 of 2 — www subdomain</p>
+        <div className="dns-record-card">
+          <div className="dns-record-header">
+            <span className="dns-record-type">A</span>
+            <span className="dns-domain">www.{domain}</span>
+          </div>
+          <div className="dns-record-fields">
+            {renderDnsField('Type', 'A', false)}
+            {renderDnsField('Host / Name', 'www')}
+            {renderDnsField('Value (IP address)', SERVER_IP)}
+            {renderDnsField('TTL', '3600 (1 hour)', false)}
+          </div>
+        </div>
+
         <div className="info-box info-box--compact">
           <svg className="info-icon" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span>
-            <strong>Using Cloudflare?</strong> Set the A record proxy status to <em>DNS only</em> (grey cloud) while we issue your SSL certificate. You can re-enable the proxy afterward.
+            <strong>Using Cloudflare?</strong> Set both A records to <em>DNS only</em> (grey cloud) while we issue your SSL certificate. You can re-enable the proxy afterward.
           </span>
         </div>
       </div>
