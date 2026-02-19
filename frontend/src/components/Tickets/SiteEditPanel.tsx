@@ -70,6 +70,10 @@ export function SiteEditPanel({ siteUrl, siteName, onSubmit, onClose }: SiteEdit
     isValid,
   } = useTicketChanges()
 
+  // ── Auto-activate the first slot so users can click immediately ───────────
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setActiveChange(changes[0]?.id ?? null) }, [])
+
   // ── Route captured element to active slot ──────────────────────────────────
   useEffect(() => {
     if (lastCaptured && activeChangeId) {

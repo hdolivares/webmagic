@@ -113,15 +113,15 @@ export function buildInspectorScript(): string {
 
   function refreshBanner() {
     if (pinCount >= pinMax) {
-      setBanner('✓ All ' + pinMax + ' elements pinned — describe your changes in the panel', '#064e3b');
+      setBanner('✓ All ' + pinMax + ' elements pinned — describe your changes in the panel →', '#064e3b');
       document.body.style.cursor = 'default';
-      overlay.style.display = 'none';
     } else if (activeSlotLabel) {
       setBanner('🎯 ' + activeSlotLabel + ' — click any element to pin it  •  Esc to cancel', '#312e81');
       document.body.style.cursor = 'crosshair';
     } else {
-      setBanner('← Select a change in the panel, then click here to pin an element  •  Esc to cancel', '#374151');
-      document.body.style.cursor = 'default';
+      // Show crosshair so users see the inspector is active; click will explain next step
+      setBanner('← Click "Pin element" in the panel, then click any element here  •  Esc to cancel', '#374151');
+      document.body.style.cursor = 'crosshair';
     }
   }
 
@@ -129,22 +129,33 @@ export function buildInspectorScript(): string {
 
   // ── Mouse handlers ────────────────────────────────────────────────────────
   function onMouseMove(e) {
-    if (pinCount >= pinMax || !activeSlotLabel) {
+    var el = e.target;
+    if (!el || el === overlay || el === tooltip || el === banner || el === flash) return;
+
+    if (pinCount >= pinMax) {
       overlay.style.display = 'none';
       tooltip.style.display = 'none';
       return;
     }
-    var el = e.target;
-    if (!el || el === overlay || el === tooltip || el === banner || el === flash) return;
+
     var rect = el.getBoundingClientRect();
-    overlay.style.cssText = overlay.style.cssText
-      .replace(/;display:[^;]*/g, '')
-      + ';display:block;top:' + rect.top + 'px;left:' + rect.left + 'px;width:' + rect.width + 'px;height:' + rect.height + 'px';
+
+    // Always show hover highlight so users know the inspector is active.
+    // When a slot is active the highlight is bright; otherwise it is dimmed.
+    var isSlotActive = !!activeSlotLabel;
+    overlay.style.borderColor = isSlotActive ? '#6366f1' : 'rgba(99,102,241,0.4)';
+    overlay.style.background  = isSlotActive ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.03)';
+    overlay.style.display = 'block';
+    overlay.style.top    = rect.top    + 'px';
+    overlay.style.left   = rect.left   + 'px';
+    overlay.style.width  = rect.width  + 'px';
+    overlay.style.height = rect.height + 'px';
+
     var tag = el.tagName.toLowerCase();
     var cls = semanticClasses(el)[0];
-    tooltip.textContent  = cls ? tag + '.' + cls : tag;
-    tooltip.style.top    = Math.max(rect.top - 22, 4) + 'px';
-    tooltip.style.left   = rect.left + 'px';
+    tooltip.textContent   = cls ? tag + '.' + cls : tag;
+    tooltip.style.top     = Math.max(rect.top - 22, 4) + 'px';
+    tooltip.style.left    = rect.left + 'px';
     tooltip.style.display = 'block';
   }
 
@@ -158,7 +169,7 @@ export function buildInspectorScript(): string {
     }
 
     if (!activeSlotLabel) {
-      showFlash('← First select "Pin element" on a change in the panel', '#92400e', '#fef3c7');
+      showFlash('← Click "Pin element" in the panel on the right first', '#92400e', '#fef3c7');
       return;
     }
 
