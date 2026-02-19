@@ -81,10 +81,7 @@ export function DomainSetup({ siteId, onComplete, onCancel }: DomainSetupProps) 
           onComplete?.(domain)
         }, 2000)
       } else {
-        setError(
-          response.message || 
-          'Domain verification failed. Please ensure DNS records are correctly configured. DNS propagation can take up to 24 hours.'
-        )
+        setError(response.message || 'Verification failed. Please check both DNS records and try again.')
       }
     } catch (err: any) {
       console.error('Failed to verify domain:', err)
@@ -384,19 +381,25 @@ export function DomainSetup({ siteId, onComplete, onCancel }: DomainSetupProps) 
           <svg className="complete-check" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
-          <span>Domain verified</span>
+          <span>Ownership verified (TXT record confirmed)</span>
         </div>
         <div className="complete-step">
           <svg className="complete-check" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
-          <span>SSL certificate provisioning (5-10 minutes)</span>
+          <span>Domain is pointing to this server (A record confirmed)</span>
         </div>
         <div className="complete-step">
           <svg className="complete-check" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
-          <span>Site will be accessible at your domain</span>
+          <span>Nginx server block created — your site is live</span>
+        </div>
+        <div className="complete-step">
+          <svg className="complete-check" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <span>SSL certificate being issued automatically (HTTPS ready in ~2 min)</span>
         </div>
       </div>
 
@@ -405,8 +408,8 @@ export function DomainSetup({ siteId, onComplete, onCancel }: DomainSetupProps) 
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <div>
-          Your site will be accessible at <strong>https://{domain}</strong> within the next 10 minutes. 
-          SSL certificate is being provisioned automatically.
+          Your site is now live at <strong>http://{domain}</strong> and will be available
+          over <strong>HTTPS</strong> within ~2 minutes once the SSL certificate is issued.
         </div>
       </div>
     </div>
