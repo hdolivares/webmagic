@@ -15,10 +15,91 @@ Best Practices:
 - Business quality scoring
 """
 import logging
+import re
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+# Canadian NANP area codes (+1 prefix but NOT US).
+# Source: CRTC / NANPA allocations.
+_CANADIAN_AREA_CODES = {
+    "204", "226", "236", "249", "250", "289",
+    "306", "343", "354", "365", "367", "368",
+    "403", "416", "418", "428", "431", "437", "438", "450",
+    "506", "514", "519", "548", "579", "581", "587",
+    "604", "613", "639", "647", "672",
+    "705", "709", "742", "778", "780", "782",
+    "807", "819", "825",
+    "867", "873",
+    "902", "905",
+}
+
+
+def infer_country_from_phone(phone: Optional[str]) -> Optional[str]:
+    """
+    Infer country from a phone number's international dialing prefix.
+
+    Uses the E.164 international prefix to determine country without any
+    API calls or LLM involvement. This is the fastest and most reliable
+    country signal when Outscraper omits country_code.
+
+    Returns a 2-letter ISO country code ("US", "GB", "CA", "AU", …) or
+    None when the phone number is absent / unrecognisable.
+    """
+    if not phone:
+        return None
+
+    # Normalise: strip spaces, dashes, dots, parentheses
+    normalized = re.sub(r"[\s\-\.\(\)]", "", phone)
+
+    # +44 → GB (United Kingdom)
+    if normalized.startswith("+44"):
+        return "GB"
+
+    # +61 → AU (Australia)
+    if normalized.startswith("+61"):
+        return "AU"
+
+    # +52 → MX (Mexico)
+    if normalized.startswith("+52"):
+        return "MX"
+
+    # +55 → BR (Brazil)
+    if normalized.startswith("+55"):
+        return "BR"
+
+    # +49 → DE (Germany)
+    if normalized.startswith("+49"):
+        return "DE"
+
+    # +33 → FR (France)
+    if normalized.startswith("+33"):
+        return "FR"
+
+    # +34 → ES (Spain)
+    if normalized.startswith("+34"):
+        return "ES"
+
+    # +39 → IT (Italy)
+    if normalized.startswith("+39"):
+        return "IT"
+
+    # NANP (+1) — could be US or CA; use area code to distinguish
+    if normalized.startswith("+1") and len(normalized) >= 5:
+        area_code = normalized[2:5]
+        if area_code in _CANADIAN_AREA_CODES:
+            return "CA"
+        return "US"
+
+    # Bare 10-digit US/CA number (no country prefix)
+    if re.match(r"^\d{10}$", normalized):
+        area_code = normalized[:3]
+        if area_code in _CANADIAN_AREA_CODES:
+            return "CA"
+        return "US"
+
+    return None
 
 
 class DataQualityService:
@@ -108,10 +189,23 @@ class DataQualityService:
             }
             state_code = state_name_to_code.get(state_from_normalized.lower())
         
-        # **ENHANCED**: If country_code is missing, use state validation
-        if country_code is None or country_code == "":
-            logger.debug(f"⚠️  country_code is None/empty, falling back to state validation")
-            
+        # If country_code is missing, try phone-based inference first (fast, free, reliable)
+        if not country_code:
+            phone = business.get("phone") or raw_data.get("phone")
+            phone_country = infer_country_from_phone(phone)
+            if phone_country:
+                logger.info(
+                    f"📞 Country inferred from phone {phone!r} → {phone_country} "
+                    f"(business: {business.get('name')})"
+                )
+                country_code = phone_country
+                # Write back so downstream code (including callers) can use it
+                business["country"] = phone_country
+            else:
+                logger.debug(f"⚠️  country_code is None/empty and phone gave no signal, falling back to state validation")
+
+        # **ENHANCED**: If country_code is still missing after phone inference, use state validation
+        if not country_code:
             # If we have a target state and the state matches, assume it's the right country
             if target_state and state_code:
                 if state_code.upper() == target_state.upper():
@@ -141,7 +235,7 @@ class DataQualityService:
                     logger.debug(f"✅ Target state found in state field")
                     return True, ["Geo-targeting validated via state substring match"]
             
-            # If nothing matched, reject
+            # Nothing matched — reject
             reasons.append(f"Country missing and state mismatch: state_code={state_code}, state_name={state_from_normalized}, target={target_state}")
             logger.warning(f"❌ Geo-validation failed: {reasons[0]}")
             return False, reasons

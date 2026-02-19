@@ -241,12 +241,14 @@ async def get_businesses_needing_generation(
         
         logger.info("📊 Getting businesses needing generation...")
         
-        # Find businesses that need generation and aren't already queued
+        # Find US businesses that need generation and aren't already queued
+        # (SMS integration only works for US; non-US businesses waste tokens)
         query = select(Business).outerjoin(
             GeneratedSite,
             Business.id == GeneratedSite.business_id
         ).where(
             and_(
+                Business.country == 'US',
                 Business.website_url.is_(None),
                 or_(
                     Business.website_validation_status == 'missing',

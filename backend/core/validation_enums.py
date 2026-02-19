@@ -46,6 +46,7 @@ class ValidationState(str, Enum):
     # TERMINAL STATES - Final outcomes
     # ============================================================================
     CONFIRMED_NO_WEBSITE = "confirmed_no_website"  # After all discovery, no website
+    GEO_MISMATCH = "geo_mismatch"  # Business confirmed to be outside target country (non-US)
     ERROR = "error"  # Validation process failed
     
     @classmethod
@@ -78,6 +79,7 @@ class ValidationState(str, Enum):
             cls.VALID_SCRAPINGDOG.value,
             cls.VALID_MANUAL.value,
             cls.CONFIRMED_NO_WEBSITE.value,
+            cls.GEO_MISMATCH.value,
             cls.ERROR.value
         }
 

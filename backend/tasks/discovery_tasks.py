@@ -25,6 +25,54 @@ from core.validation_enums import (
 
 logger = logging.getLogger(__name__)
 
+# Countries we support for SMS outreach. Businesses confirmed outside these
+# countries are marked as geo_mismatch and excluded from generation.
+_SUPPORTED_COUNTRIES = {"US"}
+
+
+def _apply_detected_country(
+    business: "Business",
+    discovery_result: Dict[str, Any]
+) -> bool:
+    """
+    Apply detected_country from a discovery result to the business record.
+
+    Updates business.country when:
+    - The discovery result contains a high-confidence detected_country, AND
+    - The current business.country is null/empty OR is less specific.
+
+    Returns True if the business country is (or remains) US-compatible.
+    Returns False if the business was detected to be outside _SUPPORTED_COUNTRIES.
+    """
+    detected_country = discovery_result.get("detected_country")
+    country_confidence = discovery_result.get("country_confidence", 0.0)
+    country_signals = discovery_result.get("country_signals", [])
+
+    if detected_country and country_confidence >= 0.7:
+        old_country = business.country
+        if not old_country or old_country != detected_country:
+            logger.info(
+                f"🌍 Updating business {business.name!r} country: "
+                f"{old_country!r} → {detected_country!r} "
+                f"(confidence={country_confidence:.0%}, signals={country_signals})"
+            )
+            business.country = detected_country
+
+        if detected_country not in _SUPPORTED_COUNTRIES:
+            logger.warning(
+                f"🚫 Business {business.name!r} detected as non-US country "
+                f"({detected_country}). Blocking from generation queue."
+            )
+            return False
+
+    elif not business.country:
+        # No detection signal and no existing country — default to US
+        # (the business passed geo-validation during scraping so it's likely US)
+        business.country = "US"
+
+    current_country = business.country or "US"
+    return current_country in _SUPPORTED_COUNTRIES
+
 
 @shared_task(
     name="tasks.discovery.discover_missing_websites_v2",
@@ -207,6 +255,9 @@ def _handle_url_found(
         f"(confidence: {confidence:.2f})"
     )
     
+    # Apply detected country (may update business.country)
+    is_supported_country = _apply_detected_country(business, discovery_result)
+
     # Update business record
     business.website_url = found_url
     business.website_validation_status = ValidationState.PENDING.value
@@ -241,10 +292,27 @@ def _handle_url_found(
         "llm_analysis": discovery_result.get("llm_analysis", {}),
         "search_results": discovery_result.get("search_results", {}),  # Full raw response
         "organic_results_count": len(discovery_result.get("search_results", {}).get("organic_results", [])),
+        "detected_country": discovery_result.get("detected_country"),
+        "country_confidence": discovery_result.get("country_confidence", 0.0),
+        "country_signals": discovery_result.get("country_signals", []),
     }
     business.raw_data = current_raw_data
     
     db.commit()
+
+    # If the business is outside our supported countries, don't queue for validation
+    if not is_supported_country:
+        logger.warning(
+            f"🚫 Skipping validation queue for {business.name!r} "
+            f"— detected country {business.country!r} is not supported."
+        )
+        return {
+            "business_id": str(business.id),
+            "status": "geo_mismatch",
+            "country": business.country,
+            "url": found_url,
+            "queued_for_validation": False
+        }
     
     # Queue for validation
     from tasks.validation_tasks_enhanced import validate_business_website_v2
@@ -282,19 +350,10 @@ def _handle_no_url_found(
     confidence = discovery_result.get("confidence", 0.95)
     
     logger.info(f"❌ ScrapingDog found no URL for {business.name} (confirmed no website)")
-    
-    # Mark as confirmed missing
-    business.website_validation_status = ValidationState.CONFIRMED_NO_WEBSITE.value
-    business.website_validated_at = datetime.utcnow()
-    
-    # Record discovery attempt
-    business.website_metadata = metadata_service.record_discovery_attempt(
-        business.website_metadata,
-        method="scrapingdog",
-        found_url=False,
-        notes="ScrapingDog found no valid website"
-    )
-    
+
+    # Apply detected country (may update business.country)
+    is_supported_country = _apply_detected_country(business, discovery_result)
+
     # Save complete ScrapingDog response to raw_data (even when no URL found)
     current_raw_data = business.raw_data or {}
     current_raw_data["scrapingdog_discovery"] = {
@@ -307,12 +366,72 @@ def _handle_no_url_found(
         "llm_analysis": discovery_result.get("llm_analysis", {}),
         "search_results": discovery_result.get("search_results", {}),  # Full raw response
         "organic_results_count": len(discovery_result.get("search_results", {}).get("organic_results", [])),
+        "detected_country": discovery_result.get("detected_country"),
+        "country_confidence": discovery_result.get("country_confidence", 0.0),
+        "country_signals": discovery_result.get("country_signals", []),
     }
     business.raw_data = current_raw_data
+
+    # ----------------------------------------------------------------
+    # GEO MISMATCH — business is confirmed non-US; do NOT mark as
+    # triple_verified so it never enters the generation queue.
+    # ----------------------------------------------------------------
+    if not is_supported_country:
+        detected_country = discovery_result.get("detected_country") or business.country
+        logger.warning(
+            f"🚫 Business {business.name!r} confirmed as non-US "
+            f"({detected_country}). Marking as geo_mismatch — "
+            f"will NOT be queued for site generation."
+        )
+        business.website_validation_status = ValidationState.GEO_MISMATCH.value
+        business.website_validated_at = datetime.utcnow()
+
+        business.website_metadata = metadata_service.record_discovery_attempt(
+            business.website_metadata,
+            method="scrapingdog",
+            found_url=False,
+            notes=f"Geo mismatch: business detected as {detected_country}, not US"
+        )
+
+        business.website_validation_result = {
+            "verdict": "geo_mismatch",
+            "detected_country": detected_country,
+            "country_confidence": discovery_result.get("country_confidence", 0.0),
+            "country_signals": discovery_result.get("country_signals", []),
+            "reasoning": f"Business detected as {detected_country} — outside supported countries (US only)",
+            "confidence": discovery_result.get("country_confidence", 0.0),
+        }
+
+        db.commit()
+
+        return {
+            "business_id": str(business.id),
+            "status": "geo_mismatch",
+            "country": detected_country,
+            "triple_verified": False
+        }
+
+    # ----------------------------------------------------------------
+    # NORMAL PATH — confirmed no website, US business
+    # ----------------------------------------------------------------
+    # Record discovery attempt
+    business.website_metadata = metadata_service.record_discovery_attempt(
+        business.website_metadata,
+        method="scrapingdog",
+        found_url=False,
+        notes="ScrapingDog found no valid website"
+    )
     
+    # Mark as confirmed missing
+    business.website_validation_status = ValidationState.CONFIRMED_NO_WEBSITE.value
+    business.website_validated_at = datetime.utcnow()
+
     # Save complete result
     business.website_validation_result = {
         "verdict": "confirmed_no_website",
+        "detected_country": discovery_result.get("detected_country"),
+        "country_confidence": discovery_result.get("country_confidence", 0.0),
+        "country_signals": discovery_result.get("country_signals", []),
         "stages": {
             "google_search": {
                 "searched": True,

@@ -306,7 +306,7 @@ class OutscraperClient:
                     "city": business.get("city"),
                     "state": business.get("state"),
                     "zip_code": business.get("postal_code"),
-                    "country": business.get("country_code", "US"),
+                    "country": business.get("country_code") or None,
                     "latitude": business.get("latitude"),
                     "longitude": business.get("longitude"),
                     

@@ -95,6 +95,9 @@ class LLMDiscoveryService:
                 - found: Boolean indicating if website was found
                 - confidence: Confidence score (0.0-1.0)
                 - reasoning: LLM's explanation
+                - detected_country: ISO country code inferred from search results
+                - country_confidence: Confidence for country detection (0.0-1.0)
+                - country_signals: List of signals used for country detection
                 - search_results: Raw ScrapingDog response
                 - query: Search query used
                 - llm_analysis: Full LLM response
@@ -116,6 +119,9 @@ class LLMDiscoveryService:
                 "found": False,
                 "confidence": 0.95,
                 "reasoning": "ScrapingDog API error or returned no data",
+                "detected_country": None,
+                "country_confidence": 0.0,
+                "country_signals": [],
                 "search_results": None,
                 "query": self._build_query(business_name, city, state),
                 "llm_analysis": None,
@@ -129,13 +135,16 @@ class LLMDiscoveryService:
                 "found": False,
                 "confidence": 0.95,
                 "reasoning": "No Google search results found",
+                "detected_country": None,
+                "country_confidence": 0.0,
+                "country_signals": [],
                 "search_results": search_results,
                 "query": self._build_query(business_name, city, state),
                 "llm_analysis": None,
                 "llm_model": await self._get_llm_model()
             }
         
-        # Step 2: Use LLM to analyze results
+        # Step 2: Use LLM to analyze results (includes country detection)
         logger.info(f"🤖 Analyzing {len(search_results['organic_results'])} search results with LLM...")
         
         llm_analysis = await self._analyze_with_llm(
@@ -144,21 +153,33 @@ class LLMDiscoveryService:
             address=address,
             city=city,
             state=state,
+            country=country,
             search_results=search_results["organic_results"]
         )
         
         found_url = llm_analysis.get("url")
+        detected_country = llm_analysis.get("detected_country")
         
         if found_url:
             logger.info(f"✅ Found website: {found_url} (confidence: {llm_analysis.get('confidence', 0)})")
         else:
             logger.info(f"❌ No matching website found")
+
+        if detected_country:
+            logger.info(
+                f"🌍 Detected country: {detected_country} "
+                f"(confidence: {llm_analysis.get('country_confidence', 0)}) "
+                f"signals: {llm_analysis.get('country_signals', [])}"
+            )
         
         return {
             "url": found_url,
             "found": bool(found_url),
             "confidence": llm_analysis.get("confidence", 0),
             "reasoning": llm_analysis.get("reasoning", ""),
+            "detected_country": detected_country,
+            "country_confidence": llm_analysis.get("country_confidence", 0.0),
+            "country_signals": llm_analysis.get("country_signals", []),
             "search_results": search_results,
             "query": self._build_query(business_name, city, state),
             "llm_analysis": llm_analysis,
@@ -242,10 +263,14 @@ class LLMDiscoveryService:
         address: Optional[str],
         city: Optional[str],
         state: Optional[str],
-        search_results: List[Dict]
+        search_results: List[Dict],
+        country: str = "US"
     ) -> Dict[str, Any]:
         """
         Use LLM to analyze search results and find the best matching website.
+
+        Also performs country detection based on signals in the search result
+        snippets (phone prefixes, postal code patterns, location mentions).
         
         Args:
             business_name: Name of the business
@@ -254,9 +279,11 @@ class LLMDiscoveryService:
             city: City
             state: State
             search_results: List of organic search results from ScrapingDog
+            country: Expected country code (used as a hint, not enforced)
             
         Returns:
-            Dict with url, confidence, reasoning, match_signals
+            Dict with url, confidence, reasoning, match_signals,
+            detected_country, country_confidence, country_signals
         """
         # Prepare business context
         business_context = {
@@ -264,7 +291,8 @@ class LLMDiscoveryService:
             "phone": phone,
             "address": address,
             "city": city,
-            "state": state
+            "state": state,
+            "expected_country": country
         }
         
         # Prepare search results for LLM
@@ -278,7 +306,7 @@ class LLMDiscoveryService:
                 "displayed_link": result.get("displayed_link", "")
             })
         
-        # Build LLM prompt
+        # Build LLM prompt (includes country detection instructions)
         prompt = self._build_discovery_prompt(business_context, formatted_results)
         
         try:
@@ -325,6 +353,9 @@ Return your analysis in valid JSON format only.""",
                 "confidence": llm_result.get("confidence", 0),
                 "reasoning": llm_result.get("reasoning", ""),
                 "match_signals": llm_result.get("match_signals", {}),
+                "detected_country": llm_result.get("detected_country"),
+                "country_confidence": llm_result.get("country_confidence", 0.0),
+                "country_signals": llm_result.get("country_signals", []),
                 "llm_model": model,
                 "llm_tokens": response.usage.input_tokens + response.usage.output_tokens,
                 "llm_raw_response": response_text
@@ -337,6 +368,9 @@ Return your analysis in valid JSON format only.""",
                 "url": None,
                 "confidence": 0,
                 "reasoning": f"LLM response parse error: {str(e)}",
+                "detected_country": None,
+                "country_confidence": 0.0,
+                "country_signals": [],
                 "error": str(e)
             }
         except Exception as e:
@@ -345,6 +379,9 @@ Return your analysis in valid JSON format only.""",
                 "url": None,
                 "confidence": 0,
                 "reasoning": f"LLM analysis error: {str(e)}",
+                "detected_country": None,
+                "country_confidence": 0.0,
+                "country_signals": [],
                 "error": str(e)
             }
     
@@ -353,9 +390,11 @@ Return your analysis in valid JSON format only.""",
         business: Dict[str, Any],
         search_results: List[Dict]
     ) -> str:
-        """Build the LLM prompt for website discovery."""
+        """Build the LLM prompt for website discovery, including country detection."""
         
-        prompt = f"""Analyze these Google search results to find the official website for this business.
+        expected_country = business.get("expected_country", "US")
+
+        prompt = f"""Analyze these Google search results to find the official website for this business AND determine which country the business is located in.
 
 **BUSINESS INFORMATION:**
 - Name: {business['name']}
@@ -363,6 +402,7 @@ Return your analysis in valid JSON format only.""",
 - Address: {business.get('address') or 'Not provided'}
 - City: {business.get('city') or 'Not provided'}
 - State: {business.get('state') or 'Not provided'}
+- Expected Country: {expected_country}
 
 **GOOGLE SEARCH RESULTS (Top 10):**
 
@@ -382,9 +422,11 @@ Result #{result['rank']}:
 
 **YOUR TASK:**
 
-Analyze ALL 10 results and determine which URL (if any) is the official website for this specific business location.
+Analyze ALL results and:
+1. Determine which URL (if any) is the official website for this specific business location.
+2. Determine which COUNTRY this business is actually located in.
 
-**CROSS-REFERENCING INSTRUCTIONS:**
+**WEBSITE CROSS-REFERENCING INSTRUCTIONS:**
 
 1. **Phone Number Matching (HIGHEST PRIORITY):**
    - Check if the business phone appears in ANY snippet
@@ -410,6 +452,36 @@ Analyze ALL 10 results and determine which URL (if any) is the official website 
    - If it's a franchise (e.g., "Mr. Rooter of Seattle"), the local franchise page IS valid
    - Verify by checking if phone/address in snippet matches business data
 
+**COUNTRY DETECTION INSTRUCTIONS:**
+
+Determine the actual country of this business using these signals (in priority order):
+
+1. **Phone number prefix (STRONGEST signal):**
+   - +44 or (0)XX = United Kingdom → "GB"
+   - +1 with area codes 204/226/236/249/250/289/306/343/365/403/416/418/431/437/438/450/506/514/519/548/579/581/587/604/613/639/647/672/705/709/778/780/782/807/819/825/867/873/902/905 = Canada → "CA"
+   - +1 with other area codes = United States → "US"
+   - +61 = Australia → "AU"
+   - +52 = Mexico → "MX"
+   - +44 = United Kingdom → "GB"
+
+2. **Postal code format in snippets:**
+   - UK: letter-number patterns like "SW1A 1AA", "EC1A 1BB" → "GB"
+   - Canada: letter-number-letter patterns like "T2P 3C3", "M5V 2T6" → "CA"
+   - US: 5-digit or 5+4 digit like "90210" or "90210-1234" → "US"
+   - Australia: 4-digit like "2000", "3000" → "AU"
+
+3. **City/location mentions in snippets:**
+   - London, Manchester, Birmingham, Glasgow = "GB"
+   - Toronto, Vancouver, Calgary, Edmonton, Montreal = "CA"
+   - Sydney, Melbourne, Brisbane = "AU"
+
+4. **Domain TLD:**
+   - .co.uk, .org.uk → "GB"
+   - .ca → "CA"
+   - .com.au, .net.au → "AU"
+
+5. **Default:** If no clear signals, use the Expected Country field above.
+
 **DECISION CRITERIA:**
 
 - **Found & High Confidence (0.8-1.0):** Phone or address match in snippet
@@ -428,7 +500,10 @@ Analyze ALL 10 results and determine which URL (if any) is the official website 
     "name_match": true,
     "location_match": true,
     "result_rank": 2
-  }
+  },
+  "detected_country": "US",
+  "country_confidence": 0.9,
+  "country_signals": ["Phone +1 area code 213 is a US area code", "Address mentions Los Angeles, CA zip 90001"]
 }
 
 **IMPORTANT:** Return ONLY valid JSON. No markdown, no explanation outside the JSON.
