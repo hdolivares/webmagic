@@ -805,6 +805,15 @@
   margin-bottom: var(--spacing-sm, 8px);
 }
 
+.dns-sub-record-title {
+  font-size: var(--font-size-sm, 13px);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-secondary, #555);
+  margin: var(--spacing-md, 12px) 0 var(--spacing-xs, 4px);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .dns-cloudflare-note {
   font-size: var(--font-size-sm, 13px);
   color: var(--color-text-secondary, #666);
