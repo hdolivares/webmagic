@@ -4,9 +4,16 @@ Customer Authentication API Endpoints
 Handles customer registration, login, email verification,
 and password management.
 
+Also contains customer-facing domain management endpoints that use customer
+auth (get_current_customer) so the customer portal can manage domains without
+needing admin credentials.
+
 Author: WebMagic Team
 Date: January 21, 2026
 """
+from typing import Optional
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
@@ -35,6 +42,17 @@ from api.schemas.customer_auth import (
 from models.site_models import CustomerUser
 from services.customer_auth_service import CustomerAuthService
 from services.emails.email_service import get_email_service
+from services.customer_site_service import CustomerSiteService
+from services.platform.domain_service import get_domain_service
+from api.schemas.domain import (
+    DomainConnectRequest,
+    DomainConnectResponse,
+    DomainVerifyRequest,
+    DomainVerifyResponse,
+    DomainStatusResponse,
+    DomainDisconnectResponse,
+    DNSRecordInfo,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -457,3 +475,176 @@ async def change_password(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Password change failed. Please try again."
         )
+
+
+# ============================================================
+# CUSTOMER-FACING DOMAIN MANAGEMENT
+# Routes: /customer/domain/...
+# Auth: get_current_customer (customer JWT, not admin JWT)
+# ============================================================
+
+async def _assert_site_ownership(
+    db: AsyncSession,
+    customer: CustomerUser,
+    site_id: UUID,
+) -> None:
+    """Raise 403 if the customer does not own the requested site."""
+    owns = await CustomerSiteService.verify_site_ownership(
+        db=db,
+        customer_user_id=customer.id,
+        site_id=site_id,
+    )
+    if not owns:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't own this site",
+        )
+
+
+@router.get(
+    "/domain/status",
+    response_model=Optional[DomainStatusResponse],
+    summary="Get domain status (customer)",
+    description="Get the custom domain status for a site owned by the customer.",
+)
+async def customer_get_domain_status(
+    site_id: UUID,
+    current_customer: CustomerUser = Depends(get_current_customer),
+    db: AsyncSession = Depends(get_db),
+):
+    await _assert_site_ownership(db, current_customer, site_id)
+    try:
+        domain_service = get_domain_service()
+        record = await domain_service.get_domain_status(db=db, site_id=site_id)
+        if not record:
+            return None
+        return DomainStatusResponse(
+            id=record.id,
+            domain=record.domain,
+            verification_status="verified" if record.verified else "pending",
+            verified=record.verified,
+            verified_at=record.verified_at,
+            ssl_status="active" if record.verified else "pending",
+            ssl_expires=None,
+            last_checked=record.last_check_at,
+            verification_attempts=record.verification_attempts,
+            dns_records=record.dns_records,
+        )
+    except Exception as e:
+        logger.error(f"[CustomerDomain] get_domain_status error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get domain status.")
+
+
+@router.post(
+    "/domain/connect",
+    response_model=DomainConnectResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Connect custom domain (customer)",
+    description="Initiate a custom domain connection for a site owned by the customer.",
+)
+async def customer_connect_domain(
+    site_id: UUID,
+    request: DomainConnectRequest,
+    current_customer: CustomerUser = Depends(get_current_customer),
+    db: AsyncSession = Depends(get_db),
+):
+    await _assert_site_ownership(db, current_customer, site_id)
+    try:
+        domain_service = get_domain_service()
+        record = await domain_service.request_domain_connection(
+            db=db,
+            site_id=site_id,
+            domain=request.domain,
+            verification_method=request.verification_method,
+            user_id=current_customer.id,
+        )
+        dns_instructions = domain_service.get_dns_instructions(
+            domain=record.domain,
+            token=record.verification_token,
+            method=record.verification_method,
+        )
+        return DomainConnectResponse(
+            id=record.id,
+            domain=record.domain,
+            verification_method=record.verification_method,
+            verification_token=record.verification_token,
+            dns_records=DNSRecordInfo(**dns_instructions),
+            instructions=dns_instructions["instructions"],
+            status="pending_verification",
+            created_at=record.created_at,
+        )
+    except (NotFoundError, ValidationError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[CustomerDomain] connect_domain error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to connect domain.")
+
+
+@router.post(
+    "/domain/verify",
+    response_model=DomainVerifyResponse,
+    summary="Verify domain ownership (customer)",
+    description="Check DNS records to verify domain ownership for a customer-owned site.",
+)
+async def customer_verify_domain(
+    site_id: UUID,
+    request: DomainVerifyRequest,
+    current_customer: CustomerUser = Depends(get_current_customer),
+    db: AsyncSession = Depends(get_db),
+):
+    await _assert_site_ownership(db, current_customer, site_id)
+    try:
+        domain_service = get_domain_service()
+        verified, dns_info = await domain_service.verify_domain(
+            db=db, site_id=site_id, domain=request.domain
+        )
+        return DomainVerifyResponse(
+            verified=verified,
+            domain=request.domain,
+            ssl_status="provisioning" if verified else None,
+            estimated_time="5-10 minutes" if verified else None,
+            message=(
+                "Domain verified successfully! SSL certificate provisioning will begin shortly."
+                if verified
+                else "Domain verification failed. Please check your DNS records."
+            ),
+            dns_found=dns_info,
+        )
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"[CustomerDomain] verify_domain error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to verify domain.")
+
+
+@router.delete(
+    "/domain/disconnect",
+    response_model=DomainDisconnectResponse,
+    summary="Disconnect custom domain (customer)",
+    description="Remove a custom domain from a site owned by the customer.",
+)
+async def customer_disconnect_domain(
+    site_id: UUID,
+    current_customer: CustomerUser = Depends(get_current_customer),
+    db: AsyncSession = Depends(get_db),
+):
+    await _assert_site_ownership(db, current_customer, site_id)
+    try:
+        domain_service = get_domain_service()
+        record = await domain_service.get_domain_status(db=db, site_id=site_id)
+        if not record:
+            raise HTTPException(status_code=404, detail="No custom domain found for this site")
+        domain = record.domain
+        await domain_service.remove_domain(
+            db=db, site_id=site_id, user_id=current_customer.id
+        )
+        return DomainDisconnectResponse(
+            success=True,
+            message=f"Domain {domain} has been disconnected successfully.",
+            default_url=f"https://web.lavish.solutions/{site_id}",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[CustomerDomain] disconnect_domain error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to disconnect domain.")

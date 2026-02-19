@@ -712,7 +712,7 @@ class ApiClient {
     }
   ): Promise<any> {
     const response = await this.client.post(
-      '/domains/connect',
+      '/customer/domain/connect',
       data,
       { params: { site_id: siteId } }
     )
@@ -724,7 +724,7 @@ class ApiClient {
     domain: string
   ): Promise<any> {
     const response = await this.client.post(
-      '/domains/verify',
+      '/customer/domain/verify',
       { domain },
       { params: { site_id: siteId } }
     )
@@ -732,14 +732,14 @@ class ApiClient {
   }
 
   async getDomainStatus(siteId: string): Promise<any> {
-    const response = await this.client.get('/domains/status', {
+    const response = await this.client.get('/customer/domain/status', {
       params: { site_id: siteId }
     })
     return response.data
   }
 
   async disconnectDomain(siteId: string): Promise<any> {
-    const response = await this.client.delete('/domains/disconnect', {
+    const response = await this.client.delete('/customer/domain/disconnect', {
       params: { site_id: siteId }
     })
     return response.data
