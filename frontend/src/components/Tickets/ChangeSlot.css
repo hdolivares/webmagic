@@ -1,84 +1,71 @@
-/* ── ChangeSlot ────────────────────────────────────────────────────────────
-   Semantic CSS variable references:
-   --color-primary-500        brand purple
-   --color-primary-200        light purple (tint)
-   --color-primary-700        dark purple
-   --background-default       page background
-   --background-secondary     elevated surface (card)
-   --background-tertiary      muted surface
-   --text-primary             main body text
-   --text-secondary           subdued text
-   --text-tertiary            placeholder text
-   --border-default           default border
-   --border-muted             subtle border
-   --radius-md                medium border radius
-   --radius-sm                small border radius
-   --shadow-sm                small shadow
-   --spacing-xs/sm/md/lg      spacing scale
-   --transition-fast          100ms ease
-──────────────────────────────────────────────────────────────────────────── */
+/* ── ChangeSlot ───────────────────────────────────────────────────────────── */
 
 /* ── Slot wrapper ─────────────────────────────────────────────────────────── */
 .change-slot {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  border: 1.5px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: var(--background-secondary);
+  gap: 8px;
+  padding: 10px;
+  border: 1.5px solid var(--border-default, #e2e8f0);
+  border-radius: 8px;
+  background: var(--background-default, #ffffff);
   transition:
-    border-color var(--transition-fast),
-    box-shadow var(--transition-fast);
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .change-slot--active {
-  border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  border-color: var(--color-primary-500, #6366f1);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
 }
 
-/* ── Header row ───────────────────────────────────────────────────────────── */
+/* ── Header ───────────────────────────────────────────────────────────────── */
 .change-slot__header {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 6px;
 }
 
 .change-slot__badge {
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--color-primary-500);
-  background: var(--color-primary-200);
-  padding: 2px 8px;
+  color: var(--color-primary-500, #6366f1);
+  background: var(--color-primary-200, rgba(99, 102, 241, 0.1));
+  padding: 2px 7px;
   border-radius: 20px;
+  flex-shrink: 0;
 }
 
 .change-slot__active-hint {
   flex: 1;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  color: var(--color-primary-500);
+  color: var(--color-primary-500, #6366f1);
   animation: pulse-hint 1.6s ease-in-out infinite;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 @keyframes pulse-hint {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
+  50% { opacity: 0.5; }
 }
 
 .change-slot__remove {
   margin-left: auto;
   background: transparent;
   border: none;
-  color: var(--text-tertiary);
-  font-size: 0.85rem;
+  color: var(--text-tertiary, #94a3b8);
+  font-size: 0.8rem;
   cursor: pointer;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  border-radius: 4px;
   line-height: 1;
-  transition: color var(--transition-fast), background var(--transition-fast);
+  transition: color 120ms ease, background 120ms ease;
+  flex-shrink: 0;
 }
 
 .change-slot__remove:hover {
@@ -90,26 +77,28 @@
 .change-slot__description {
   width: 100%;
   resize: vertical;
-  min-height: 72px;
-  padding: var(--spacing-sm);
-  border: 1.5px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  background: var(--background-default);
-  color: var(--text-primary);
-  font-size: 0.9rem;
+  min-height: 64px;
+  max-height: 160px;
+  padding: 7px 8px;
+  border: 1.5px solid var(--border-default, #e2e8f0);
+  border-radius: 5px;
+  background: var(--background-default, #ffffff);
+  color: var(--text-primary, #1e293b);
+  font-size: 0.82rem;
   font-family: inherit;
-  line-height: 1.5;
-  transition: border-color var(--transition-fast);
+  line-height: 1.45;
+  transition: border-color 120ms ease;
   box-sizing: border-box;
 }
 
 .change-slot__description::placeholder {
-  color: var(--text-tertiary);
+  color: var(--text-tertiary, #94a3b8);
+  font-size: 0.8rem;
 }
 
 .change-slot__description:focus {
   outline: none;
-  border-color: var(--color-primary-500);
+  border-color: var(--color-primary-500, #6366f1);
 }
 
 /* ── Pin area ─────────────────────────────────────────────────────────────── */
@@ -117,51 +106,50 @@
   margin-top: 2px;
 }
 
-/* Idle state */
+/* Idle pin button */
 .change-slot__pin-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   width: 100%;
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1.5px dashed var(--border-default);
-  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  border: 1.5px dashed var(--border-default, #e2e8f0);
+  border-radius: 5px;
   background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
+  color: var(--text-secondary, #64748b);
+  font-size: 0.78rem;
   cursor: pointer;
-  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
 }
 
 .change-slot__pin-btn:hover {
-  border-color: var(--color-primary-500);
-  color: var(--color-primary-500);
-  background: var(--color-primary-200);
+  border-color: var(--color-primary-500, #6366f1);
+  color: var(--color-primary-500, #6366f1);
+  background: var(--color-primary-200, rgba(99, 102, 241, 0.06));
 }
 
 /* Active (waiting for click) state */
 .change-slot__pin-btn--active {
   border-style: solid;
-  border-color: var(--color-primary-500);
-  background: var(--color-primary-200);
-  color: var(--color-primary-700);
+  border-color: var(--color-primary-500, #6366f1);
+  background: var(--color-primary-200, rgba(99, 102, 241, 0.08));
+  color: var(--color-primary-700, #4f46e5);
   font-weight: 600;
   cursor: crosshair;
   animation: border-pulse 1.4s ease-in-out infinite;
 }
 
 @keyframes border-pulse {
-  0%, 100% { border-color: var(--color-primary-500); }
-  50% { border-color: var(--color-primary-200); }
+  0%, 100% { border-color: var(--color-primary-500, #6366f1); }
+  50% { border-color: var(--color-primary-200, rgba(99, 102, 241, 0.3)); }
 }
 
-/* Pulsing dot when actively pinning */
 .change-slot__pin-pulse {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--color-primary-500);
+  background: var(--color-primary-500, #6366f1);
   flex-shrink: 0;
   animation: dot-pulse 1s ease-in-out infinite;
 }
@@ -172,32 +160,32 @@
 }
 
 .change-slot__optional {
-  color: var(--text-tertiary);
-  font-size: 0.8em;
+  color: var(--text-tertiary, #94a3b8);
+  font-size: 0.75em;
 }
 
 /* ── Pinned element ───────────────────────────────────────────────────────── */
 .change-slot__pinned-element {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: 4px;
 }
 
 .change-slot__replace-btn {
   align-self: flex-end;
   background: transparent;
-  border: 1px solid var(--border-muted);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  font-size: 0.78rem;
-  padding: 3px 10px;
+  border: 1px solid var(--border-muted, #e2e8f0);
+  border-radius: 4px;
+  color: var(--text-secondary, #64748b);
+  font-size: 0.72rem;
+  padding: 2px 8px;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 120ms ease;
 }
 
 .change-slot__replace-btn:hover,
 .change-slot__replace-btn--active {
-  border-color: var(--color-primary-500);
-  color: var(--color-primary-500);
-  background: var(--color-primary-200);
+  border-color: var(--color-primary-500, #6366f1);
+  color: var(--color-primary-500, #6366f1);
+  background: var(--color-primary-200, rgba(99, 102, 241, 0.06));
 }

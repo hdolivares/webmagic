@@ -2,11 +2,11 @@
  * SiteEditPanel Styles
  *
  * Full-screen split-pane layout for site_edit ticket creation.
- *   Left column  — customer's live site iframe
- *   Right column — structured change slots
+ *   Left column  (70%) — customer's live site iframe
+ *   Right column (30%) — structured change slots
  *
- * All colours reference semantic CSS variables; no hardcoded hex values
- * except for the dark header which uses a named scale value.
+ * All colours reference semantic CSS variables with hardcoded fallbacks
+ * so the panel renders correctly even if variables aren't defined on the page.
  */
 
 /* ── Outer container ──────────────────────────────────────────────────────── */
@@ -14,10 +14,10 @@
 .site-edit-panel {
   position: fixed;
   inset: 0;
-  z-index: var(--z-index-modal, 9000);
+  z-index: 9100;                            /* explicit value — not a variable */
   display: flex;
   flex-direction: column;
-  background: var(--background-default);
+  background: var(--background-default, #f8fafc);
   animation: sep-in 200ms ease;
 }
 
@@ -32,12 +32,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 20px;
+  padding: 8px 16px;
   background: var(--color-primary-900, #1e1b4b);
   color: #e0e7ff;
   flex-shrink: 0;
   gap: 12px;
-  min-height: 52px;
+  min-height: 48px;
 }
 
 .site-edit-panel__header-left {
@@ -54,38 +54,38 @@
 
 .site-edit-panel__header-title {
   display: block;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: #e0e7ff;
 }
 
 .site-edit-panel__header-site {
-  font-size: 0.78rem;
-  color: rgba(224, 231, 255, 0.65);
+  font-size: 0.75rem;
+  color: rgba(224, 231, 255, 0.6);
 }
 
 .site-edit-panel__change-count {
-  font-size: 0.78rem;
-  color: rgba(224, 231, 255, 0.7);
+  font-size: 0.75rem;
+  color: rgba(224, 231, 255, 0.65);
   white-space: nowrap;
 }
 
 .site-edit-panel__close {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: var(--radius-sm, 6px);
+  gap: 5px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 5px;
   color: #e0e7ff;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   cursor: pointer;
   transition: background 120ms ease;
 }
 
 .site-edit-panel__close:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 /* ── Body: two-column split ──────────────────────────────────────────────── */
@@ -97,13 +97,13 @@
   min-height: 0;
 }
 
-/* LEFT — iframe column */
+/* LEFT — site iframe (70%) */
 .site-edit-panel__site {
-  flex: 0 0 62%;
+  flex: 0 0 70%;
   display: flex;
   flex-direction: column;
   position: relative;
-  border-right: 1px solid var(--border-default);
+  border-right: 1px solid var(--border-default, #e2e8f0);
   overflow: hidden;
 }
 
@@ -114,29 +114,30 @@
   display: block;
 }
 
-/* RIGHT — form column */
+/* RIGHT — form column (30%) */
 .site-edit-panel__form-col {
-  flex: 0 0 38%;
+  flex: 0 0 30%;
   display: flex;
   flex-direction: column;
-  background: var(--background-secondary);
+  background: var(--background-secondary, #f1f5f9);
   overflow-y: auto;
+  min-width: 280px;
 }
 
 .site-edit-panel__form {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md, 16px);
-  padding: var(--spacing-lg, 24px) var(--spacing-md, 16px);
+  gap: 12px;
+  padding: 14px 12px;
   flex: 1;
 }
 
 /* ── Intro text ───────────────────────────────────────────────────────────── */
 
 .site-edit-panel__intro {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
+  font-size: 0.78rem;
+  color: var(--text-secondary, #64748b);
+  line-height: 1.45;
   margin: 0;
 }
 
@@ -145,7 +146,7 @@
 .site-edit-panel__slots {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md, 16px);
+  gap: 10px;
 }
 
 /* ── Add change button ────────────────────────────────────────────────────── */
@@ -153,22 +154,22 @@
 .site-edit-panel__add-change {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   align-self: flex-start;
   background: transparent;
-  border: 1.5px dashed var(--border-default);
-  border-radius: var(--radius-md, 8px);
-  color: var(--color-primary-500);
-  font-size: 0.875rem;
+  border: 1.5px dashed var(--border-default, #e2e8f0);
+  border-radius: 6px;
+  color: var(--color-primary-500, #6366f1);
+  font-size: 0.8rem;
   font-weight: 600;
-  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  padding: 6px 12px;
   cursor: pointer;
   transition: border-color 120ms ease, background 120ms ease;
 }
 
 .site-edit-panel__add-change:hover:not(:disabled) {
-  border-color: var(--color-primary-500);
-  background: var(--color-primary-200);
+  border-color: var(--color-primary-500, #6366f1);
+  background: var(--color-primary-200, rgba(99, 102, 241, 0.08));
 }
 
 .site-edit-panel__add-change:disabled {
@@ -177,9 +178,9 @@
 }
 
 .site-edit-panel__add-hint {
-  font-size: 0.78rem;
+  font-size: 0.73rem;
   font-weight: 400;
-  color: var(--text-tertiary);
+  color: var(--text-tertiary, #94a3b8);
 }
 
 /* ── Error ─────────────────────────────────────────────────────────────────── */
@@ -187,33 +188,32 @@
 .site-edit-panel__error {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  gap: 7px;
+  padding: 7px 12px;
   background: rgba(239, 68, 68, 0.08);
   border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: 5px;
   color: var(--color-error, #ef4444);
-  font-size: 0.84rem;
+  font-size: 0.8rem;
 }
 
 /* ── Actions row ──────────────────────────────────────────────────────────── */
 
 .site-edit-panel__actions {
   display: flex;
-  gap: var(--spacing-sm, 8px);
+  gap: 8px;
   justify-content: flex-end;
-  padding-top: var(--spacing-sm, 8px);
+  padding-top: 4px;
   margin-top: auto;
 }
 
-/* Shared button base */
 .site-edit-panel__btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 9px 18px;
-  border-radius: var(--radius-sm, 6px);
-  font-size: 0.875rem;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: 5px;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 120ms ease, opacity 120ms ease;
@@ -227,31 +227,31 @@
 
 .site-edit-panel__btn--secondary {
   background: transparent;
-  border-color: var(--border-default);
-  color: var(--text-secondary);
+  border-color: var(--border-default, #e2e8f0);
+  color: var(--text-secondary, #64748b);
 }
 
 .site-edit-panel__btn--secondary:hover:not(:disabled) {
-  background: var(--background-tertiary);
+  background: var(--background-tertiary, #e2e8f0);
 }
 
 .site-edit-panel__btn--primary {
-  background: var(--color-primary-500);
+  background: var(--color-primary-500, #6366f1);
   color: #fff;
-  border-color: var(--color-primary-500);
+  border-color: var(--color-primary-500, #6366f1);
 }
 
 .site-edit-panel__btn--primary:hover:not(:disabled) {
-  background: var(--color-primary-700);
-  border-color: var(--color-primary-700);
+  background: var(--color-primary-700, #4f46e5);
+  border-color: var(--color-primary-700, #4f46e5);
 }
 
 /* ── Spinner ──────────────────────────────────────────────────────────────── */
 
 .site-edit-panel__spinner {
   display: inline-block;
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-top-color: #fff;
   border-radius: 50%;
