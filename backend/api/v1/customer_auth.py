@@ -529,6 +529,8 @@ async def customer_get_domain_status(
             last_checked=record.last_check_at,
             verification_attempts=record.verification_attempts,
             dns_records=record.dns_records,
+            verification_token=record.verification_token,
+            verification_method=record.verification_method,
         )
     except Exception as e:
         logger.error(f"[CustomerDomain] get_domain_status error: {e}", exc_info=True)

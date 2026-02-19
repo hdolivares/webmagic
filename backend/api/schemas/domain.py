@@ -108,6 +108,10 @@ class DomainStatusResponse(BaseModel):
     last_checked: Optional[datetime] = None
     verification_attempts: int
     dns_records: Optional[Dict[str, Any]] = None
+    # Included so the frontend can display DNS setup instructions
+    # without requiring a separate API call.
+    verification_token: Optional[str] = None
+    verification_method: Optional[str] = None
     
     class Config:
         from_attributes = True
