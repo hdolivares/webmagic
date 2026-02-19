@@ -81,17 +81,26 @@ class SiteEditProcessor:
         context = await self._stage1_extract_context(db, ticket.site_id)
 
         # Stage 2: Decompose customer request.
-        # element_context is set when the customer used the visual element picker.
-        element_context = ticket.element_context  # Optional[List[Dict] | Dict] from JSONB column
-        pin_count = len(element_context) if isinstance(element_context, list) else (1 if element_context else 0)
+        # ticket.element_context stores List[TicketChange dicts] for structured tickets,
+        # or None for plain-text tickets (legacy / non-site_edit).
+        raw_changes = ticket.element_context  # Optional[List[Dict]]
+        changes: List[Dict[str, Any]] = []
+        if isinstance(raw_changes, list):
+            changes = raw_changes
+        elif isinstance(raw_changes, dict):
+            # Legacy single-element format — wrap in a list
+            changes = [{"description": ticket.description, "element_context": raw_changes}]
+
+        change_count = len(changes)
+        pin_count = sum(1 for c in changes if c.get("element_context"))
         logger.info(
-            f"[SiteEditProcessor] Stage 2: decomposing request: {ticket.description[:100]!r} "
-            f"({pin_count} pinned element(s))"
+            f"[SiteEditProcessor] Stage 2: {change_count} change(s), {pin_count} pinned. "
+            f"Request: {ticket.description[:100]!r}"
         )
         decomposition = await self._stage2_decompose_request(
-            edit_request=ticket.description,
             site_context=context,
-            element_context=element_context,
+            changes=changes,
+            fallback_description=ticket.description,
         )
 
         if decomposition.get("error"):
@@ -274,17 +283,20 @@ class SiteEditProcessor:
 
     async def _stage2_decompose_request(
         self,
-        edit_request: str,
         site_context: Dict[str, Any],
-        element_context: Optional[Dict[str, Any]] = None,
+        changes: List[Dict[str, Any]],
+        fallback_description: str = "",
     ) -> Dict[str, Any]:
         """
-        Use Claude to map the customer's natural-language request to a structured
-        list of edit operations.
+        Map structured customer changes → concrete edit operations.
 
-        When element_context is provided (customer used the visual picker), the LLM
-        receives the exact CSS selector, current styles, and HTML of the target element.
-        This eliminates all ambiguity about *which* element to change.
+        Each change in `changes` is a dict with:
+          - description     : plain-language intent (required)
+          - element_context : exact DOM snapshot from the visual picker (optional)
+
+        Having one (intent, optional_target) pair per change gives the LLM
+        zero-ambiguity matching — no cross-referencing across a global description
+        and a separate pin list.
         """
         css_vars = site_context.get("css_variables", {})
         key_section_rules = site_context.get("key_section_rules", "")
@@ -296,44 +308,51 @@ class SiteEditProcessor:
         ) or "  (none found)"
         sections_summary = "\n".join(f"  - {s}" for s in sections) or "  (none found)"
 
-        # ── Element context block ─────────────────────────────────────────────
-        # element_context may be a list (multi-pin) or a single dict (legacy).
-        pin_list: List[Dict[str, Any]] = []
-        if isinstance(element_context, list):
-            pin_list = element_context
-        elif isinstance(element_context, dict):
-            pin_list = [element_context]
+        # ── Build per-change blocks ───────────────────────────────────────────
+        # If no structured changes were provided, wrap the fallback description
+        # in a single change block so the prompt structure stays consistent.
+        if not changes:
+            changes = [{"description": fallback_description, "element_context": None}]
 
-        if pin_list:
-            pin_sections = []
-            for idx, pin in enumerate(pin_list, start=1):
+        change_blocks = []
+        for idx, change in enumerate(changes, start=1):
+            desc = change.get("description", "").strip()
+            pin = change.get("element_context")
+
+            pin_detail = ""
+            if pin and isinstance(pin, dict):
                 styles = pin.get("computed_styles", {})
-                styles_formatted = "\n".join(
-                    f"      {k}: {v}" for k, v in styles.items() if v
+                styles_fmt = "\n".join(
+                    f"        {k}: {v}" for k, v in styles.items() if v
                 )
-                pin_sections.append(
-                    f"  Pin {idx}:\n"
+                pin_detail = (
+                    f"\n  Pinned element (customer clicked this EXACT element):\n"
                     f"    CSS selector : {pin.get('css_selector', 'unknown')}\n"
                     f"    Tag          : <{pin.get('tag', '?')}>\n"
                     f"    DOM path     : {pin.get('dom_path', '')}\n"
                     f"    Text content : \"{pin.get('text_content', '')[:150]}\"\n"
                     f"    HTML snippet : {pin.get('html', '')[:300]}\n"
-                    f"    Computed styles:\n{styles_formatted}"
+                    f"    Computed styles:\n{styles_fmt}\n"
+                    f"  → For this change, target_selector MUST be: {pin.get('css_selector', '')}"
                 )
-            element_block = (
-                "\n=== PINNED ELEMENTS (customer clicked these exact elements) ===\n"
-                + "\n\n".join(pin_sections)
-                + "\n\nIMPORTANT: The customer PINNED these specific elements.\n"
-                + "Each edit operation MUST target one of these selectors.\n"
-                + "Do NOT guess which element they mean — they told you exactly.\n"
-            )
-        else:
-            element_block = ""
+            else:
+                pin_detail = "\n  Pinned element: (none — infer the target from the description and site structure)"
 
-        prompt = f"""You are a website editing assistant. A customer has submitted a change request for their website.
-You must figure out EXACTLY which CSS variable or HTML element needs to change to satisfy their request.
-The customer is NOT technical — they describe things visually, not by code.
-{element_block}
+            change_blocks.append(
+                f"Change {idx} of {len(changes)}:\n"
+                f"  Customer says: \"{desc}\""
+                + pin_detail
+            )
+
+        changes_block = "\n\n".join(change_blocks)
+
+        prompt = f"""You are a website editing assistant. A customer has submitted a structured list of changes for their website.
+Each change has a plain-language description and optionally a pinned element (the exact DOM node they clicked).
+The customer is NOT technical — interpret their words visually and concretely.
+
+=== CUSTOMER CHANGES ===
+{changes_block}
+
 === AVAILABLE CSS VARIABLES (:root) ===
 {css_vars_summary}
 
@@ -346,43 +365,48 @@ The customer is NOT technical — they describe things visually, not by code.
 === TOP OF PAGE HTML STRUCTURE ===
 {body_preview[:1500]}
 
-=== CUSTOMER REQUEST ===
-"{edit_request}"
-
 === YOUR TASK ===
-1. Read the customer request carefully. Interpret their visual/plain-language description.
-{'2. The customer PINNED ' + str(len(pin_list)) + ' ELEMENT(S) — use their CSS selectors and current styles to target each change precisely.' if pin_list else '2. Match their description to the actual CSS rules and variables shown above.'}
-   - "the top section" / "the banner" / "the header" usually means .hero or nav
-   - "background color" means a `background` or `background-color` CSS property
-   - "the black one" means find which variable is dark/black (e.g. #0a0a0f, #000)
-   - For color changes, prefer css_var_change if the color is controlled by a :root variable
-   - If the background is a gradient, you may need to change MULTIPLE variables
-3. Return ONLY valid JSON with no markdown fences:
+For EACH customer change above, produce one or more edit_operations.
+Match the change index (1, 2, 3) to the edit_operations via a "change_index" field.
+
+Interpretation rules:
+  - "the top section" / "the banner" / "the header" usually means .hero or nav
+  - "background color" means a `background` or `background-color` CSS property
+  - "the black one" / "the dark one" means find which variable is dark (e.g. #0a0a0f)
+  - For color changes, prefer css_var_change if the color is controlled by a :root variable
+  - For gradient backgrounds, you may need to change MULTIPLE variables
+  - If a pinned element is provided, its css_selector is authoritative — use it exactly
+  - Do NOT guess which element the customer means when a pin is provided
+
+Return ONLY valid JSON with no markdown fences:
 
 {{
-  "edit_summary": "One clear sentence describing exactly what will change",
+  "edit_summary": "One clear sentence describing ALL changes that will be made",
   "edit_operations": [
     {{
+      "change_index": 1,
       "type": "css_var_change",
       "target_variable": "--color-off-black",
       "current_value": "#0a0a0f",
       "new_value": "#0d1b2e",
-      "reason": "Hero gradient endpoint is --color-off-black which appears black; customer wants darker navy"
+      "reason": "Change 1: hero background uses --color-off-black; customer wants navy"
     }},
     {{
+      "change_index": 2,
       "type": "text_change",
       "selector_hint": "h1 in .hero section",
       "current_value": "exact current text here",
       "new_value": "exact new text here",
-      "reason": "Customer asked to change heading"
+      "reason": "Change 2: customer asked to update the main heading"
     }},
     {{
+      "change_index": 2,
       "type": "css_rule_change",
       "css_selector": "section.hero > h1",
       "property": "font-size",
       "current_value": "48px",
       "new_value": "60px",
-      "reason": "Customer pinned this h1 and asked for larger text"
+      "reason": "Change 2: customer pinned this h1 and asked for larger text"
     }}
   ],
   "complexity": "simple",
@@ -390,8 +414,8 @@ The customer is NOT technical — they describe things visually, not by code.
 }}
 
 Operation types:
-- css_var_change  : change a CSS custom property in :root (best for color/font/spacing)
-- text_change     : change visible text content (headings, paragraphs, phone numbers, CTAs)
+- css_var_change  : change a CSS custom property in :root (best for colors / fonts / spacing)
+- text_change     : change visible text (headings, paragraphs, phone numbers, CTAs)
 - css_rule_change : change a CSS property that is NOT a variable — use the exact selector
 - section_add     : add a new page section
 - section_remove  : remove an existing section
@@ -399,8 +423,9 @@ Operation types:
 
 Rules:
 - For css_var_change, target_variable MUST be one of the variables listed in AVAILABLE CSS VARIABLES.
-- For text_change, current_value must be as close to the exact text as possible.
-- For css_rule_change with a pinned element, use the css_selector from the PINNED ELEMENT block exactly.
+- For text_change, current_value must exactly match the text currently in the HTML.
+- For css_rule_change with a pinned element, copy the css_selector from the pinned element block.
+- Include a "change_index" on every operation so Stage 3 can log which change it came from.
 """
         try:
             response = await self._client.messages.create(

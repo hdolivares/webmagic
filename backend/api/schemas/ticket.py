@@ -12,7 +12,7 @@ from datetime import datetime
 class ElementContextSchema(BaseModel):
     """
     Snapshot of a DOM element captured by the visual element picker.
-    Attached to site_edit tickets to give the AI pipeline a precise target.
+    Included in a TicketChangeSchema to give the AI pipeline a precise target.
     """
     css_selector: str
     tag: str
@@ -26,21 +26,43 @@ class ElementContextSchema(BaseModel):
     captured_at: Optional[str] = None
 
 
+class TicketChangeSchema(BaseModel):
+    """
+    A single, self-contained change request.
+
+    Pairs one plain-language description with one optional pinned element.
+    Storing (intent, optional_target) per change gives Stage 2 zero-ambiguity
+    targeting — no cross-referencing between a global description and separate
+    element pins is required.
+    """
+    description: str = Field(
+        ...,
+        min_length=5,
+        description="Plain-language description of what the customer wants changed",
+    )
+    element_context: Optional[ElementContextSchema] = Field(
+        None,
+        description="Exact DOM element to target; null if the change is general",
+    )
+
+
 class TicketCreateRequest(BaseModel):
     """Request schema for creating a new ticket."""
 
     subject: str = Field(..., min_length=5, max_length=255, description="Ticket subject")
-    description: str = Field(..., min_length=10, description="Detailed description of the issue")
+    description: str = Field(..., min_length=5, description="Detailed description of the issue")
     category: str = Field(
         ...,
         description="Ticket category (billing, technical_support, site_edit, question, other)",
     )
     site_id: Optional[UUID] = Field(None, description="Optional site ID if ticket is site-specific")
-    element_context: Optional[List[ElementContextSchema]] = Field(
+    changes: Optional[List[TicketChangeSchema]] = Field(
         None,
+        max_length=3,
         description=(
-            "Ordered list of DOM element snapshots from the visual element picker "
-            "(maximum 3). Only meaningful for site_edit tickets."
+            "Structured change list for site_edit tickets (max 3). "
+            "Each change has its own description and an optional pinned element. "
+            "When provided, the top-level description field is treated as a fallback summary."
         ),
     )
 
@@ -103,7 +125,7 @@ class TicketResponse(BaseModel):
     customer_satisfaction_rating: Optional[str] = None
     internal_notes: Optional[str] = None
     tags: Optional[List[str]] = None
-    element_context: Optional[Dict[str, Any]] = None
+    element_context: Optional[Any] = None  # stores List[TicketChange] for site_edit tickets
     created_at: datetime
     updated_at: datetime
     messages: List[TicketMessageResponse] = []

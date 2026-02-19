@@ -1,29 +1,22 @@
 /**
  * Inspector Script — injected verbatim into the customer's site iframe.
  *
- * Behaviour (v2 — multi-select):
- *   • Hover → CSS outline highlight + tag tooltip
- *   • Click  → capture element metadata, postMessage to parent, show "Pinned!" flash
- *   • Does NOT close after a click — stays open for more selections
- *   • Receives WEBMAGIC_PIN_COUNT from parent to update the counter badge
- *   • Receives WEBMAGIC_SELECTION_LIMIT to disable further clicks
- *   • Esc key → cancel (posts WEBMAGIC_INSPECTOR_CANCELLED)
+ * v3 — slot-aware multi-select:
+ *   • Clicking without an active slot shows a friendly "pick a change first" message
+ *   • Receives WEBMAGIC_ACTIVE_SLOT { label } — updates banner with slot name
+ *   • Receives WEBMAGIC_PIN_COUNT  { count, max } — updates count badge
+ *   • Clicking with an active slot captures and posts WEBMAGIC_ELEMENT_SELECTED
+ *   • Esc → posts WEBMAGIC_INSPECTOR_CANCELLED
+ *   • Does NOT auto-close after a click
  */
 
 const UTILITY_CLASS_PATTERN =
   /^(flex|grid|block|inline|hidden|absolute|relative|fixed|sticky|overflow|container|wrapper|row|col(?:umn)?-?\d*|d-|is-|js-|text-(?:xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl|left|right|center|justify)|bg-|p-|px-|py-|pt-|pb-|pl-|pr-|m-|mx-|my-|mt-|mb-|ml-|mr-|w-|h-|min-[wh]-|max-[wh]-|border(?:-\w+)?|rounded(?:-\w+)?|shadow(?:-\w+)?|font-(?:thin|light|normal|medium|semibold|bold|extrabold|black|\d{3})|leading-|tracking-|items-|justify-|gap-|space-[xy]-|z-\d|opacity-|cursor-|select-|sr-only|not-sr-only|\d+)/
 
 const STYLE_KEYS = [
-  'font-size',
-  'font-weight',
-  'font-family',
-  'color',
-  'background-color',
-  'padding',
-  'margin',
-  'display',
-  'text-align',
-  'border-radius',
+  'font-size', 'font-weight', 'font-family', 'color',
+  'background-color', 'padding', 'margin', 'display',
+  'text-align', 'border-radius',
 ] as const
 
 export function buildInspectorScript(): string {
@@ -34,14 +27,14 @@ export function buildInspectorScript(): string {
 (function () {
   'use strict';
 
-  // ── Config ────────────────────────────────────────────────────────────────
-  var UTILITY_RE = new RegExp(${JSON.stringify(utilityPattern)});
-  var STYLE_KEYS  = ${styleKeys};
+  // ── State ─────────────────────────────────────────────────────────────────
+  var UTILITY_RE   = new RegExp(${JSON.stringify(utilityPattern)});
+  var STYLE_KEYS   = ${styleKeys};
+  var activeSlotLabel = null;  // null = no slot selected
   var pinCount = 0;
   var pinMax   = 3;
-  var limitReached = false;
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // ── Selector helpers ──────────────────────────────────────────────────────
   function semanticClasses(el) {
     return Array.from(el.classList)
       .filter(function(c) { return c.length > 2 && !UTILITY_RE.test(c); })
@@ -60,8 +53,7 @@ export function buildInspectorScript(): string {
         var sibs = Array.from(node.parentElement.children)
           .filter(function(s) { return s.tagName === node.tagName; });
         if (sibs.length > 1) {
-          var all = Array.from(node.parentElement.children);
-          seg += ':nth-child(' + (all.indexOf(node) + 1) + ')';
+          seg += ':nth-child(' + (Array.from(node.parentElement.children).indexOf(node) + 1) + ')';
         }
       }
       segs.unshift(seg);
@@ -73,8 +65,8 @@ export function buildInspectorScript(): string {
   function buildDomPath(el) {
     var crumbs = [], node = el;
     for (var d = 0; d < 5 && node && node.tagName; d++) {
-      var tag = node.tagName.toLowerCase();
-      var cls = Array.from(node.classList).filter(function(c) { return !UTILITY_RE.test(c); })[0];
+      var tag  = node.tagName.toLowerCase();
+      var cls  = Array.from(node.classList).filter(function(c) { return !UTILITY_RE.test(c); })[0];
       crumbs.unshift(node.id ? tag + '#' + node.id : cls ? tag + '.' + cls : tag);
       node = node.parentElement;
     }
@@ -89,55 +81,65 @@ export function buildInspectorScript(): string {
 
   // ── UI Elements ───────────────────────────────────────────────────────────
 
-  // Hover outline overlay
   var overlay = document.createElement('div');
-  overlay.id = '__wm_overlay__';
-  overlay.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483640;box-sizing:border-box;border:2px solid #6366f1;background:rgba(99,102,241,0.08);border-radius:3px;transition:all 70ms ease;display:none';
+  overlay.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483640;box-sizing:border-box;border:2px solid #6366f1;background:rgba(99,102,241,.08);border-radius:3px;transition:all 70ms ease;display:none';
   document.body.appendChild(overlay);
 
-  // Element tag tooltip
   var tooltip = document.createElement('div');
   tooltip.style.cssText = 'position:fixed;z-index:2147483645;background:#1e1b4b;color:#e0e7ff;font:600 11px/1 monospace;padding:3px 7px;border-radius:3px;pointer-events:none;white-space:nowrap;display:none;box-shadow:0 2px 8px rgba(0,0,0,.3)';
   document.body.appendChild(tooltip);
 
-  // Top banner / instructions
   var banner = document.createElement('div');
-  banner.id = '__wm_banner__';
-  banner.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:2147483647;background:#1e1b4b;color:#e0e7ff;font:500 13px/1.4 system-ui,sans-serif;padding:10px 20px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.3);pointer-events:none;white-space:nowrap';
-  updateBanner();
+  banner.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:2147483647;font:500 13px/1.4 system-ui,sans-serif;padding:9px 18px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.3);pointer-events:none;white-space:nowrap;transition:background 250ms ease';
   document.body.appendChild(banner);
 
-  // "Pinned!" flash confirmation
   var flash = document.createElement('div');
-  flash.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:2147483647;background:#059669;color:white;font:600 13px/1 system-ui,sans-serif;padding:8px 18px;border-radius:20px;pointer-events:none;opacity:0;transition:opacity 200ms ease;box-shadow:0 4px 12px rgba(0,0,0,.2)';
+  flash.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:2147483647;font:600 13px/1 system-ui,sans-serif;padding:8px 18px;border-radius:20px;pointer-events:none;opacity:0;transition:opacity 200ms ease;box-shadow:0 4px 12px rgba(0,0,0,.2)';
   document.body.appendChild(flash);
 
-  function updateBanner() {
-    if (limitReached) {
-      banner.textContent = '✓ ' + pinMax + '/' + pinMax + ' elements selected — type your request in the panel  •  Esc to cancel';
-      banner.style.background = '#064e3b';
+  function setBanner(text, bg, color) {
+    banner.textContent = text;
+    banner.style.background = bg || '#1e1b4b';
+    banner.style.color = color || '#e0e7ff';
+  }
+
+  function showFlash(text, bg, color) {
+    flash.textContent = text;
+    flash.style.background = bg || '#059669';
+    flash.style.color = color || 'white';
+    flash.style.opacity = '1';
+    setTimeout(function() { flash.style.opacity = '0'; }, 1800);
+  }
+
+  function refreshBanner() {
+    if (pinCount >= pinMax) {
+      setBanner('✓ All ' + pinMax + ' elements pinned — describe your changes in the panel', '#064e3b');
+      document.body.style.cursor = 'default';
+      overlay.style.display = 'none';
+    } else if (activeSlotLabel) {
+      setBanner('🎯 ' + activeSlotLabel + ' — click any element to pin it  •  Esc to cancel', '#312e81');
+      document.body.style.cursor = 'crosshair';
     } else {
-      banner.textContent = 'Click to pin an element (' + pinCount + '/' + pinMax + ')  •  Esc to cancel';
-      banner.style.background = '#1e1b4b';
+      setBanner('← Select a change in the panel, then click here to pin an element  •  Esc to cancel', '#374151');
+      document.body.style.cursor = 'default';
     }
   }
 
-  function showFlash(msg) {
-    flash.textContent = msg;
-    flash.style.opacity = '1';
-    setTimeout(function() { flash.style.opacity = '0'; }, 1600);
-  }
+  refreshBanner();
 
   // ── Mouse handlers ────────────────────────────────────────────────────────
   function onMouseMove(e) {
+    if (pinCount >= pinMax || !activeSlotLabel) {
+      overlay.style.display = 'none';
+      tooltip.style.display = 'none';
+      return;
+    }
     var el = e.target;
     if (!el || el === overlay || el === tooltip || el === banner || el === flash) return;
     var rect = el.getBoundingClientRect();
-    overlay.style.display = 'block';
-    overlay.style.top    = rect.top    + 'px';
-    overlay.style.left   = rect.left   + 'px';
-    overlay.style.width  = rect.width  + 'px';
-    overlay.style.height = rect.height + 'px';
+    overlay.style.cssText = overlay.style.cssText
+      .replace(/;display:[^;]*/g, '')
+      + ';display:block;top:' + rect.top + 'px;left:' + rect.left + 'px;width:' + rect.width + 'px;height:' + rect.height + 'px';
     var tag = el.tagName.toLowerCase();
     var cls = semanticClasses(el)[0];
     tooltip.textContent  = cls ? tag + '.' + cls : tag;
@@ -147,70 +149,69 @@ export function buildInspectorScript(): string {
   }
 
   function onClick(e) {
-    if (limitReached) {
-      showFlash('Limit reached — type your request in the panel');
-      return;
-    }
-    e.preventDefault();
-    e.stopImmediatePropagation();
-
     var el = e.target;
     if (!el || el === overlay || el === tooltip || el === banner || el === flash) return;
 
-    var rect = el.getBoundingClientRect();
-    var payload = {
-      css_selector:    buildSelector(el),
-      tag:             el.tagName.toLowerCase(),
-      id:              el.id || null,
-      classes:         Array.from(el.classList),
-      text_content:    (el.textContent || '').trim().slice(0, 300),
-      html:            el.outerHTML.slice(0, 600),
-      dom_path:        buildDomPath(el),
-      computed_styles: getStyles(el),
-      bounding_box: {
-        top:    Math.round(rect.top),
-        left:   Math.round(rect.left),
-        width:  Math.round(rect.width),
-        height: Math.round(rect.height),
-      },
-      captured_at: new Date().toISOString(),
-    };
-
-    window.parent.postMessage({ type: 'WEBMAGIC_ELEMENT_SELECTED', payload: payload }, '*');
-    // Parent will send WEBMAGIC_PIN_COUNT back; we optimistically increment for UX
-    pinCount = Math.min(pinCount + 1, pinMax);
-    updateBanner();
-    showFlash('✓ Element pinned!');
-  }
-
-  function onKeyDown(e) {
-    if (e.key === 'Escape') {
-      window.parent.postMessage({ type: 'WEBMAGIC_INSPECTOR_CANCELLED' }, '*');
+    if (pinCount >= pinMax) {
+      showFlash('All elements pinned. Describe your changes in the panel.', '#1f2937');
+      return;
     }
+
+    if (!activeSlotLabel) {
+      showFlash('← First select "Pin element" on a change in the panel', '#92400e', '#fef3c7');
+      return;
+    }
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    var rect = el.getBoundingClientRect();
+    window.parent.postMessage({
+      type: 'WEBMAGIC_ELEMENT_SELECTED',
+      payload: {
+        css_selector:    buildSelector(el),
+        tag:             el.tagName.toLowerCase(),
+        id:              el.id || null,
+        classes:         Array.from(el.classList),
+        text_content:    (el.textContent || '').trim().slice(0, 300),
+        html:            el.outerHTML.slice(0, 600),
+        dom_path:        buildDomPath(el),
+        computed_styles: getStyles(el),
+        bounding_box: {
+          top: Math.round(rect.top), left: Math.round(rect.left),
+          width: Math.round(rect.width), height: Math.round(rect.height),
+        },
+        captured_at: new Date().toISOString(),
+      },
+    }, '*');
+
+    showFlash('✓ Pinned to ' + activeSlotLabel, '#059669');
   }
 
-  // ── Listen for messages from parent ───────────────────────────────────────
+  // ── Inbound messages from parent ──────────────────────────────────────────
   window.addEventListener('message', function(e) {
     var data = e.data;
     if (!data || !data.type) return;
 
+    if (data.type === 'WEBMAGIC_ACTIVE_SLOT') {
+      activeSlotLabel = data.label || null;
+      refreshBanner();
+    }
+
     if (data.type === 'WEBMAGIC_PIN_COUNT') {
       pinCount = data.count;
       pinMax   = data.max;
-      limitReached = (pinCount >= pinMax);
-      updateBanner();
-      if (limitReached) {
-        document.body.style.cursor = 'not-allowed';
-        overlay.style.border = '2px solid #059669';
-      }
+      refreshBanner();
     }
   });
 
-  // ── Activate ──────────────────────────────────────────────────────────────
+  // ── Keyboard ──────────────────────────────────────────────────────────────
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') window.parent.postMessage({ type: 'WEBMAGIC_INSPECTOR_CANCELLED' }, '*');
+  });
+
   document.addEventListener('mousemove', onMouseMove, { passive: true });
   document.addEventListener('click', onClick, true);
-  document.addEventListener('keydown', onKeyDown);
-  document.body.style.cursor = 'crosshair';
 })();
 `
 }

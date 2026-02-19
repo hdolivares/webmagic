@@ -1,63 +1,59 @@
 /**
- * useElementPicker — multi-element selection hook.
+ * useElementPicker
  *
- * Manages the full lifecycle of the visual element picker:
- *   • Stores up to MAX_SELECTIONS pinned elements
- *   • Injects the inspector script once the iframe loads
- *   • Syncs the current pin count back into the iframe so its badge stays current
- *   • Exposes stable siteUrl so the overlay always renders with the correct URL
+ * Focused, single-responsibility hook for the iframe inspector.
+ * Responsibilities:
+ *   1. Inject the inspector script when the iframe loads
+ *   2. Surface the latest captured element as `lastCaptured`
+ *   3. Send control messages back into the iframe (active slot label, pin count)
+ *
+ * NOT responsible for:
+ *   - Managing the array of ticket changes (that's useTicketChanges)
+ *   - Deciding which change slot receives the captured element (that's SiteEditPanel)
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ElementContext, InspectorMessage } from './types'
 
-/** Hard cap on elements per ticket. Keeps LLM scope tight. */
-export const MAX_SELECTIONS = 3
-
 export interface UseElementPickerReturn {
-  /** Whether the iframe panel is currently visible */
-  isOpen: boolean
-
-  /** The URL currently loaded in the iframe (null when picker is closed) */
-  siteUrl: string | null
-
-  /** Ordered list of pinned elements (max MAX_SELECTIONS) */
-  selectedElements: ElementContext[]
-
-  /** True when selectedElements.length < MAX_SELECTIONS */
-  canAddMore: boolean
-
-  /** Open the picker panel for a given site URL */
-  openPicker: (url: string) => void
-
-  /** Close the panel (does not clear selections) */
-  closePicker: () => void
-
-  /** Remove a pinned element by index */
-  removeElement: (index: number) => void
-
-  /** Clear all pinned elements */
-  clearAll: () => void
-
-  /** Ref to attach to the <iframe> element */
+  /** Attach to the <iframe> element */
   iframeRef: React.RefObject<HTMLIFrameElement>
+
+  /** Most recently captured element; null until user clicks something */
+  lastCaptured: ElementContext | null
+
+  /** Call after routing lastCaptured to a change slot to reset it */
+  clearLastCaptured: () => void
+
+  /**
+   * Tell the iframe which change slot is currently active.
+   * The inspector updates its banner to "Pinning for Change N".
+   * Pass null to show the "select a change slot" prompt instead.
+   */
+  announceActiveSlot: (label: string | null) => void
+
+  /**
+   * Sync the pin count badge in the iframe.
+   * @param pinned  How many slots already have an element
+   * @param max     Hard cap (MAX_CHANGES)
+   */
+  announceSlotCount: (pinned: number, max: number) => void
 }
 
-export function useElementPicker(): UseElementPickerReturn {
-  const [isOpen, setIsOpen] = useState(false)
-  const [siteUrl, setSiteUrl] = useState<string | null>(null)
-  const [selectedElements, setSelectedElements] = useState<ElementContext[]>([])
+export function useElementPicker(opts?: {
+  /** Called when the user presses Esc inside the iframe */
+  onCancel?: () => void
+}): UseElementPickerReturn {
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [lastCaptured, setLastCaptured] = useState<ElementContext | null>(null)
 
-  const canAddMore = selectedElements.length < MAX_SELECTIONS
-
-  // ── Inject inspector script when iframe loads ─────────────────────────────
+  // ── Inject inspector on iframe load ───────────────────────────────────────
   const handleIframeLoad = useCallback(() => {
     const iframe = iframeRef.current
     if (!iframe) return
 
     try {
       const doc = iframe.contentDocument
-      if (!doc || !doc.body) return
+      if (!doc?.body) return
 
       import('./inspectorScript').then(({ buildInspectorScript }) => {
         const script = doc.createElement('script')
@@ -65,100 +61,63 @@ export function useElementPicker(): UseElementPickerReturn {
         doc.body.appendChild(script)
       })
     } catch (err) {
-      console.error('[ElementPicker] Could not inject inspector script:', err)
+      console.error('[ElementPicker] Could not inject inspector:', err)
     }
   }, [])
 
-  // ── Sync pin count into the iframe whenever it changes ───────────────────
-  const syncCountToIframe = useCallback(
-    (elements: ElementContext[]) => {
-      const iframe = iframeRef.current
-      if (!iframe || !isOpen) return
-      try {
-        iframe.contentWindow?.postMessage(
-          {
-            type: 'WEBMAGIC_PIN_COUNT',
-            count: elements.length,
-            max: MAX_SELECTIONS,
-          },
-          '*',
-        )
-      } catch {
-        // Cross-origin guard; shouldn't happen for same-origin sites
-      }
-    },
-    [isOpen],
-  )
-
   useEffect(() => {
-    if (isOpen) syncCountToIframe(selectedElements)
-  }, [selectedElements, isOpen, syncCountToIframe])
+    const iframe = iframeRef.current
+    if (!iframe) return
+    iframe.addEventListener('load', handleIframeLoad)
+    return () => iframe.removeEventListener('load', handleIframeLoad)
+  }, [handleIframeLoad])
 
-  // ── Listen for postMessage from the iframe ────────────────────────────────
+  // ── Listen for postMessages from the iframe ────────────────────────────────
   useEffect(() => {
-    if (!isOpen) return
-
     function handleMessage(event: MessageEvent) {
       const data = event.data as InspectorMessage | { type: string }
       if (!data?.type) return
 
       if (data.type === 'WEBMAGIC_ELEMENT_SELECTED') {
-        const incoming = (data as InspectorMessage).payload
-        setSelectedElements(prev => {
-          if (prev.length >= MAX_SELECTIONS) return prev
-          const updated = [...prev, incoming]
-          // Sync count immediately (state closure)
-          setTimeout(() => syncCountToIframe(updated), 0)
-          return updated
-        })
-        // Do NOT close — user continues selecting
+        setLastCaptured((data as InspectorMessage).payload)
       }
 
       if (data.type === 'WEBMAGIC_INSPECTOR_CANCELLED') {
-        setIsOpen(false)
+        opts?.onCancel?.()
       }
     }
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [isOpen, syncCountToIframe])
+  }, [opts?.onCancel])
 
-  // ── Attach iframe load listener whenever picker opens ─────────────────────
-  useEffect(() => {
-    const iframe = iframeRef.current
-    if (!iframe || !isOpen) return
-
-    iframe.addEventListener('load', handleIframeLoad)
-    return () => iframe.removeEventListener('load', handleIframeLoad)
-  }, [isOpen, handleIframeLoad])
-
-  // ── Public API ────────────────────────────────────────────────────────────
-  const openPicker = useCallback((url: string) => {
-    setSiteUrl(url)
-    setIsOpen(true)
+  // ── Outbound control helpers ───────────────────────────────────────────────
+  const postToIframe = useCallback((msg: object) => {
+    try {
+      iframeRef.current?.contentWindow?.postMessage(msg, '*')
+    } catch {
+      // Same-origin access guard — shouldn't happen for our own sites
+    }
   }, [])
 
-  const closePicker = useCallback(() => {
-    setIsOpen(false)
-  }, [])
+  const clearLastCaptured = useCallback(() => setLastCaptured(null), [])
 
-  const removeElement = useCallback((index: number) => {
-    setSelectedElements(prev => prev.filter((_, i) => i !== index))
-  }, [])
+  const announceActiveSlot = useCallback(
+    (label: string | null) => postToIframe({ type: 'WEBMAGIC_ACTIVE_SLOT', label }),
+    [postToIframe],
+  )
 
-  const clearAll = useCallback(() => {
-    setSelectedElements([])
-  }, [])
+  const announceSlotCount = useCallback(
+    (pinned: number, max: number) =>
+      postToIframe({ type: 'WEBMAGIC_PIN_COUNT', count: pinned, max }),
+    [postToIframe],
+  )
 
   return {
-    isOpen,
-    siteUrl,
-    selectedElements,
-    canAddMore,
-    openPicker,
-    closePicker,
-    removeElement,
-    clearAll,
     iframeRef,
+    lastCaptured,
+    clearLastCaptured,
+    announceActiveSlot,
+    announceSlotCount,
   }
 }
