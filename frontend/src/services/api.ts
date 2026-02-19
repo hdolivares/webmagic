@@ -759,7 +759,11 @@ class ApiClient {
     description: string
     category: string
     site_id?: string
-    element_context?: Record<string, any> | null
+    /** For site_edit tickets: structured per-change array */
+    changes?: Array<{
+      description: string
+      element_context?: Record<string, any> | null
+    }> | null
   }): Promise<any> {
     const response = await this.client.post('/tickets/', data)
     return response.data

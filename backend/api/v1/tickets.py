@@ -25,7 +25,8 @@ from api.schemas.ticket import (
     TicketCategoriesResponse,
     TicketMessageResponse,
     MessageResponse,
-    ErrorResponse
+    ErrorResponse,
+    TicketChangeSchema,
 )
 from models.site_models import CustomerUser
 from services.support.ticket_service import TicketService
@@ -150,10 +151,10 @@ async def create_ticket(
                 detail="You don't own this site"
             )
         
-        # Serialise element_context list → plain dicts for JSONB storage
-        element_context = (
-            [ec.model_dump() for ec in request.element_context]
-            if request.element_context
+        # Serialise changes → plain dicts for JSONB storage
+        changes = (
+            [c.model_dump() for c in request.changes]
+            if request.changes
             else None
         )
         ticket = await TicketService.create_ticket(
@@ -163,7 +164,7 @@ async def create_ticket(
             description=request.description,
             category=request.category,
             site_id=site_id,
-            element_context=element_context,
+            changes=changes,
         )
         
         logger.info(

@@ -131,7 +131,6 @@ const CreateTicketForm: React.FC<CreateTicketFormProps> = ({ siteId, onSuccess, 
         description,
         category,
         site_id: selectedSiteId || undefined,
-        element_context: null,
       })
       resetForm()
       onSuccess?.(ticket)
@@ -156,7 +155,10 @@ const CreateTicketForm: React.FC<CreateTicketFormProps> = ({ siteId, onSuccess, 
       description: data.description,
       category: 'site_edit',
       site_id: selectedSiteId || undefined,
-      element_context: data.element_context,
+      changes: data.changes.map(c => ({
+        description: c.description,
+        element_context: c.element ?? null,
+      })),
     })
     setSiteEditOpen(false)
     onSuccess?.(ticket)

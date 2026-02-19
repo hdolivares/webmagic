@@ -1,12 +1,13 @@
 /**
  * ElementPicker Types
  *
- * Shared interfaces for the visual element selection feature.
- * This data is attached to site_edit tickets so the AI pipeline
- * has precise targeting information instead of guessing from prose.
+ * Shared data contracts for the visual element selection and
+ * structured ticket change system.
  */
 
-/** Subset of computed CSS properties we capture for LLM context. */
+// ── Element snapshot ───────────────────────────────────────────────────────
+
+/** Subset of computed CSS properties captured for LLM context. */
 export interface CapturedStyles {
   'font-size': string
   'font-weight': string
@@ -20,7 +21,7 @@ export interface CapturedStyles {
   'border-radius'?: string
 }
 
-/** Geometric position within the page viewport. */
+/** Viewport-relative geometry. */
 export interface BoundingBox {
   top: number
   left: number
@@ -29,42 +30,41 @@ export interface BoundingBox {
 }
 
 /**
- * Full snapshot of a selected DOM element.
- * Serialised to JSON and stored in support_tickets.element_context.
+ * Full DOM element snapshot captured by the inspector.
+ * Stored per-change in support_tickets.element_context JSONB.
  */
 export interface ElementContext {
-  /** Shortest reliable CSS selector, e.g. "section.hero > h1" */
   css_selector: string
-
-  /** Tag name, e.g. "h1" */
   tag: string
-
-  /** Element id attribute (if present) */
   id: string | null
-
-  /** All class names on the element */
   classes: string[]
-
-  /** Visible text content, truncated at 300 chars */
   text_content: string
-
-  /** Outer HTML, truncated at 600 chars */
   html: string
-
-  /** Human-readable ancestry breadcrumb, e.g. "body > section.hero > h1" */
   dom_path: string
-
-  /** Key computed styles at the moment of capture */
   computed_styles: CapturedStyles
-
-  /** Viewport-relative bounding box */
   bounding_box: BoundingBox
-
-  /** ISO timestamp of when the element was picked */
   captured_at: string
 }
 
-/** Internal message shape sent via postMessage from iframe → parent. */
+// ── Ticket change ──────────────────────────────────────────────────────────
+
+/**
+ * A single, self-contained change request.
+ * Pairing one plain-language description with one optional pinned element
+ * gives Stage 2 zero-ambiguity targeting — no cross-referencing required.
+ */
+export interface TicketChange {
+  /** Client-side unique id (crypto.randomUUID) */
+  id: string
+  /** Customer's plain-language description of what to change */
+  description: string
+  /** The exact DOM element to target, or null if not pinned */
+  element: ElementContext | null
+}
+
+// ── postMessage contracts ──────────────────────────────────────────────────
+
+/** Sent from iframe → parent when an element is clicked. */
 export interface InspectorMessage {
   type: 'WEBMAGIC_ELEMENT_SELECTED'
   payload: ElementContext
