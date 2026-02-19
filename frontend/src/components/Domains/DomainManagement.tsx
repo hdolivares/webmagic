@@ -13,7 +13,8 @@ import './DomainManagement.css'
 
 interface DomainManagementProps {
   siteId: string
-  onAddDomain?: () => void
+  /** Called after the domain is successfully disconnected so the parent can switch views. */
+  onDisconnected?: () => void
 }
 
 interface DomainStatus {
@@ -83,7 +84,7 @@ function formatDate(dateString: string | null): string {
 
 // ─── component ──────────────────────────────────────────────────────────────
 
-export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps) {
+export function DomainManagement({ siteId, onDisconnected }: DomainManagementProps) {
   const [domainStatus, setDomainStatus] = useState<DomainStatus | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -143,8 +144,10 @@ export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps)
     setError(null)
     try {
       await api.disconnectDomain(siteId)
-      setDomainStatus(null)
       setShowRemoveConfirm(false)
+      // Let the parent page handle the view switch — don't render an empty
+      // state inside this component (which causes the broken layout).
+      onDisconnected?.()
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to remove domain. Please try again.')
     } finally {
@@ -176,37 +179,9 @@ export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps)
     )
   }
 
-  // ── No domain ────────────────────────────────────────────────────────────
-
-  if (!domainStatus) {
-    return (
-      <div className="domain-management">
-        <div className="empty-state">
-          <svg className="empty-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-          </svg>
-          <h3>No Custom Domain</h3>
-          <p>Connect your own domain to give your site a professional web address.</p>
-          <button className="btn-primary" onClick={onAddDomain}>
-            <svg className="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Connect Custom Domain
-          </button>
-          <div className="benefits-list">
-            {['Professional branding', 'Better SEO performance', 'Free SSL certificate'].map((b) => (
-              <div key={b} className="benefit-item">
-                <svg className="benefit-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span>{b}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // No domain — parent (DomainsPage) is responsible for switching to DomainSetup.
+  // Render nothing while the transition happens.
+  if (!domainStatus) return null
 
   // ── DNS record for pending verification ──────────────────────────────────
 

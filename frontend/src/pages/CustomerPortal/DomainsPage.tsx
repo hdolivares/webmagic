@@ -141,7 +141,10 @@ const DomainsPage: React.FC = () => {
 
       {selectedSiteId && (
         hasDomain ? (
-          <DomainManagement siteId={selectedSiteId} />
+          <DomainManagement
+            siteId={selectedSiteId}
+            onDisconnected={handleDomainUpdate}
+          />
         ) : (
           <DomainSetup siteId={selectedSiteId} onComplete={handleDomainUpdate} />
         )
