@@ -690,6 +690,7 @@ h1 {{ margin: 0 0 0.5rem; font-family: var(--font-heading); font-size: 2.5rem; c
             <div>
                 <p style="margin: 0; font-weight: 600; font-size: 15px;">Is this your business?</p>
                 <p style="margin: 0; font-size: 13px; opacity: 0.9;">Claim this website for only <strong>$497</strong> · Then just $97/month for hosting, maintenance & updates</p>
+                <a href="https://web.lavish.solutions/how-it-works" target="_blank" rel="noopener noreferrer" style="color: #bfdbfe; font-size: 12px; text-decoration: underline; margin-top: 2px; display: inline-block;">See what's included →</a>
             </div>
         </div>
         <button id="webmagic-claim-btn" style="background: #fbbf24; color: #1e3a5f; border: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px;">
