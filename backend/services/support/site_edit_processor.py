@@ -656,6 +656,13 @@ Return ONLY the updated HTML section:"""
             )
             updated_section = response.content[0].text.strip()
 
+            # Strip markdown code fences — the AI often wraps HTML in ```html ... ```
+            if updated_section.startswith("```"):
+                updated_section = re.sub(
+                    r"^```(?:html|css|javascript|js)?\s*", "", updated_section, flags=re.IGNORECASE
+                )
+                updated_section = re.sub(r"\s*```\s*$", "", updated_section).strip()
+
             # If the operation affected HTML, splice back the updated section
             if op_type in ("section_add", "section_remove", "image_change"):
                 if relevant_html and relevant_html in html and updated_section != relevant_html:
