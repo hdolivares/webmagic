@@ -1,0 +1,105 @@
+# WebMagic Frontend - React Dashboard + Customer Sites (path-based)
+#
+# Customer sites live at /var/www/sites/{slug}/ and are served on the
+# SAME origin as the portal (web.lavish.solutions) so that the SiteEditPanel
+# iframe has same-origin DOM access for the element inspector script injection.
+#
+# Location priority:
+#   ^~ /api/         prefix with stop-regex flag; API calls never hit slug regex
+#   ~  ^/slug/       customer site regex (before CSS/JS rule so site assets use correct root)
+#   ~* .html         no-cache for HTML
+#   ~* .(css|js|...) long-cache for portal static assets (only reached if not a site asset)
+#   /                SPA fallback for remaining portal routes
+
+server {
+    server_name web.lavish.solutions;
+
+    root /var/www/webmagic/frontend/dist;
+    index index.html;
+
+    add_header X-Content-Type-Options "nosniff" always;
+
+    # ── API Proxy ─────────────────────────────────────────────────────────
+    # ^~ prevents regex locations from matching /api/* paths.
+    location ^~ /api/ {
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' 'https://sites.lavish.solutions' always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS, PATCH' always;
+            add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, X-Requested-With' always;
+            add_header 'Access-Control-Allow-Credentials' 'true' always;
+            add_header 'Access-Control-Max-Age' 1728000 always;
+            add_header 'Content-Type' 'text/plain charset=UTF-8' always;
+            add_header 'Content-Length' 0 always;
+            return 204;
+        }
+
+        add_header 'Access-Control-Allow-Origin' 'https://sites.lavish.solutions' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS, PATCH' always;
+        add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, X-Requested-With' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+
+        proxy_pass http://127.0.0.1:8000/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+    }
+
+    # ── Customer sites ────────────────────────────────────────────────────
+    # root switches to /var/www/sites so Nginx resolves {root}/{request_uri}.
+    # Example: /test-cpa-site/styles.css -> /var/www/sites/test-cpa-site/styles.css
+    # Falls back to @portal (SPA) when the slug directory does not exist in
+    # /var/www/sites — ensures portal routes like /customer/* reach the React app.
+    location ~ ^/([a-z0-9][a-z0-9_-]*)/ {
+        root /var/www/sites;
+        index index.html;
+        try_files $uri $uri/index.html @portal;
+    }
+
+    # Named location: React portal SPA fallback
+    location @portal {
+        root /var/www/webmagic/frontend/dist;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # ── Portal static assets ──────────────────────────────────────────────
+    # Only reached for portal's own assets (customer site assets handled above).
+    location ~* \.html$ {
+        expires -1;
+        add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";
+    }
+
+    location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # ── SPA fallback ──────────────────────────────────────────────────────
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location ~ /\. { deny all; }
+
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/web.lavish.solutions/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/web.lavish.solutions/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+server {
+    if ($host = web.lavish.solutions) {
+        return 301 https://$host$request_uri;
+    }
+
+    listen 80;
+    server_name web.lavish.solutions;
+    return 404;
+}
