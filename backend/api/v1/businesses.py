@@ -225,24 +225,31 @@ async def get_businesses_needing_generation(
     current_user: AdminUser = Depends(get_current_user)
 ):
     """
-    Get all businesses that need website generation.
-    
-    Returns businesses that:
-    - Have no website URL
-    - Have been validated as truly having no website (missing or confirmed_missing)
-    - Are not already queued/generated (not in generated_sites table)
-    
-    Useful for bulk queueing on the AI Generation page.
+    Get all US businesses that are confirmed to have no website and are ready
+    for AI site generation.
+
+    Eligibility criteria:
+    1. Country = US  (SMS delivery only works in the US)
+    2. No website URL (confirmed by ScrapingDog + LLM pipeline)
+    3. Validation status = 'triple_verified' or 'confirmed_no_website'
+       - triple_verified:      Outscraper found no URL AND ScrapingDog confirmed none
+       - confirmed_no_website: ScrapingDog + LLM both confirmed no website exists
+       Old statuses 'missing' / 'confirmed_missing' are excluded because those
+       businesses bypassed the ScrapingDog double-check.
+    4. Rating >= 4.0  (business has good reviews — worth building a site for)
+    5. Operational (not permanently closed)
+    6. Not already in the generation queue / generated
     """
     try:
         from sqlalchemy import select, and_, or_
         from models.business import Business
         from models.site import GeneratedSite
-        
+
         logger.info("📊 Getting businesses needing generation...")
-        
-        # Find US businesses that need generation and aren't already queued
-        # (SMS integration only works for US; non-US businesses waste tokens)
+
+        # Minimum rating — good-review businesses only
+        MIN_RATING = 4.0
+
         query = select(Business).outerjoin(
             GeneratedSite,
             Business.id == GeneratedSite.business_id
@@ -251,18 +258,24 @@ async def get_businesses_needing_generation(
                 Business.country == 'US',
                 Business.website_url.is_(None),
                 or_(
-                    Business.website_validation_status == 'missing',
-                    Business.website_validation_status == 'confirmed_missing'
+                    Business.website_validation_status == 'triple_verified',
+                    Business.website_validation_status == 'confirmed_no_website',
                 ),
-                GeneratedSite.id.is_(None)  # Not already in generation queue
+                # Only good-rated businesses (rating exists AND meets threshold,
+                # OR rating is null — new scrapes may not have it yet)
+                or_(
+                    Business.rating.is_(None),
+                    Business.rating >= MIN_RATING,
+                ),
+                GeneratedSite.id.is_(None),  # Not already in generation queue
             )
-        ).order_by(Business.created_at.desc())
-        
+        ).order_by(Business.rating.desc().nullslast(), Business.review_count.desc())
+
         result = await db.execute(query)
         businesses = result.scalars().all()
-        
+
         logger.info(f"Found {len(businesses)} businesses needing generation")
-        
+
         # Format response with safe None handling
         businesses_data = []
         for b in businesses:
@@ -278,14 +291,15 @@ async def get_businesses_needing_generation(
                     "email": b.email,
                     "rating": float(b.rating) if b.rating else None,
                     "review_count": b.review_count or 0,
-                    "website_validation_status": b.website_validation_status or "missing",
+                    "qualification_score": b.qualification_score or 0,
+                    "website_validation_status": b.website_validation_status or "",
                     "created_at": b.created_at.isoformat() if b.created_at else None,
                 }
                 businesses_data.append(business_dict)
             except Exception as e:
                 logger.error(f"Error formatting business {b.id}: {e}")
                 continue
-        
+
         return {
             "total": len(businesses_data),
             "businesses": businesses_data
