@@ -40,6 +40,7 @@ import AccountSettingsPage from '@/pages/CustomerPortal/AccountSettingsPage'
 // Public Pages
 import SitePreviewPage from '@/pages/Public/SitePreviewPage'
 import PurchaseSuccessPage from '@/pages/Public/PurchaseSuccessPage'
+import HowItWorksPage from '@/pages/Public/HowItWorksPage'
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -89,6 +90,7 @@ function App() {
           {/* Public site preview & purchase */}
           <Route path="/site-preview/:slug" element={<SitePreviewPage />} />
           <Route path="/purchase-success" element={<PurchaseSuccessPage />} />
+          <Route path="/how-it-works" element={<HowItWorksPage />} />
 
           {/* Admin Protected routes */}
           <Route
