@@ -22,8 +22,9 @@ def main():
     print("="*70)
     
     with get_db_session_sync() as db:
-        # Find businesses ready for generation
+        # Find US businesses ready for generation (SMS only works for US)
         businesses = db.query(Business).filter(
+            Business.country == 'US',
             Business.website_url.is_(None),
             Business.website_validation_status == 'triple_verified',
             Business.qualification_score >= 70,

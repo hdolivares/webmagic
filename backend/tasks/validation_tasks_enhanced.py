@@ -28,6 +28,45 @@ from core.validation_enums import (
 
 logger = logging.getLogger(__name__)
 
+# Countries we support for SMS outreach
+_SUPPORTED_COUNTRIES = {"US"}
+
+
+def _apply_detected_country_from_validation(
+    business: Business,
+    validation_result: Dict[str, Any]
+) -> None:
+    """
+    Apply detected_country from the LLM website validator to the business record.
+
+    The validator inspects the actual website content (phone numbers, postal codes,
+    domain TLDs) and returns a detected_country alongside the standard verdict.
+    We use this to correct or populate business.country when Outscraper omitted it.
+
+    Only updates country when confidence >= 0.7 to avoid false positives.
+    """
+    detected_country = validation_result.get("detected_country")
+    country_confidence = validation_result.get("country_confidence", 0.0)
+    country_signals = validation_result.get("country_signals", [])
+
+    if not detected_country or country_confidence < 0.7:
+        return
+
+    old_country = business.country
+    if not old_country or old_country != detected_country:
+        logger.info(
+            f"🌍 Updating business {business.name!r} country from validation: "
+            f"{old_country!r} → {detected_country!r} "
+            f"(confidence={country_confidence:.0%}, signals={country_signals})"
+        )
+        business.country = detected_country
+
+    if detected_country not in _SUPPORTED_COUNTRIES:
+        logger.warning(
+            f"🚫 Business {business.name!r} detected as non-US ({detected_country}) "
+            f"during website validation."
+        )
+
 
 @shared_task(
     name="tasks.validation.validate_business_website_v2",
@@ -199,13 +238,16 @@ async def _run_website_validation(
     confidence = validation_result.get("confidence", 0)
     recommendation = validation_result.get("recommendation", "")
     invalid_reason = validation_result.get("invalid_reason")
-    
+
     logger.info(
         f"Validation complete: verdict={verdict}, "
         f"confidence={confidence:.2f}, "
         f"recommendation={recommendation}, "
         f"reason={invalid_reason}"
     )
+
+    # Apply detected country from the LLM validator's website analysis
+    _apply_detected_country_from_validation(business, validation_result)
     
     # Add to validation history
     business.website_metadata = metadata_service.add_validation_entry(

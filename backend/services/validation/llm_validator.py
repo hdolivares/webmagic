@@ -108,6 +108,14 @@ CROSS-REFERENCE RULES:
 - Wrong city/state mentioned prominently
 - Website clearly belongs to different business
 
+COUNTRY DETECTION:
+Also determine which country this business is located in, using signals from the website content:
+1. Phone numbers on the website: +44/UK format → "GB", +1 with Canadian area codes (780,604,416,514,905,647,etc.) → "CA", +1 with US area codes → "US", +61 → "AU"
+2. Address format: UK postcodes (e.g. SW1A 1AA) → "GB", Canadian postal codes (e.g. T2P 3C3) → "CA", US ZIP codes (5-digit) → "US"
+3. Domain TLD: .co.uk/.org.uk → "GB", .ca → "CA", .com.au → "AU"
+4. Explicit country/city mentions in content (London/Manchester → "GB", Toronto/Vancouver → "CA", Sydney → "AU")
+5. If no clear signals, use the Country from BUSINESS INFORMATION above.
+
 VALIDATION DECISION:
 Respond ONLY with valid JSON in this exact format:
 {{
@@ -121,7 +129,10 @@ Respond ONLY with valid JSON in this exact format:
     "name_match": true/false,
     "is_directory": true/false,
     "is_aggregator": true/false
-  }}
+  }},
+  "detected_country": "US" | "GB" | "CA" | "AU" | null,
+  "country_confidence": 0.0-1.0,
+  "country_signals": ["list of signals used to determine country"]
 }}
 
 VERDICT DEFINITIONS:
@@ -134,22 +145,22 @@ EXAMPLES:
 Example 1 - Member Directory:
 Business: DX Plumbing, Canton, OH
 URL: business.cantonchamber.org/member/dx-plumbing
-Result: {{"verdict": "missing", "confidence": 0.95, "reasoning": "This is a Canton Chamber of Commerce member directory listing, not the business's actual website. The business needs its own domain.", "recommendation": "clear_url_and_mark_missing", "match_signals": {{"phone_match": false, "address_match": false, "name_match": true, "is_directory": true, "is_aggregator": false}}}}
+Result: {{"verdict": "missing", "confidence": 0.95, "reasoning": "This is a Canton Chamber of Commerce member directory listing, not the business's actual website. The business needs its own domain.", "recommendation": "clear_url_and_mark_missing", "match_signals": {{"phone_match": false, "address_match": false, "name_match": true, "is_directory": true, "is_aggregator": false}}, "detected_country": "US", "country_confidence": 0.7, "country_signals": ["Canton, OH is in the United States"]}}
 
 Example 2 - MapQuest Aggregator:
 Business: Brian's Plumbing, Kansas
 URL: mapquest.com/us/kansas/brians-plumbing-456601382
-Result: {{"verdict": "missing", "confidence": 1.0, "reasoning": "MapQuest business listing page, not the company's website. This is an aggregator directory.", "recommendation": "clear_url_and_mark_missing", "match_signals": {{"phone_match": false, "address_match": false, "name_match": true, "is_directory": false, "is_aggregator": true}}}}
+Result: {{"verdict": "missing", "confidence": 1.0, "reasoning": "MapQuest business listing page, not the company's website. This is an aggregator directory.", "recommendation": "clear_url_and_mark_missing", "match_signals": {{"phone_match": false, "address_match": false, "name_match": true, "is_directory": false, "is_aggregator": true}}, "detected_country": "US", "country_confidence": 0.9, "country_signals": ["Kansas is a US state", "URL path contains /us/"]}}
 
 Example 3 - Valid Website with Phone Match:
 Business: Ray Miller Plumbing, Phone: (555) 123-4567
 URL: raymillerplumbinginc.com, Phones found: ["555-123-4567"]
-Result: {{"verdict": "valid", "confidence": 0.98, "reasoning": "Business name matches title, phone number matches exactly. This is clearly their official website.", "recommendation": "keep_url", "match_signals": {{"phone_match": true, "address_match": false, "name_match": true, "is_directory": false, "is_aggregator": false}}}}
+Result: {{"verdict": "valid", "confidence": 0.98, "reasoning": "Business name matches title, phone number matches exactly. This is clearly their official website.", "recommendation": "keep_url", "match_signals": {{"phone_match": true, "address_match": false, "name_match": true, "is_directory": false, "is_aggregator": false}}, "detected_country": "US", "country_confidence": 0.85, "country_signals": ["Phone area code 555 is a US number"]}}
 
-Example 4 - Unrelated Business:
-Business: Smith Plumbing, Austin TX
-URL: johnsplumbing.com with different phone/address
-Result: {{"verdict": "missing", "confidence": 0.90, "reasoning": "Website is for 'Johnson Plumbing' with different contact info. This is not Smith Plumbing's website.", "recommendation": "clear_url_and_mark_missing", "match_signals": {{"phone_match": false, "address_match": false, "name_match": false, "is_directory": false, "is_aggregator": false}}}}
+Example 4 - UK Business (wrong country):
+Business: London Plumbers, Phone: +44 20 7946 0123
+URL: londonplumbers.co.uk, Phones found: ["+44 20 7946 0123"]
+Result: {{"verdict": "valid", "confidence": 0.95, "reasoning": "Business name matches, UK phone number matches exactly.", "recommendation": "keep_url", "match_signals": {{"phone_match": true, "address_match": false, "name_match": true, "is_directory": false, "is_aggregator": false}}, "detected_country": "GB", "country_confidence": 0.99, "country_signals": ["+44 prefix indicates UK", ".co.uk TLD confirms UK"]}}
 
 Now analyze the provided business and website information above and return your validation decision."""
 
@@ -330,6 +341,9 @@ Now analyze the provided business and website information above and return your 
                 "is_directory": False,
                 "is_aggregator": False
             },
+            "detected_country": None,
+            "country_confidence": 0.0,
+            "country_signals": [],
             "llm_model": "fallback",
             "llm_tokens": 0,
             "llm_raw_response": None

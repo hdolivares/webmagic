@@ -429,6 +429,8 @@ class WebsiteGenerationQueueService:
             select(Business)
             .where(
                 and_(
+                    # US only — SMS integration only works for US businesses
+                    Business.country == 'US',
                     # No website or invalid
                     or_(
                         Business.website_url.is_(None),
@@ -451,7 +453,7 @@ class WebsiteGenerationQueueService:
         businesses = result.scalars().all()
         
         logger.info(
-            f"Found {len(businesses)} businesses needing generation "
+            f"Found {len(businesses)} US businesses needing generation "
             f"(min_score: {min_qualification_score})"
         )
         
@@ -477,6 +479,8 @@ class WebsiteGenerationQueueService:
             select(Business)
             .where(
                 and_(
+                    # US only — SMS integration only works for US businesses
+                    Business.country == 'US',
                     Business.website_validation_status == 'missing',
                     Business.website_validated_at.isnot(None),
                     or_(
@@ -494,7 +498,7 @@ class WebsiteGenerationQueueService:
         )
         businesses = result.scalars().all()
         logger.info(
-            f"Found {len(businesses)} TRIPLE-VERIFIED businesses needing generation"
+            f"Found {len(businesses)} TRIPLE-VERIFIED US businesses needing generation"
         )
         return list(businesses)
     
