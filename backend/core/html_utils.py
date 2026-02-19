@@ -3,43 +3,97 @@ HTML utility helpers shared across the codebase.
 """
 import re
 
+# ── Markers that identify where claim-bar content starts ──────────────────────
+# Checked in order; the earliest one found in the document wins.
+_CLAIM_MARKERS = [
+    "webmagic claim bar",   # comment: <!-- WebMagic Claim Bar ... -->
+    "webmagic-claim-bar",   # outer wrapper div id
+    "webmagic-claim",       # any other claim element
+]
+
+# Standalone button that survives when the outer wrapper was already removed
+_CLAIM_BTN_RE = re.compile(
+    r"<button[^>]+id=[\"']webmagic-claim-btn[\"'][^>]*>.*?</button>",
+    re.DOTALL | re.IGNORECASE,
+)
+
+# Orphaned </div>s that appear between page content and </body> after stripping
+_ORPHAN_DIVS_BEFORE_BODY_RE = re.compile(
+    r"(\s*</div>){1,5}(\s*</body>)",
+    re.IGNORECASE,
+)
+
+# Claim-bar JavaScript block
+_CLAIM_JS_RE = re.compile(
+    r"//\s*WebMagic Claim Bar Handler.*?\}\)\(\);",
+    re.DOTALL,
+)
+
+# Claim-bar CSS block (in <style> tags or standalone CSS files)
+_CLAIM_CSS_RE = re.compile(
+    r"/\*\s*WebMagic Claim Bar Styles\s*\*/.*?(?=/\*|</style>|$)",
+    re.DOTALL,
+)
+
 
 def strip_claim_bar(html: str) -> str:
     """
-    Remove all WebMagic claim-bar markup (HTML, CSS, JS) from a full HTML document.
+    Remove all WebMagic claim-bar markup from a full HTML document.
 
-    The architect always injects the claim bar into generated HTML before saving to
-    the database.  Any code path that deploys HTML to disk for an *owned* site, or
-    that feeds HTML to the site-edit AI pipeline, must strip it first so the bar
-    doesn't appear on live sites and doesn't confuse the LLM.
+    Strategy
+    --------
+    Regex-matching *nested* HTML is fundamentally unreliable — a non-greedy
+    ``.*?</div>`` always stops at the first closing tag, leaving sibling divs
+    and child buttons behind.
+
+    Instead we:
+
+    1. **Anchor search** — find the first occurrence of any claim-bar marker
+       string (case-insensitive), walk backwards to the nearest ``<`` to get
+       the true start of the HTML element/comment, then truncate the document
+       from that point and re-append ``</body>\\n</html>`` cleanly.
+
+    2. **Fallback button removal** — explicitly remove ``<button id="webmagic-
+       claim-btn">`` in case the outer wrapper was already stripped in a
+       previous pass but the button survived.
+
+    3. **Orphan div cleanup** — remove stray ``</div>`` tags that appear
+       directly before ``</body>`` after partial stripping.
+
+    4. **JS / CSS removal** — strip the claim-bar script block and CSS block.
     """
-    if not html or "webmagic-claim" not in html.lower():
+    if not html:
         return html
 
-    # 1. Remove the claim-bar <div> (with optional preceding HTML comment)
-    patterns = [
-        r'<!--\s*WebMagic Claim Bar[^-]*-->\s*<div\s+id=["\']webmagic-claim-bar["\'][^>]*>.*?</div>',
-        r'<div\s+id=["\']webmagic-claim-bar["\'][^>]*>.*?</div>',
-        r'<div[^>]*id=["\']?claim[^>]*>.*?</div>',
-    ]
-    for pattern in patterns:
-        html = re.sub(pattern, "", html, flags=re.DOTALL | re.IGNORECASE)
+    lower = html.lower()
 
-    # 2. Remove claim-bar JS block
-    html = re.sub(
-        r"//\s*WebMagic Claim Bar Handler.*?\}\)\(\);",
-        "",
-        html,
-        flags=re.DOTALL,
-    )
+    # ── 1. Anchor-based truncation ─────────────────────────────────────────
+    for marker in _CLAIM_MARKERS:
+        idx = lower.find(marker)
+        if idx < 0:
+            continue
 
-    # 3. Remove claim-bar CSS block (inside a <style> tag or standalone CSS file)
-    html = re.sub(
-        r"/\*\s*WebMagic Claim Bar Styles\s*\*/.*?(?=/\*|</style>|$)",
-        "",
-        html,
-        flags=re.DOTALL,
-    )
+        # Walk back to the start of the enclosing HTML tag / comment
+        tag_start = html.rfind("<", 0, idx)
+        if tag_start < 0:
+            tag_start = idx
+
+        before = html[:tag_start].rstrip()
+        html = before + "\n</body>\n</html>"
+        lower = html.lower()
+        break  # stop after first match — one truncation is enough
+
+    # ── 2. Fallback: remove standalone claim button ────────────────────────
+    html = _CLAIM_BTN_RE.sub("", html)
+
+    # ── 3. Remove orphaned closing divs now sitting before </body> ─────────
+    html = _ORPHAN_DIVS_BEFORE_BODY_RE.sub(r"\2", html)
+
+    # ── 4. Remove claim-bar JavaScript block ───────────────────────────────
+    html = _CLAIM_JS_RE.sub("", html)
+
+    # ── 5. Remove claim-bar CSS block (inside <style> tags) ────────────────
+    html = _CLAIM_CSS_RE.sub("", html)
 
     return html
 
