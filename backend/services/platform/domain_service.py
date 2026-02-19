@@ -30,6 +30,7 @@ from core.exceptions import (
     ValidationError,
     ForbiddenError
 )
+from services.platform.nginx_provisioning import NginxProvisioningService
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +196,7 @@ class DomainService:
         if verified:
             record.verified = True
             record.verified_at = datetime.utcnow()
-            
+
             logger.info(
                 f"Domain verified successfully: {domain}",
                 extra={
@@ -204,6 +205,26 @@ class DomainService:
                     "attempts": record.verification_attempts
                 }
             )
+
+            await db.commit()
+            await db.refresh(record)
+
+            # Auto-provision Nginx vhost + SSL now that ownership is confirmed.
+            # Fetch the site slug needed for the web root path.
+            site_result = await db.execute(select(Site).where(Site.id == site_id))
+            site = site_result.scalar_one_or_none()
+            if site and site.slug:
+                provision_result = await NginxProvisioningService.provision(
+                    domain=domain, slug=site.slug
+                )
+                logger.info(
+                    f"[Domain] Provisioning result for {domain}: {provision_result}"
+                )
+            else:
+                logger.warning(
+                    f"[Domain] Could not provision {domain}: site slug not found "
+                    f"for site_id={site_id}"
+                )
         else:
             logger.warning(
                 f"Domain verification failed: {domain}",
@@ -214,10 +235,10 @@ class DomainService:
                     "dns_info": dns_info
                 }
             )
-        
-        await db.commit()
-        await db.refresh(record)
-        
+
+            await db.commit()
+            await db.refresh(record)
+
         return verified, dns_info
     
     # ============================================
@@ -268,19 +289,22 @@ class DomainService:
         record = await DomainService._get_site_domain(db, site_id)
         if not record:
             raise NotFoundError("No custom domain found for this site")
-        
+
         domain = record.domain
+        was_verified = record.verified
+
         await db.delete(record)
         await db.commit()
-        
+
         logger.info(
             f"Domain removed from site {site_id}: {domain}",
-            extra={
-                "site_id": str(site_id),
-                "domain": domain
-            }
+            extra={"site_id": str(site_id), "domain": domain}
         )
-        
+
+        # Remove Nginx vhost only if it was ever provisioned (i.e. verified).
+        if was_verified:
+            await NginxProvisioningService.deprovision(domain)
+
         return True
     
     # ============================================
