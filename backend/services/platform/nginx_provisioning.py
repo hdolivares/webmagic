@@ -139,10 +139,11 @@ class NginxProvisioningService:
         logger.info(f"[Provision] Nginx vhost created for {bare} → {slug}")
 
         # 5. SSL via certbot ─────────────────────────────────────────────────
-        #    Requires the domain A record to already point to this server.
-        #    If the record hasn't propagated yet certbot will fail gracefully.
+        #    We verified the A record already points here, so certbot's HTTP-01
+        #    challenge should succeed.  --force-renewal avoids "No such
+        #    authorization" errors caused by stale failed ACME orders.
         certbot_cmd = (
-            f"certbot --nginx --non-interactive --agree-tos "
+            f"certbot --nginx --non-interactive --agree-tos --force-renewal "
             f"--email {CERTBOT_EMAIL} -d {bare} -d www.{bare}"
         )
         ssl_ok, ssl_output = await _run(certbot_cmd)
@@ -151,8 +152,7 @@ class NginxProvisioningService:
             logger.info(f"[Provision] SSL certificate issued for {bare}")
         else:
             logger.warning(
-                f"[Provision] SSL cert failed for {bare} "
-                f"(DNS may not be pointing to this server yet):\n{ssl_output}"
+                f"[Provision] SSL cert failed for {bare}:\n{ssl_output}"
             )
 
         return result

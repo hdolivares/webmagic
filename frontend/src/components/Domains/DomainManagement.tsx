@@ -463,6 +463,26 @@ export function DomainManagement({ siteId, onDisconnected }: DomainManagementPro
         </div>
       </div>
 
+      {/* SSL provisioning notice — shown when verified but SSL not yet confirmed active */}
+      {domainStatus.verified && domainStatus.ssl_status !== 'active' && (
+        <div className="ssl-provisioning-notice">
+          <div className="ssl-provisioning-icon">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="22" height="22">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+          </div>
+          <div className="ssl-provisioning-text">
+            <strong>Your SSL certificate is being issued — this takes 1–5 minutes.</strong>
+            <p>
+              During this short window you may see a <em>"Your connection is not private"</em> warning
+              in your browser when visiting <strong>{domainStatus.domain}</strong>.
+              This is completely normal and will go away automatically once the certificate
+              is ready. You do not need to do anything — just wait a few minutes and refresh.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* URLs */}
       <div className="urls-section">
         <h3 className="section-title">Your Site URLs</h3>
