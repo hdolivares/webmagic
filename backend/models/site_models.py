@@ -19,7 +19,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from models.base import BaseModel
 
@@ -503,4 +503,4 @@ class DomainVerificationRecord(BaseModel):
         """Check if verification has expired."""
         if not self.expires_at:
             return False
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
