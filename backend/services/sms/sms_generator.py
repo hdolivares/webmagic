@@ -35,9 +35,9 @@ class SMSGenerator:
     
     # Message variants
     VARIANTS = {
-        "friendly": "warm, conversational, and helpful (RECOMMENDED for cold outreach)",
-        "professional": "formal and professional business tone",
-        "urgent": "direct and action-oriented for emergency services"
+        "friendly": "warm and conversational — feels like a real person texting, not a company (RECOMMENDED)",
+        "professional": "polite and professional but still personal — suitable for formal service businesses",
+        "urgent": "direct and confident — ideal for emergency/on-demand services like plumbers, locksmiths, HVAC"
     }
     
     def __init__(self):
@@ -132,59 +132,61 @@ class SMSGenerator:
         tone: str,
         max_length: int
     ) -> str:
-        """
-        Build AI prompt for SMS generation.
-        
-        Args:
-            business_data: Business information
-            site_url: Website URL
-            tone: Desired message tone
-            max_length: Maximum length
-        
-        Returns:
-            Prompt string for Claude
-        """
+        """Build AI prompt for SMS generation using research-backed psychology."""
         business_name = business_data.get("name", "the business")
         category = business_data.get("category", "business")
         city = business_data.get("city", "")
         state = business_data.get("state", "")
         rating = business_data.get("rating", 0)
-        
-        location = f"{city}, {state}" if city and state else city or state or "your area"
-        rating_str = f"{rating}⭐" if rating > 0 else ""
-        
-        prompt = f"""Generate a cold outreach SMS for a business we created a website for.
+        review_count = business_data.get("review_count", 0)
 
-Business: {business_name}
-Category: {category}
-Location: {location}
-Rating: {rating_str}
-Website: {site_url or "[creating...]"}
+        location = f"{city}, {state}" if city and state else city or state or ""
+        location_hint = f" in {location}" if location else ""
 
-COLD SMS BEST PRACTICES (research-backed for 15-45% response rate):
-1. Maximum {max_length} characters (STRICT - fits 1 SMS segment)
-2. Tone: {tone}
-3. START with personalization: "Hi [BusinessName]" or "[BusinessName] in [City]"
-4. Lead with SPECIFIC VALUE, not sales: "We created a preview website for your [category] business"
-5. Make it about THEM: "for your business" not "we want to help you"
-6. Conversational CTA: "Take a look" or "Check it out" (not "Click here NOW!")
-7. Invite reply: "Text back with questions" or "Reply YES if interested"
-8. End with compliance: "Reply STOP to opt out"
-9. NO pushy language: avoid "limited time", "act now", "free", "buy", "click here"
-10. NO emojis (looks unprofessional in cold outreach)
-11. Proper grammar and punctuation
+        # Build review signal — the single most powerful personalization hook
+        if rating and rating >= 4.0 and review_count and review_count >= 5:
+            review_signal = f"They have a {rating}⭐ rating from {review_count} Google reviews."
+        elif rating and rating >= 4.0:
+            review_signal = f"They have a {rating}⭐ Google rating."
+        else:
+            review_signal = "They have an active Google Business profile."
 
-WINNING FORMULA:
-"Hi [Business] in [City] - We created a preview website for your [category] business. [URL]. [Friendly CTA]. Reply STOP to opt out."
+        prompt = f"""You are writing a cold outreach SMS from a single person (not a company) to the owner of a small business. We found their Google Business listing, confirmed they have no website, and built them a free preview site.
 
-AVOID SPAM TRIGGERS:
-- Generic greetings ("Hey!", "Hello there!")
-- Immediate sales pitch
-- All caps or excessive punctuation (!!! or ???)
-- Vague sender identity
-- Multiple CTAs or links
+BUSINESS DETAILS:
+- Name: {business_name}{location_hint}
+- Category: {category}
+- {review_signal}
+- Preview website: {site_url or "[URL]"}
 
-Return ONLY the SMS message text, no quotes or explanations."""
+TONE: {tone}
+
+RESEARCH-BACKED RULES (from analysis of 25B+ SMS messages and 100k+ sales conversations):
+1. STRICT maximum {max_length} characters — must fit in ONE SMS segment
+2. Lead with a SPECIFIC compliment about their reviews — this is the #1 engagement trigger because it proves you actually looked them up
+3. Immediately name the gap: they have great reviews but NO website
+4. Deliver the value: you already built it, here's the link
+5. End with ONE soft question — messages with questions get 28% reply rates vs 24% without
+6. "I built" / "I made" beats "we created" — sounds human, not corporate
+7. Use "your" and "you" throughout — second-person language outperforms first-person
+8. NO spam triggers: free, limited time, act now, click here, congratulations, winner
+9. NO exclamation marks after the opening greeting
+10. Compliance footer: "Reply STOP to opt out" (required — do NOT omit)
+
+PSYCHOLOGICAL STRUCTURE (follow this order):
+[Greeting with business name] → [Compliment their reviews — show you looked them up] → [Name the gap: no website] → [Value: built one for them + URL] → [Soft question inviting dialogue] → [Opt-out]
+
+EXAMPLE OUTPUT (friendly variant, ~155 chars):
+"Hi {business_name}! Saw your {rating}⭐ Google reviews — nice work. No website yet so I built one: {site_url or '[URL]'}. Want to personalize it? Reply STOP to opt out."
+
+AVOID:
+- "We created a preview website" (sounds like a blast)
+- "Take a look and let us know" (weak, generic)
+- "Check it out!" (pushy)
+- Starting with "I" (start with "Hi [BusinessName]")
+- Any mention of payment, pricing, or urgency
+
+Return ONLY the SMS message text — no quotes, no labels, no explanation."""
 
         return prompt
     
@@ -244,65 +246,55 @@ Return ONLY the SMS message text, no quotes or explanations."""
         site_url: Optional[str]
     ) -> str:
         """
-        Get fallback SMS template if AI generation fails.
-        
-        Uses research-backed best practices for cold outreach:
-        - Personalization (name + location)
-        - Value-first messaging
-        - Conversational tone
-        - Invitation to reply
-        
-        Args:
-            business_data: Business information
-            site_url: Website URL
-        
-        Returns:
-            Template-based SMS message optimized for response rates
+        Fallback SMS template used when AI generation fails.
+
+        Structure: Compliment reviews → name the gap → deliver value → soft question → opt-out.
+        This is the research-backed formula for cold outreach (Attentive / Closeable data):
+        - Leading with a review compliment proves you looked them up (+personalization)
+        - Naming the gap (no website) creates a cognitive hook without being pushy
+        - Soft question at the end boosts reply rates from 24% to 28%
         """
-        business_name = business_data.get("name", "Your business")
-        category = business_data.get("category", "business")
-        city = business_data.get("city", "")
-        
-        # Shorten URL if too long
-        url_display = self._shorten_url_display(site_url) if site_url else "[creating...]"
-        
-        # Build template (research-backed format)
-        # Format: "Hi [Name] in [City] - We created a preview website for your [category] business. [URL]. Take a look and let us know what you think. Reply STOP to opt out."
-        if city:
-            greeting = f"Hi {business_name} in {city}"
+        business_name = business_data.get("name") or "Your business"
+        rating = business_data.get("rating", 0)
+        review_count = business_data.get("review_count", 0)
+        url_display = site_url or "[link]"
+
+        # Build the review compliment — most powerful personalization hook
+        if rating and rating >= 4.0 and review_count and review_count >= 5:
+            review_hook = f"Saw your {rating}⭐ Google reviews"
+        elif rating and rating >= 4.0:
+            review_hook = f"Saw your {rating}⭐ Google rating"
         else:
-            greeting = f"Hi {business_name}"
-        
+            review_hook = "Saw your Google Business listing"
+
+        # Full version (~155 chars with a short URL)
         template = (
-            f"{greeting} - We created a preview website for your {category} business. "
-            f"{url_display}. Take a look and let us know what you think. Reply STOP to opt out."
+            f"Hi {business_name}! {review_hook} — nice work. "
+            f"No website yet, so I built one: {url_display}. "
+            f"Want to personalize it? Reply STOP to opt out."
         )
-        
-        # Ensure it fits in single segment (160 chars)
-        if len(template) > self.SINGLE_SEGMENT_LIMIT:
-            # Fallback to shorter version
-            template = (
-                f"{greeting} - Preview website created for your {category} business. "
-                f"{url_display}. Take a look. Reply STOP to opt out."
-            )
-        
-        # If still too long, truncate business name
-        if len(template) > self.SINGLE_SEGMENT_LIMIT:
-            max_name_length = 20
-            if len(business_name) > max_name_length:
-                business_name = business_name[:max_name_length] + "..."
-            
-            if city:
-                greeting = f"Hi {business_name} in {city}"
-            else:
-                greeting = f"Hi {business_name}"
-            
-            template = (
-                f"{greeting} - Preview site: {url_display}. "
-                f"Take a look. Reply STOP to opt out."
-            )
-        
-        return template
+
+        if len(template) <= self.SINGLE_SEGMENT_LIMIT:
+            return template
+
+        # Short version — drop the question
+        template = (
+            f"Hi {business_name}! {review_hook} — built you a site: "
+            f"{url_display}. Want it customized? Reply STOP to opt out."
+        )
+
+        if len(template) <= self.SINGLE_SEGMENT_LIMIT:
+            return template
+
+        # Minimal version — truncate business name if needed
+        max_name = 20
+        short_name = business_name[:max_name].rsplit(" ", 1)[0] if len(business_name) > max_name else business_name
+        template = (
+            f"Hi {short_name}! {review_hook} — I built you a site: "
+            f"{url_display}. Reply STOP to opt out."
+        )
+
+        return template[:self.SINGLE_SEGMENT_LIMIT]
     
     def _shorten_url_display(self, url: str) -> str:
         """

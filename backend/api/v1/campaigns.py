@@ -432,13 +432,14 @@ async def preview_sms_message(
             f"Using full URL: {url_to_use}"
         )
     
-    # Prepare business data
+    # Prepare business data — include review_count so the SMS can reference it
     business_data = {
         "name": business.name,
         "category": business.category,
         "city": business.city,
         "state": business.state,
-        "rating": float(business.rating) if business.rating else 0
+        "rating": float(business.rating) if business.rating else 0,
+        "review_count": business.review_count or 0,
     }
     
     # Use custom template from Settings > Messaging if set
