@@ -644,6 +644,41 @@
 }
 
 /* ============================================
+   SSL WARNING BOX (complete screen)
+   ============================================ */
+
+.ssl-warning-box {
+  display: flex;
+  gap: var(--spacing-md, 12px);
+  align-items: flex-start;
+  background: var(--color-warning-50, #fffbeb);
+  border: 1.5px solid var(--color-warning-300, #fcd34d);
+  border-radius: var(--radius-lg, 12px);
+  padding: var(--spacing-lg, 20px);
+  margin-top: var(--spacing-xl, 24px);
+}
+
+.ssl-warning-icon {
+  flex-shrink: 0;
+  color: var(--color-warning-600, #d97706);
+  margin-top: 2px;
+}
+
+.ssl-warning-title {
+  font-weight: var(--font-weight-semibold, 600);
+  font-size: var(--font-size-base, 15px);
+  color: var(--color-warning-900, #78350f);
+  margin: 0 0 var(--spacing-xs, 4px);
+}
+
+.ssl-warning-body {
+  font-size: var(--font-size-sm, 13px);
+  color: var(--color-warning-800, #92400e);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ============================================
    RESPONSIVE DESIGN
    ============================================ */
 @media (max-width: 768px) {

@@ -384,45 +384,42 @@ export function DomainSetup({ siteId, onComplete, onCancel }: DomainSetupProps) 
         </svg>
       </div>
 
-      <h2 className="wizard-title">Domain Connected! 🎉</h2>
+      <h2 className="wizard-title">Domain Connected!</h2>
       <p className="wizard-description">
-        Your custom domain <strong>{domain}</strong> has been successfully verified and connected.
+        <strong>{domain}</strong> has been verified and your site is being provisioned.
       </p>
 
       <div className="complete-info">
-        <div className="complete-step">
-          <svg className="complete-check" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          <span>Ownership verified (TXT record confirmed)</span>
-        </div>
-        <div className="complete-step">
-          <svg className="complete-check" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          <span>Domain is pointing to this server (A record confirmed)</span>
-        </div>
-        <div className="complete-step">
-          <svg className="complete-check" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          <span>Nginx server block created — your site is live</span>
-        </div>
-        <div className="complete-step">
-          <svg className="complete-check" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          <span>SSL certificate being issued automatically (HTTPS ready in ~2 min)</span>
-        </div>
+        {[
+          'Ownership verified (TXT record confirmed)',
+          'Domain is pointing to this server (A record confirmed)',
+          'Nginx server block created — site is live over HTTP',
+          'SSL certificate is being issued automatically',
+        ].map(label => (
+          <div key={label} className="complete-step">
+            <svg className="complete-check" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span>{label}</span>
+          </div>
+        ))}
       </div>
 
-      <div className="info-box">
-        <svg className="info-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+      {/* Privacy warning explanation */}
+      <div className="ssl-warning-box">
+        <div className="ssl-warning-icon">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="22" height="22">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+        </div>
         <div>
-          Your site is now live at <strong>http://{domain}</strong> and will be available
-          over <strong>HTTPS</strong> within ~2 minutes once the SSL certificate is issued.
+          <p className="ssl-warning-title">You may see a "Your connection is not private" warning for a few minutes</p>
+          <p className="ssl-warning-body">
+            This is completely normal. Your SSL certificate is being issued right now by Let's Encrypt.
+            The process takes <strong>1–5 minutes</strong>. Once it's done, your site will load
+            securely over <strong>https://{domain}</strong> with no warnings.
+            You do not need to do anything — just wait a few minutes and refresh.
+          </p>
         </div>
       </div>
     </div>

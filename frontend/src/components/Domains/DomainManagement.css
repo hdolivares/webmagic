@@ -814,6 +814,42 @@
   letter-spacing: 0.04em;
 }
 
+/* ── SSL Provisioning Notice ─────────────────────────────────────────────── */
+
+.ssl-provisioning-notice {
+  display: flex;
+  gap: var(--spacing-md, 12px);
+  align-items: flex-start;
+  background: var(--color-warning-50, #fffbeb);
+  border: 1.5px solid var(--color-warning-300, #fcd34d);
+  border-radius: var(--radius-lg, 12px);
+  padding: var(--spacing-lg, 20px);
+  margin-bottom: var(--spacing-xl, 24px);
+}
+
+.ssl-provisioning-icon {
+  flex-shrink: 0;
+  color: var(--color-warning-600, #d97706);
+  margin-top: 2px;
+}
+
+.ssl-provisioning-text {
+  font-size: var(--font-size-sm, 13px);
+  color: var(--color-warning-900, #78350f);
+  line-height: 1.5;
+}
+
+.ssl-provisioning-text strong {
+  display: block;
+  font-size: var(--font-size-base, 15px);
+  margin-bottom: var(--spacing-xs, 4px);
+}
+
+.ssl-provisioning-text p {
+  margin: 0;
+  color: var(--color-warning-800, #92400e);
+}
+
 .dns-cloudflare-note {
   font-size: var(--font-size-sm, 13px);
   color: var(--color-text-secondary, #666);
