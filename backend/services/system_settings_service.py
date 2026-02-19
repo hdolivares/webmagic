@@ -56,37 +56,38 @@ MESSAGING_TEMPLATE_KEYS = (
 )
 
 MESSAGING_DEFAULT_TEMPLATES = {
-    # RECOMMENDED: Friendly - Highest response rate (40-50%)
+    # RECOMMENDED: Friendly — leads with review compliment (highest reply rate)
+    # Research: compliment + gap + soft question = 28-45% reply rate
     "messaging_sms_template_friendly": (
-        "Hi {{business_name}} in {{city}} - We created a preview website "
-        "for your {{category}} business. {{site_url}}. Take a look and let "
-        "us know what you think. Reply STOP to opt out."
+        "Hi {{business_name}}! Saw your {{rating}} Google reviews — nice work. "
+        "No website yet, so I built one: {{site_url}}. "
+        "Want to personalize it? Reply STOP to opt out."
     ),
-    
-    # Professional - Good for B2B services (35-45% response rate)
+
+    # Professional — polite and personal, suitable for formal service businesses
     "messaging_sms_template_professional": (
-        "{{business_name}} ({{city}}) - We developed a preview website "
-        "for your {{category}} business. {{site_url}}. Review and let us "
-        "know if interested. Reply STOP to opt out."
+        "Hi {{business_name}}, I came across your {{rating}} Google rating and noticed "
+        "you don't have a website yet. I built a preview for your {{category}} business: "
+        "{{site_url}}. Would you like it customized? Reply STOP to opt out."
     ),
-    
-    # Value-First - Ultra short for cost optimization (30-40% response rate)
+
+    # Value-First — ultra-short, lowest cost (1 segment guaranteed)
     "messaging_sms_template_value_first": (
-        "Hi {{business_name}} - Preview website created: {{site_url}}. "
-        "Interested? Reply YES. Text STOP to opt out."
+        "Hi {{business_name}} — {{rating}} stars on Google, no website yet. "
+        "I made one for you: {{site_url}}. Want it? Reply STOP to opt out."
     ),
-    
-    # Local Community - Highest engagement (45-55% response rate, worth 2x cost)
+
+    # Local Community — mentions city for hyper-local feel
     "messaging_sms_template_local_community": (
-        "Hi {{business_name}} - While helping {{category}} businesses in {{city}}, "
-        "we created a preview site for you: {{site_url}}. Take a look. "
-        "Reply STOP to opt out."
+        "Hi {{business_name}}! Noticed your great reputation in {{city}} but no website. "
+        "I built a free preview: {{site_url}}. Want to customize it? Reply STOP to opt out."
     ),
-    
-    # Urgent - Only for emergency services (plumbers, locksmiths)
+
+    # Urgent — direct and confident, for emergency/on-demand services
     "messaging_sms_template_urgent": (
-        "{{business_name}} - Emergency {{category}} website preview ready. "
-        "{{site_url}}. Check it out. Reply STOP to opt out."
+        "{{business_name}} — {{rating}} stars but no website. "
+        "I built one for your {{category}} business: {{site_url}}. "
+        "Interested? Reply STOP to opt out."
     ),
 }
 
