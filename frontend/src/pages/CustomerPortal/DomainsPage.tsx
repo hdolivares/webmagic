@@ -1,61 +1,86 @@
 /**
  * Customer Domains Page
- * 
- * Page for customers to manage their custom domain
+ *
+ * Page for customers to manage their custom domain.
+ * Loads site list via the customer API (same as MySitesPage) so customers
+ * with multiple sites can select which one they want to manage.
  */
 import React, { useState, useEffect } from 'react'
 import { api } from '../../services/api'
 import { DomainSetup, DomainManagement } from '../../components/Domains'
 import './DomainsPage.css'
 
+interface CustomerSite {
+  site_id: string
+  slug: string
+  site_title: string
+  is_primary: boolean
+}
+
 const DomainsPage: React.FC = () => {
-  const [site, setSite] = useState<any>(null)
+  const [sites, setSites] = useState<CustomerSite[]>([])
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null)
   const [domainStatus, setDomainStatus] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    loadSiteAndDomain()
+    loadSites()
   }, [])
 
-  const loadSiteAndDomain = async () => {
+  // Reload domain status whenever the selected site changes
+  useEffect(() => {
+    if (selectedSiteId) {
+      loadDomainStatus(selectedSiteId)
+    }
+  }, [selectedSiteId])
+
+  const loadSites = async () => {
     setLoading(true)
     setError(null)
 
     try {
-      // Get customer's site from token or API
-      const customerEmail = localStorage.getItem('customer_email')
-      // In a real implementation, you'd have an endpoint to get customer's site
-      // For now, we'll need to store the site_id when customer logs in
-      const siteId = localStorage.getItem('customer_site_id')
+      const response = await api.getMySites()
+      const fetchedSites: CustomerSite[] = response.sites ?? []
 
-      if (!siteId) {
+      if (fetchedSites.length === 0) {
         setError('No site found for your account. Please contact support.')
         setLoading(false)
         return
       }
 
-      // Load domain status
-      try {
-        const status = await api.getDomainStatus(siteId)
-        setDomainStatus(status)
-      } catch (err: any) {
-        // If no domain exists yet, that's okay
-        if (err.response?.status !== 404) {
-          console.error('Failed to load domain status:', err)
-        }
-      }
+      setSites(fetchedSites)
 
-      setSite({ id: siteId })
+      // Default to the primary site, fall back to first
+      const primary = fetchedSites.find((s) => s.is_primary) ?? fetchedSites[0]
+      setSelectedSiteId(primary.site_id)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load site information')
+      setLoading(false)
+    }
+  }
+
+  const loadDomainStatus = async (siteId: string) => {
+    setLoading(true)
+    setDomainStatus(null)
+
+    try {
+      const status = await api.getDomainStatus(siteId)
+      setDomainStatus(status)
+    } catch (err: any) {
+      // 404 means no domain connected yet — that's fine
+      if (err.response?.status !== 404) {
+        console.error('Failed to load domain status:', err)
+      }
     } finally {
       setLoading(false)
     }
   }
 
   const handleDomainUpdate = () => {
-    loadSiteAndDomain()
+    if (selectedSiteId) {
+      loadDomainStatus(selectedSiteId)
+    }
   }
 
   if (loading) {
@@ -96,15 +121,30 @@ const DomainsPage: React.FC = () => {
         </p>
       </div>
 
-      {hasDomain ? (
-        <DomainManagement
-          siteId={site.id}
-        />
-      ) : (
-        <DomainSetup
-          siteId={site.id}
-          onComplete={handleDomainUpdate}
-        />
+      {/* Site selector — only shown when the customer owns more than one site */}
+      {sites.length > 1 && (
+        <div className="domains-site-selector">
+          <label htmlFor="domain-site-select">Managing domain for:</label>
+          <select
+            id="domain-site-select"
+            value={selectedSiteId ?? ''}
+            onChange={(e) => setSelectedSiteId(e.target.value)}
+          >
+            {sites.map((s) => (
+              <option key={s.site_id} value={s.site_id}>
+                {s.site_title || s.slug}{s.is_primary ? ' (primary)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {selectedSiteId && (
+        hasDomain ? (
+          <DomainManagement siteId={selectedSiteId} />
+        ) : (
+          <DomainSetup siteId={selectedSiteId} onComplete={handleDomainUpdate} />
+        )
       )}
 
       <div className="domains-help">
