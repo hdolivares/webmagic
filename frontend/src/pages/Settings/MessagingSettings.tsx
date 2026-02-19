@@ -16,8 +16,10 @@ const TEMPLATE_KEYS = {
 
 const VARIABLES = [
   { name: '{{business_name}}', description: 'Business name' },
-  { name: '{{category}}', description: 'Business category (e.g. Plumber)' },
+  { name: '{{rating}}', description: 'Google rating with star (e.g. 4.8⭐)' },
+  { name: '{{review_count}}', description: 'Number of Google reviews (e.g. 47)' },
   { name: '{{site_url}}', description: 'Generated site preview URL' },
+  { name: '{{category}}', description: 'Business category (e.g. Plumber)' },
   { name: '{{city}}', description: 'Business city' },
   { name: '{{state}}', description: 'Business state or region' },
 ]

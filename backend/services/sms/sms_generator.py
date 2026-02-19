@@ -53,7 +53,7 @@ class SMSGenerator:
         logger.info("SMS generator initialized")
     
     # Template variables available for custom messages (Settings > Messaging)
-    TEMPLATE_VARIABLES = ("business_name", "category", "site_url", "city", "state")
+    TEMPLATE_VARIABLES = ("business_name", "category", "site_url", "city", "state", "rating", "review_count")
 
     async def generate_sms(
         self,
@@ -224,13 +224,20 @@ Return ONLY the SMS message text — no quotes, no labels, no explanation."""
     ) -> str:
         """
         Replace {{variable}} placeholders in a template.
-        Available: {{business_name}}, {{category}}, {{site_url}}, {{city}}, {{state}}
+        Available: {{business_name}}, {{category}}, {{site_url}}, {{city}}, {{state}},
+                   {{rating}}, {{review_count}}
         """
         business_name = (business_data.get("name") or "Your business").strip()
         category = (business_data.get("category") or "business").strip()
         city = (business_data.get("city") or "").strip()
         state = (business_data.get("state") or "").strip()
         url = (site_url or "").strip() or "[creating...]"
+        rating = business_data.get("rating", 0)
+        review_count = business_data.get("review_count", 0)
+
+        # Format rating as "4.8⭐" or omit star if no rating
+        rating_str = f"{rating}⭐" if rating and float(rating) > 0 else "great"
+        review_count_str = str(int(review_count)) if review_count else ""
 
         return (
             template.replace("{{business_name}}", business_name)
@@ -238,6 +245,8 @@ Return ONLY the SMS message text — no quotes, no labels, no explanation."""
             .replace("{{site_url}}", url)
             .replace("{{city}}", city)
             .replace("{{state}}", state)
+            .replace("{{rating}}", rating_str)
+            .replace("{{review_count}}", review_count_str)
         )
 
     def _get_fallback_template(
