@@ -1,11 +1,11 @@
 /**
  * DomainManagement Component
- * 
- * Dashboard for managing connected custom domain.
- * Shows status, SSL info, and allows disconnection.
- * 
- * Author: WebMagic Team
- * Date: January 21, 2026
+ *
+ * Dashboard for managing a connected custom domain.
+ * When the domain is not yet verified it surfaces the DNS record
+ * instructions and a "Check Verification" button so customers can
+ * retry verification at any time without having to disconnect and
+ * re-add the domain.
  */
 import { useState, useEffect } from 'react'
 import { api } from '@/services/api'
@@ -27,7 +27,61 @@ interface DomainStatus {
   last_checked: string | null
   verification_attempts: number
   dns_records: any
+  verification_token: string | null
+  verification_method: string | null
 }
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+function buildDnsRecord(
+  domain: string,
+  token: string,
+  method: string
+): { type: string; host: string; value: string; ttl: number } {
+  if (method === 'dns_cname') {
+    return {
+      type: 'CNAME',
+      host: `verify.${domain}`,
+      value: `verify.webmagic.io`,
+      ttl: 3600,
+    }
+  }
+  return {
+    type: 'TXT',
+    host: `_webmagic-verify.${domain}`,
+    value: `webmagic-verification=${token}`,
+    ttl: 3600,
+  }
+}
+
+function getStatusColor(status: string): string {
+  switch (status) {
+    case 'verified': return 'status-success'
+    case 'pending':  return 'status-warning'
+    case 'failed':   return 'status-error'
+    default:         return 'status-default'
+  }
+}
+
+function getSSLStatusColor(status: string | null): string {
+  if (!status) return 'status-default'
+  switch (status) {
+    case 'active':       return 'status-success'
+    case 'provisioning': return 'status-warning'
+    case 'failed':       return 'status-error'
+    default:             return 'status-default'
+  }
+}
+
+function formatDate(dateString: string | null): string {
+  if (!dateString) return 'Never'
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
+// ─── component ──────────────────────────────────────────────────────────────
 
 export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps) {
   const [domainStatus, setDomainStatus] = useState<DomainStatus | null>(null)
@@ -35,6 +89,9 @@ export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps)
   const [error, setError] = useState<string | null>(null)
   const [isRemoving, setIsRemoving] = useState(false)
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [verifyResult, setVerifyResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [copiedField, setCopiedField] = useState<string | null>(null)
 
   useEffect(() => {
     fetchDomainStatus()
@@ -43,12 +100,10 @@ export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps)
   const fetchDomainStatus = async () => {
     setIsLoading(true)
     setError(null)
-
     try {
       const status = await api.getDomainStatus(siteId)
       setDomainStatus(status)
     } catch (err: any) {
-      console.error('Failed to fetch domain status:', err)
       if (err.response?.status !== 404) {
         setError('Failed to load domain status')
       }
@@ -57,60 +112,57 @@ export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps)
     }
   }
 
+  const handleVerifyDomain = async () => {
+    if (!domainStatus) return
+    setIsVerifying(true)
+    setVerifyResult(null)
+    try {
+      const response = await api.verifyDomain(siteId, domainStatus.domain)
+      if (response.verified) {
+        setVerifyResult({ success: true, message: 'Domain verified successfully! SSL provisioning will begin shortly.' })
+        // Refresh status to show verified state
+        await fetchDomainStatus()
+      } else {
+        setVerifyResult({
+          success: false,
+          message: 'DNS record not found yet. DNS changes can take up to 24 hours to propagate — please try again later.',
+        })
+      }
+    } catch (err: any) {
+      setVerifyResult({
+        success: false,
+        message: err.response?.data?.detail || 'Verification check failed. Please try again.',
+      })
+    } finally {
+      setIsVerifying(false)
+    }
+  }
+
   const handleRemoveDomain = async () => {
     setIsRemoving(true)
     setError(null)
-
     try {
       await api.disconnectDomain(siteId)
       setDomainStatus(null)
       setShowRemoveConfirm(false)
     } catch (err: any) {
-      console.error('Failed to remove domain:', err)
       setError(err.response?.data?.detail || 'Failed to remove domain. Please try again.')
     } finally {
       setIsRemoving(false)
     }
   }
 
-  const getStatusColor = (status: string): string => {
-    switch (status) {
-      case 'verified':
-        return 'status-success'
-      case 'pending':
-        return 'status-warning'
-      case 'failed':
-        return 'status-error'
-      default:
-        return 'status-default'
+  const copyToClipboard = async (text: string, fieldId: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedField(fieldId)
+      setTimeout(() => setCopiedField(null), 2000)
+    } catch {
+      // Clipboard API not available — silently ignore
     }
   }
 
-  const getSSLStatusColor = (status: string | null): string => {
-    if (!status) return 'status-default'
-    switch (status) {
-      case 'active':
-        return 'status-success'
-      case 'provisioning':
-        return 'status-warning'
-      case 'failed':
-        return 'status-error'
-      default:
-        return 'status-default'
-    }
-  }
-
-  const formatDate = (dateString: string | null): string => {
-    if (!dateString) return 'Never'
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
+  // ── Loading ──────────────────────────────────────────────────────────────
 
   if (isLoading) {
     return (
@@ -124,6 +176,8 @@ export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps)
     )
   }
 
+  // ── No domain ────────────────────────────────────────────────────────────
+
   if (!domainStatus) {
     return (
       <div className="domain-management">
@@ -133,42 +187,42 @@ export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps)
           </svg>
           <h3>No Custom Domain</h3>
           <p>Connect your own domain to give your site a professional web address.</p>
-          
           <button className="btn-primary" onClick={onAddDomain}>
             <svg className="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             Connect Custom Domain
           </button>
-
           <div className="benefits-list">
-            <div className="benefit-item">
-              <svg className="benefit-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>Professional branding</span>
-            </div>
-            <div className="benefit-item">
-              <svg className="benefit-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>Better SEO performance</span>
-            </div>
-            <div className="benefit-item">
-              <svg className="benefit-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>Free SSL certificate</span>
-            </div>
+            {['Professional branding', 'Better SEO performance', 'Free SSL certificate'].map((b) => (
+              <div key={b} className="benefit-item">
+                <svg className="benefit-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>{b}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
     )
   }
 
+  // ── DNS record for pending verification ──────────────────────────────────
+
+  const dnsRecord =
+    !domainStatus.verified &&
+    domainStatus.verification_token &&
+    domainStatus.verification_method
+      ? buildDnsRecord(domainStatus.domain, domainStatus.verification_token, domainStatus.verification_method)
+      : null
+
+  // ── Main render ──────────────────────────────────────────────────────────
+
   return (
     <div className="domain-management">
-      {/* Domain Header */}
+
+      {/* Domain header */}
       <div className="domain-header">
         <div className="domain-info">
           <div className="domain-icon">
@@ -181,11 +235,7 @@ export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps)
             <p className="domain-subtitle">Custom Domain</p>
           </div>
         </div>
-        
-        <button
-          className="btn-remove"
-          onClick={() => setShowRemoveConfirm(true)}
-        >
+        <button className="btn-remove" onClick={() => setShowRemoveConfirm(true)}>
           <svg className="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -193,9 +243,95 @@ export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps)
         </button>
       </div>
 
-      {/* Status Cards */}
+      {/* ── DNS Instructions (only when not verified) ─── */}
+      {dnsRecord && (
+        <div className="dns-instructions-panel">
+          <div className="dns-instructions-header">
+            <svg className="dns-instructions-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <h3 className="dns-instructions-title">Add This DNS Record</h3>
+              <p className="dns-instructions-subtitle">
+                Log in to your domain registrar and add the following record. DNS propagation can take up to 24 hours.
+              </p>
+            </div>
+          </div>
+
+          <div className="dns-record-table">
+            {[
+              { label: 'Type', value: dnsRecord.type },
+              { label: 'Host / Name', value: dnsRecord.host },
+              { label: 'Value', value: dnsRecord.value },
+              { label: 'TTL', value: String(dnsRecord.ttl) },
+            ].map(({ label, value }) => (
+              <div key={label} className="dns-record-row">
+                <span className="dns-record-label">{label}</span>
+                <div className="dns-record-value-wrap">
+                  <code className="dns-record-value">{value}</code>
+                  <button
+                    className="btn-copy"
+                    onClick={() => copyToClipboard(value, label)}
+                    title="Copy to clipboard"
+                  >
+                    {copiedField === label ? (
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Verify button + result */}
+          <div className="dns-verify-actions">
+            <button
+              className="btn-verify"
+              onClick={handleVerifyDomain}
+              disabled={isVerifying}
+            >
+              {isVerifying ? (
+                <>
+                  <svg className="spinner" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Checking…
+                </>
+              ) : (
+                <>
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Check Verification
+                </>
+              )}
+            </button>
+
+            {verifyResult && (
+              <div className={`verify-result ${verifyResult.success ? 'verify-result--success' : 'verify-result--error'}`}>
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
+                  {verifyResult.success ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  )}
+                </svg>
+                {verifyResult.message}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Status cards */}
       <div className="status-grid">
-        {/* Verification Status */}
         <div className="status-card">
           <div className="status-card-header">
             <span className="status-card-title">Verification</span>
@@ -221,14 +357,17 @@ export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps)
                 </svg>
                 <div>
                   <div className="status-value">Pending Verification</div>
-                  <div className="status-label">{domainStatus.verification_attempts} attempts</div>
+                  <div className="status-label">
+                    {domainStatus.verification_attempts > 0
+                      ? `${domainStatus.verification_attempts} check${domainStatus.verification_attempts !== 1 ? 's' : ''} performed`
+                      : 'No checks yet — click "Check Verification" above'}
+                  </div>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* SSL Status */}
         <div className="status-card">
           <div className="status-card-header">
             <span className="status-card-title">SSL Certificate</span>
@@ -256,7 +395,7 @@ export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps)
                 </svg>
                 <div>
                   <div className="status-value">Provisioning SSL</div>
-                  <div className="status-label">Usually takes 5-10 minutes</div>
+                  <div className="status-label">Starts automatically after verification</div>
                 </div>
               </div>
             )}
@@ -285,12 +424,12 @@ export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps)
           <div className="url-item">
             <div className="url-label">Default URL</div>
             <a
-              href={`https://sites.lavish.solutions/site-${siteId.substring(0, 8)}`}
+              href={`https://web.lavish.solutions/${siteId}`}
               target="_blank"
               rel="noopener noreferrer"
               className="url-link secondary"
             >
-              https://sites.lavish.solutions/site-{siteId.substring(0, 8)}
+              https://web.lavish.solutions/{siteId.substring(0, 8)}…
               <svg className="external-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
@@ -299,19 +438,7 @@ export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps)
         </div>
       </div>
 
-      {/* DNS Records (if available) */}
-      {domainStatus.dns_records && (
-        <div className="dns-section">
-          <h3 className="section-title">DNS Records Found</h3>
-          <div className="dns-records">
-            <pre className="dns-code">
-              {JSON.stringify(domainStatus.dns_records, null, 2)}
-            </pre>
-          </div>
-        </div>
-      )}
-
-      {/* Last Checked */}
+      {/* Footer */}
       <div className="info-footer">
         <svg className="info-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -319,7 +446,6 @@ export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps)
         <span>Last checked: {formatDate(domainStatus.last_checked)}</span>
       </div>
 
-      {/* Error Message */}
       {error && (
         <div className="error-message">
           <svg className="error-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -329,40 +455,29 @@ export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps)
         </div>
       )}
 
-      {/* Remove Confirmation Modal */}
+      {/* Disconnect confirmation modal */}
       {showRemoveConfirm && (
         <div className="modal-backdrop" onClick={() => setShowRemoveConfirm(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3 className="modal-title">Disconnect Custom Domain?</h3>
             <p className="modal-description">
-              Are you sure you want to disconnect <strong>{domainStatus.domain}</strong>? 
+              Are you sure you want to disconnect <strong>{domainStatus.domain}</strong>?{' '}
               Your site will still be accessible at the default URL.
             </p>
-            
             <div className="modal-actions">
-              <button
-                className="btn-cancel"
-                onClick={() => setShowRemoveConfirm(false)}
-                disabled={isRemoving}
-              >
+              <button className="btn-cancel" onClick={() => setShowRemoveConfirm(false)} disabled={isRemoving}>
                 Cancel
               </button>
-              <button
-                className="btn-danger"
-                onClick={handleRemoveDomain}
-                disabled={isRemoving}
-              >
+              <button className="btn-danger" onClick={handleRemoveDomain} disabled={isRemoving}>
                 {isRemoving ? (
                   <>
                     <svg className="spinner" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    Removing...
+                    Removing…
                   </>
-                ) : (
-                  'Yes, Disconnect'
-                )}
+                ) : 'Yes, Disconnect'}
               </button>
             </div>
           </div>
@@ -371,4 +486,3 @@ export function DomainManagement({ siteId, onAddDomain }: DomainManagementProps)
     </div>
   )
 }
-
