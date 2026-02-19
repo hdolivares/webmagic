@@ -113,7 +113,7 @@ def main():
                 celery_app.send_task(
                     task_name,
                     args=[business_id],
-                    queue="validation",
+                    queue="discovery",
                 )
                 queued += 1
             except Exception as exc:
