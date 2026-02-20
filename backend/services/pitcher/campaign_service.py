@@ -415,18 +415,22 @@ class CampaignService:
     # SENDING METHODS
     # ========================================================================
     
-    async def send_campaign(self, campaign_id: UUID) -> bool:
+    async def send_campaign(
+        self,
+        campaign_id: UUID,
+        preferred_only: bool = False,
+    ) -> bool:
         """
         Send a campaign (email or SMS based on channel).
-        
+
         Args:
-            campaign_id: Campaign UUID
-            
+            campaign_id:    Campaign UUID
+            preferred_only: When True (autopilot), SMS is only sent during the
+                            three preferred engagement windows (1–5 PM, 7–9 PM,
+                            10 AM–12 PM local time).  Manual sends pass False.
+
         Returns:
-            True if sent successfully
-        
-        Raises:
-            ValidationException: If campaign not found or invalid status
+            True if sent, False if skipped (window miss), raises on hard error.
         """
         logger.info(f"Sending campaign: {campaign_id}")
         
@@ -448,7 +452,7 @@ class CampaignService:
         if campaign.channel == "email":
             return await self._send_email_campaign(campaign)
         elif campaign.channel == "sms":
-            return await self._send_sms_campaign(campaign)
+            return await self._send_sms_campaign(campaign, preferred_only=preferred_only)
         else:
             raise ValidationException(f"Unsupported channel: {campaign.channel}")
     
@@ -529,13 +533,31 @@ class CampaignService:
             
             return False
     
-    async def _send_sms_campaign(self, campaign: Campaign) -> bool:
+    async def _send_sms_campaign(
+        self,
+        campaign: Campaign,
+        preferred_only: bool = False,
+    ) -> bool:
         """Send SMS campaign with compliance checks and tracking."""
+        # Resolve the business's state timezone for accurate compliance checks
+        business_tz = "America/Chicago"
+        try:
+            result = await self.db.execute(
+                select(Business).where(Business.id == campaign.business_id)
+            )
+            biz = result.scalar_one_or_none()
+            if biz and biz.state:
+                business_tz = _get_business_timezone(biz.state)
+        except Exception:
+            pass  # Fall back to Chicago if lookup fails
+
         return await SMSCampaignHelper.send_sms_campaign(
             campaign=campaign,
             sms_sender=self.sms_sender,
             sms_compliance=self.sms_compliance,
-            db=self.db
+            db=self.db,
+            timezone_str=business_tz,
+            preferred_only=preferred_only,
         )
     
     # ========================================================================

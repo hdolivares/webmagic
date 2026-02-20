@@ -34,45 +34,50 @@ class SMSCampaignHelper:
         campaign: Campaign,
         sms_sender: SMSSender,
         sms_compliance: SMSComplianceService,
-        db: AsyncSession
+        db: AsyncSession,
+        timezone_str: str = "America/Chicago",
+        preferred_only: bool = False,
     ) -> bool:
         """
         Send SMS campaign with full compliance checks and tracking.
-        
+
         Args:
-            campaign: Campaign instance
-            sms_sender: SMS sender service
+            campaign:       Campaign instance
+            sms_sender:     SMS sender service
             sms_compliance: Compliance service
-            db: Database session
-        
+            db:             Database session
+            timezone_str:   Recipient's IANA timezone (use business state, not Chicago default)
+            preferred_only: When True (autopilot), enforce preferred engagement windows
+                            (1–5 PM, 7–9 PM, 10 AM–12 PM) in addition to TCPA quiet hours.
+
         Returns:
-            True if sent successfully
-        
-        Raises:
-            ValidationException: If compliance check fails
-            ExternalAPIException: If SMS sending fails
+            True if sent successfully (False if compliance skipped, not a hard failure)
         """
         try:
             # Final compliance check before sending
             can_send, reason = await sms_compliance.check_can_send(
                 phone_number=campaign.recipient_phone,
-                timezone_str="America/Chicago"
+                timezone_str=timezone_str,
+                preferred_only=preferred_only,
             )
             
             if not can_send:
+                is_window_skip = reason and "preferred send window" in reason
+                if is_window_skip:
+                    # Outside preferred window (autopilot only) — silently skip,
+                    # leave campaign status as "scheduled" so the next tick retries
+                    logger.info(f"Campaign {campaign.id} deferred: {reason}")
+                    return False
+
+                # Hard compliance failure (quiet hours, opt-out) — mark as failed
                 error_msg = f"Compliance check failed: {reason}"
                 logger.warning(f"Campaign {campaign.id}: {error_msg}")
-                
                 await db.execute(
                     update(Campaign)
                     .where(Campaign.id == campaign.id)
-                    .values(
-                        status="failed",
-                        error_message=error_msg
-                    )
+                    .values(status="failed", error_message=error_msg)
                 )
                 await db.commit()
-                
                 raise ValidationException(error_msg)
             
             # Build status callback URL for delivery tracking (Telnyx)
