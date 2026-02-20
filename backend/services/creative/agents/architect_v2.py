@@ -303,7 +303,34 @@ document.addEventListener('DOMContentLoaded', () => {
         if not result["html"]:
             logger.warning("[architect] No HTML found in delimited output, creating fallback")
             result = self._create_simple_website(business_data)
-        
+
+        # Validate HTML completeness: a proper site must have a <body> with a hero/main section.
+        # If the body appears to jump straight to mid-page content (missing hero), raise so the
+        # caller can retry rather than saving a broken page.
+        html = result.get("html", "")
+        if html:
+            body_pos = html.lower().find("<body")
+            if body_pos != -1:
+                body_content = html[body_pos:body_pos + 2000].lower()
+                has_hero = any(kw in body_content for kw in ["hero", "class=\"hero", "id=\"hero", "class='hero"])
+                has_nav_content = any(kw in body_content for kw in [
+                    "nav-link", "nav-logo", "nav-brand", "nav-content", "nav-menu",
+                    "<a href", "logo", "hamburger", "menu-toggle"
+                ])
+                # If <body> has no hero and no nav content in the first 2000 chars,
+                # the site is almost certainly truncated at the beginning.
+                if not has_hero and not has_nav_content:
+                    logger.error(
+                        "[architect] HTML validation failed: body content starts mid-page "
+                        "(no hero or nav content found in first 2000 chars). "
+                        "This indicates the LLM output was truncated or malformed."
+                    )
+                    from core.exceptions import ValidationException
+                    raise ValidationException(
+                        "Generated HTML appears truncated: body is missing the hero section "
+                        "and navigation content. The site will not be saved to prevent a broken page."
+                    )
+
         return result
     
     # ── Post-processing guards ────────────────────────────────────────────────
