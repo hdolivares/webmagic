@@ -24,11 +24,71 @@ from models.campaign import Campaign
 from models.sms_message import SMSMessage
 from services.sms import SMSComplianceService
 from services.pitcher.sms_campaign_helper import SMSCampaignHelper
+from services.pitcher.email_sender import EmailSender
 from services.crm import BusinessLifecycleService
+from core.config import get_settings
+
+_settings = get_settings()
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/telnyx", tags=["Telnyx Webhooks"])
+
+
+async def _notify_admin_reply(
+    from_phone: str,
+    message_body: str,
+    business_name: str | None,
+    action: str
+) -> None:
+    """Fire-and-forget email to admin when an SMS reply is received."""
+    try:
+        admin_email = _settings.SUPPORT_ADMIN_EMAIL
+        action_label = {
+            "opt_out": "🚫 Opt-out (STOP)",
+            "reply": "💬 Reply",
+        }.get(action, f"ℹ️ {action.capitalize()}")
+
+        subject = f"SMS Reply Received — {from_phone}"
+        if business_name:
+            subject = f"SMS Reply from {business_name} — {from_phone}"
+
+        body_html = f"""
+<div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; background: #f9fafb; padding: 24px; border-radius: 8px;">
+  <h2 style="margin: 0 0 16px; color: #111827;">📱 New SMS Reply Received</h2>
+  <table style="width:100%; border-collapse:collapse; background:#fff; border-radius:6px; overflow:hidden; border:1px solid #e5e7eb;">
+    <tr><td style="padding:10px 14px; background:#f3f4f6; font-weight:600; width:140px; color:#374151;">From</td>
+        <td style="padding:10px 14px; color:#111827;">{from_phone}</td></tr>
+    {'<tr><td style="padding:10px 14px; background:#f3f4f6; font-weight:600; color:#374151;">Business</td><td style="padding:10px 14px; color:#111827;">' + business_name + '</td></tr>' if business_name else ''}
+    <tr><td style="padding:10px 14px; background:#f3f4f6; font-weight:600; color:#374151;">Action</td>
+        <td style="padding:10px 14px; color:#111827;">{action_label}</td></tr>
+    <tr><td style="padding:10px 14px; background:#f3f4f6; font-weight:600; color:#374151; vertical-align:top;">Message</td>
+        <td style="padding:10px 14px; color:#111827; font-style:italic;">"{message_body}"</td></tr>
+  </table>
+  <p style="margin:16px 0 0; font-size:13px; color:#6b7280;">
+    View all messages at <a href="https://web.lavish.solutions/messages" style="color:#7c3aed;">web.lavish.solutions/messages</a>
+  </p>
+</div>
+"""
+        body_text = (
+            f"New SMS reply received\n\n"
+            f"From: {from_phone}\n"
+            + (f"Business: {business_name}\n" if business_name else "")
+            + f"Action: {action_label}\n"
+            f"Message: {message_body}\n\n"
+            f"View: https://web.lavish.solutions/messages"
+        )
+
+        sender = EmailSender()
+        await sender.provider.send_email(
+            to_email=admin_email,
+            subject=subject,
+            body_text=body_text,
+            body_html=body_html,
+        )
+        logger.info(f"Admin reply notification sent to {admin_email} for {from_phone}")
+    except Exception as e:
+        logger.error(f"Failed to send admin reply notification: {e}", exc_info=True)
 
 # Telnyx status mapping to internal status
 TELNYX_STATUS_MAP = {
@@ -294,7 +354,15 @@ async def handle_incoming_sms(
             # Save the inbound message without campaign link
             db.add(inbound_message)
             await db.commit()
-            
+
+            # Still notify admin even if no campaign is linked
+            await _notify_admin_reply(
+                from_phone=from_phone,
+                message_body=message_body,
+                business_name=None,
+                action="reply",
+            )
+
             # Still process opt-out if needed
             compliance = SMSComplianceService(db)
             await compliance.process_reply(
@@ -302,7 +370,7 @@ async def handle_incoming_sms(
                 reply_message=message_body,
                 campaign_id=None
             )
-            
+
             return {"status": "ok", "message": "Opt-out processed (no campaign found)"}
         
         # Process reply with most recent campaign
@@ -323,7 +391,16 @@ async def handle_incoming_sms(
         )
         
         logger.info(f"Reply processed: {result['action']} from {from_phone}")
-        
+
+        # Email notification to admin
+        business_name = latest_campaign.business_name if latest_campaign else None
+        await _notify_admin_reply(
+            from_phone=from_phone,
+            message_body=message_body,
+            business_name=business_name,
+            action=result['action'],
+        )
+
         # CRM Integration: Update business contact status based on reply
         if latest_campaign.business_id:
             lifecycle_service = BusinessLifecycleService(db)
