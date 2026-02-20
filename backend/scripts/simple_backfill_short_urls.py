@@ -1,146 +1,114 @@
 """
-Simple backfill script for legacy site short URLs.
+Backfill short_url for legacy generated sites that have none.
 
-Gets all sites without short_url, builds their full URL,
-creates a short link, and updates the record.
-
-Simple, clean, one site at a time.
+Strategy:
+  - Load raw (id, subdomain, business_id) tuples — NOT ORM objects — so
+    that per-site commits cannot trigger async lazy-reload errors.
+  - Join with businesses to get the business name for readable slugs.
+  - Uses ShortLinkServiceV2 with business_name for human-readable slugs
+    (e.g. "redwx7k" for "Redwood Plumbing").
 """
 import asyncio
 import logging
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
+import os
+import sys
 
-from core.database import get_db
-from models.site import GeneratedSite
-from models.business import Business
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
+
 from services.shortener.short_link_service_v2 import ShortLinkServiceV2
-from sqlalchemy.future import select as sa_select
+from services.shortener.slug_generator import generate_business_slug
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-# Constants
 SITE_BASE_URL = "https://sites.lavish.solutions"
 
 
-def build_full_url(subdomain: str) -> str:
-    """Build full site URL from subdomain."""
+def _build_full_url(subdomain: str) -> str:
     return f"{SITE_BASE_URL}/{subdomain}"
 
 
-async def backfill_one_site(db: AsyncSession, site: GeneratedSite) -> bool:
-    """
-    Backfill short URL for a single site.
+async def main() -> None:
+    # Load DATABASE_URL from env or .env file
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        from dotenv import load_dotenv
+        load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+        db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        logger.error("DATABASE_URL not set")
+        sys.exit(1)
 
-    Args:
-        db: Database session
-        site: GeneratedSite instance
+    engine = create_async_engine(db_url, echo=False)
+    AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    Returns:
-        True if successful, False if failed
-    """
-    try:
-        # Resolve business name for readable slug (e.g. "redwx7k")
-        business_name = None
-        if site.business_id:
-            biz_result = await db.execute(
-                sa_select(Business.name).where(Business.id == site.business_id)
-            )
-            business_name = biz_result.scalar_one_or_none()
-
-        # Build full URL
-        full_url = build_full_url(site.subdomain)
-
-        # Create short link with business-name prefix
-        short_url = await ShortLinkServiceV2.get_or_create_short_link(
-            db=db,
-            destination_url=full_url,
-            link_type="site_preview",
-            business_id=site.business_id,
-            site_id=site.id,
-            business_name=business_name,
-        )
-        
-        # Update site record
-        await db.execute(
-            update(GeneratedSite)
-            .where(GeneratedSite.id == site.id)
-            .values(short_url=short_url)
-        )
-        
-        # Commit immediately
-        await db.commit()
-        
-        logger.info(f"✅ {site.subdomain} → {short_url}")
-        return True
-        
-    except Exception as e:
-        # Rollback on error
-        await db.rollback()
-        logger.error(f"❌ {site.subdomain}: {str(e)}")
-        return False
-
-
-async def main():
-    """Main backfill process."""
-    logger.info("Starting simple backfill for legacy sites...")
     logger.info("=" * 60)
-    
-    success_count = 0
-    error_count = 0
-    
-    # Get database session properly
-    db_gen = get_db()
-    db = await db_gen.__anext__()
-    
-    try:
-        # Get all sites without short_url
-        result = await db.execute(
-            select(GeneratedSite)
-            .where(
-                GeneratedSite.status == 'completed',
-                GeneratedSite.short_url == None  # noqa: E711
-            )
-            .order_by(GeneratedSite.created_at.asc())
-        )
-        
-        sites = result.scalars().all()
-        total = len(sites)
-        
-        if total == 0:
-            logger.info("✅ No sites need backfilling!")
-            return
-        
-        logger.info(f"Found {total} sites needing short links\n")
-        
-        # Process each site
-        for i, site in enumerate(sites, 1):
-            logger.info(f"[{i}/{total}] Processing {site.subdomain}...")
-            
-            if await backfill_one_site(db, site):
-                success_count += 1
-            else:
-                error_count += 1
-        
-        # Summary
-        logger.info("")
-        logger.info("=" * 60)
-        logger.info("Backfill Complete!")
-        logger.info("=" * 60)
-        logger.info(f"Total sites: {total}")
-        logger.info(f"✅ Success: {success_count}")
-        logger.info(f"❌ Errors: {error_count}")
-        logger.info("=" * 60)
-        
-    except Exception as e:
-        logger.error(f"Fatal error: {e}", exc_info=True)
-        raise
-    finally:
-        await db_gen.aclose()
+    logger.info("Starting short URL backfill for legacy sites")
+    logger.info("=" * 60)
+
+    success, errors = 0, 0
+
+    async with AsyncSessionLocal() as db:
+        # Load raw rows — tuples, not ORM objects — immune to expire_on_commit
+        rows_result = await db.execute(text("""
+            SELECT gs.id, gs.subdomain, gs.business_id, b.name AS business_name
+            FROM generated_sites gs
+            LEFT JOIN businesses b ON b.id = gs.business_id
+            WHERE gs.short_url IS NULL
+              AND gs.status = 'completed'
+            ORDER BY gs.created_at ASC
+        """))
+        rows = rows_result.fetchall()
+
+    total = len(rows)
+    if total == 0:
+        logger.info("✅ All sites already have short URLs — nothing to do.")
+        await engine.dispose()
+        return
+
+    logger.info(f"Found {total} sites needing short links\n")
+
+    for i, row in enumerate(rows, 1):
+        site_id = row.id
+        subdomain = row.subdomain
+        business_id = row.business_id
+        business_name = row.business_name
+
+        logger.info(f"[{i}/{total}] {subdomain} ({business_name}) …")
+
+        try:
+            # Each site gets its own session so a commit doesn't bleed into others
+            async with AsyncSessionLocal() as db:
+                full_url = _build_full_url(subdomain)
+                short_url = await ShortLinkServiceV2.get_or_create_short_link(
+                    db=db,
+                    destination_url=full_url,
+                    link_type="site_preview",
+                    business_id=business_id,
+                    site_id=site_id,
+                    business_name=business_name,
+                )
+                await db.execute(
+                    text("UPDATE generated_sites SET short_url = :u WHERE id = :id"),
+                    {"u": short_url, "id": str(site_id)},
+                )
+                await db.commit()
+
+            logger.info(f"  ✅  → {short_url}")
+            success += 1
+
+        except Exception as exc:
+            logger.error(f"  ❌  {subdomain}: {exc}")
+            errors += 1
+
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info(f"Done — ✅ {success} succeeded, ❌ {errors} failed out of {total}")
+    logger.info("=" * 60)
+
+    await engine.dispose()
 
 
 if __name__ == "__main__":
