@@ -95,11 +95,23 @@ class BaseAgent:
             ) as stream:
                 # Collect complete response from stream
                 content = await stream.get_final_text()
+                # Check why the model stopped generating
+                final_message = await stream.get_final_message()
+                stop_reason = final_message.stop_reason if final_message else None
             
             logger.info(
                 f"[{self.agent_name}] Generation complete. "
-                f"Output length: {len(content)} chars"
+                f"Output length: {len(content)} chars. "
+                f"Stop reason: {stop_reason}"
             )
+
+            # If the model hit the token limit, the output is truncated — don't save garbage
+            if stop_reason == "max_tokens":
+                raise ExternalAPIException(
+                    f"[{self.agent_name}] Response truncated at max_tokens limit "
+                    f"({max_tokens or self.max_tokens} tokens). "
+                    "Increase max_tokens or shorten the prompt to avoid partial output."
+                )
             
             return content
             
