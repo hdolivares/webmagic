@@ -19,6 +19,7 @@ from api.schemas.campaign import (
     CampaignStats,
     BulkCampaignCreate,
     EmailTestRequest,
+    SMSTestRequest,
     ReadyBusinessResponse,
     ReadyBusinessesListResponse,
     SMSPreviewRequest,
@@ -29,6 +30,8 @@ from services.pitcher.campaign_service import CampaignService
 from services.pitcher.email_sender import EmailSender
 from services.pitcher.tracking import EmailTracker
 from services.sms import SMSGenerator
+from services.sms.sms_sender import SMSSender
+from services.sms.phone_validator import PhoneValidator
 from services.system_settings_service import SystemSettingsService
 from models.user import AdminUser
 from models.business import Business
@@ -340,6 +343,44 @@ async def send_test_email(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to send test email: {str(e)}"
+        )
+
+
+@router.post("/test-sms")
+async def send_test_sms(
+    test_data: SMSTestRequest,
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """Send a test SMS to verify Telnyx configuration and international reach."""
+    is_valid, formatted_phone, error = PhoneValidator.validate_and_format(
+        test_data.to_phone, region="US"
+    )
+    if not is_valid:
+        # Try international parse if US fails
+        is_valid, formatted_phone, error = PhoneValidator.validate_and_format(
+            test_data.to_phone, region=None
+        )
+    if not is_valid:
+        raise HTTPException(status_code=422, detail=f"Invalid phone number: {error}")
+
+    try:
+        sender = SMSSender()
+        result = await sender.send(
+            to_phone=formatted_phone,
+            body=test_data.message
+        )
+        return {
+            "status": "sent",
+            "message": f"Test SMS sent to {formatted_phone}",
+            "from": result.get("from_phone"),
+            "to": formatted_phone,
+            "message_id": result.get("message_id"),
+            "provider": "telnyx"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send test SMS: {str(e)}"
         )
 
 
