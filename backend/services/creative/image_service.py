@@ -1,310 +1,445 @@
 """
 Image Generation Service using Google Gemini (Nano Banana).
-Generates images for website creation using gemini-2.5-flash-image model.
+Generates 3 high-quality contextual images per website using gemini-2.5-flash-image.
+
+Images are saved to disk and served via a dedicated FastAPI endpoint.
 """
-import logging
+import asyncio
 import base64
-import httpx
-from typing import Dict, Any, List, Optional
+import io
+import logging
 from pathlib import Path
+from typing import Dict, Any, List, Optional
+
+import httpx
+
 from core.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
+# ── Category → image subject knowledge ──────────────────────────────────────
+
+# For each category cluster we define what the 3 images should show.
+# "woman" means the prompt will describe a beautiful, attractive woman as subject.
+_CATEGORY_PROMPTS: Dict[str, List[Dict[str, str]]] = {
+    # ── Plumbing / HVAC ──────────────────────────────────────────────────────
+    "plumber": [
+        {
+            "slot": "hero",
+            "aspect": "16:9",
+            "desc": (
+                "A confident, beautiful woman in crisp navy plumbing uniform "
+                "smiling at camera while holding professional tools in a modern "
+                "bright kitchen. Cinematic lighting, photorealistic, 8K quality, "
+                "ultra-detailed, clean and polished home background."
+            ),
+        },
+        {
+            "slot": "about",
+            "aspect": "4:3",
+            "desc": (
+                "A professional female plumber with an attractive appearance "
+                "fixing a modern under-sink pipe, focused and competent. "
+                "Warm residential lighting, ultra-realistic photography."
+            ),
+        },
+        {
+            "slot": "services",
+            "aspect": "4:3",
+            "desc": (
+                "Close-up of gleaming modern plumbing fixtures — chrome faucet, "
+                "clean pipes — professional product photography, bright studio lighting."
+            ),
+        },
+    ],
+    "hvac": [
+        {
+            "slot": "hero",
+            "aspect": "16:9",
+            "desc": (
+                "A beautiful, attractive female HVAC technician in a branded "
+                "uniform smiling in front of a modern home exterior on a sunny day. "
+                "Photorealistic, cinematic, 8K."
+            ),
+        },
+        {
+            "slot": "about",
+            "aspect": "4:3",
+            "desc": (
+                "A stunning woman technician adjusting a modern smart thermostat "
+                "inside a bright, airy living room. Ultra-realistic."
+            ),
+        },
+        {
+            "slot": "services",
+            "aspect": "4:3",
+            "desc": (
+                "Modern HVAC equipment — sleek air conditioning unit, professional "
+                "tools laid out neatly. Studio product photography."
+            ),
+        },
+    ],
+    # ── Health / Wellness ─────────────────────────────────────────────────────
+    "chiropractor": [
+        {
+            "slot": "hero",
+            "aspect": "16:9",
+            "desc": (
+                "A beautiful, professional female chiropractor in white coat "
+                "warmly welcoming a patient in a modern, bright clinical office. "
+                "Natural light, premium healthcare photography, 8K."
+            ),
+        },
+        {
+            "slot": "about",
+            "aspect": "4:3",
+            "desc": (
+                "An attractive female chiropractor performing a gentle spinal "
+                "adjustment on a relaxed patient. Bright, clean clinical setting."
+            ),
+        },
+        {
+            "slot": "services",
+            "aspect": "4:3",
+            "desc": (
+                "Modern chiropractic treatment room with adjustment table and "
+                "natural light. Clean, professional interior photography."
+            ),
+        },
+    ],
+    "counselor": [
+        {
+            "slot": "hero",
+            "aspect": "16:9",
+            "desc": (
+                "A beautiful, empathetic female therapist with warm smile sitting "
+                "in a cozy, stylish therapy office with soft natural light and "
+                "indoor plants. Professional portrait photography, 8K."
+            ),
+        },
+        {
+            "slot": "about",
+            "aspect": "4:3",
+            "desc": (
+                "An attractive female counselor listening attentively to a client "
+                "in a calm, modern therapy room. Warm tones, natural light."
+            ),
+        },
+        {
+            "slot": "services",
+            "aspect": "4:3",
+            "desc": (
+                "A serene, beautifully decorated therapy office interior — "
+                "comfortable chairs, soft lighting, plants. Architectural photography."
+            ),
+        },
+    ],
+    "veterinarian": [
+        {
+            "slot": "hero",
+            "aspect": "16:9",
+            "desc": (
+                "A stunning female veterinarian in white coat gently holding "
+                "an adorable golden retriever puppy, smiling warmly. "
+                "Bright clinic background, photorealistic, 8K."
+            ),
+        },
+        {
+            "slot": "about",
+            "aspect": "4:3",
+            "desc": (
+                "An attractive female vet examining a happy cat on a clean "
+                "examination table. Professional clinic lighting."
+            ),
+        },
+        {
+            "slot": "services",
+            "aspect": "4:3",
+            "desc": (
+                "Modern veterinary clinic reception area — bright, welcoming, "
+                "with pets visible. Clean interior photography."
+            ),
+        },
+    ],
+    # ── Finance / Professional Services ───────────────────────────────────────
+    "accountant": [
+        {
+            "slot": "hero",
+            "aspect": "16:9",
+            "desc": (
+                "A beautiful, professional female CPA in a modern glass-walled "
+                "office, confidently reviewing documents, bright city view behind her. "
+                "Corporate photography, 8K."
+            ),
+        },
+        {
+            "slot": "about",
+            "aspect": "4:3",
+            "desc": (
+                "An attractive female accountant in elegant business attire "
+                "working on financial reports at a sleek desk. Natural office light."
+            ),
+        },
+        {
+            "slot": "services",
+            "aspect": "4:3",
+            "desc": (
+                "Modern financial charts and documents on a clean desk with a "
+                "laptop. Professional business photography."
+            ),
+        },
+    ],
+    # ── Default fallback for any other category ───────────────────────────────
+    "default": [
+        {
+            "slot": "hero",
+            "aspect": "16:9",
+            "desc": (
+                "A beautiful, confident professional woman in business casual "
+                "attire smiling at a modern bright office or storefront. "
+                "Cinematic lighting, photorealistic, 8K."
+            ),
+        },
+        {
+            "slot": "about",
+            "aspect": "4:3",
+            "desc": (
+                "An attractive professional woman working with focus and "
+                "competence in a clean, modern workspace. Natural light."
+            ),
+        },
+        {
+            "slot": "services",
+            "aspect": "4:3",
+            "desc": (
+                "Modern professional workspace — desk, tools of the trade, "
+                "clean design. Architectural / product photography."
+            ),
+        },
+    ],
+}
+
+# Map common category keywords to our known buckets
+_CATEGORY_KEYWORDS: Dict[str, str] = {
+    "plumb": "plumber",
+    "drain": "plumber",
+    "sewer": "plumber",
+    "hvac": "hvac",
+    "air condition": "hvac",
+    "heating": "hvac",
+    "chiropract": "chiropractor",
+    "chiro": "chiropractor",
+    "counsel": "counselor",
+    "therap": "counselor",
+    "psycholog": "counselor",
+    "psychiatr": "counselor",
+    "vet": "veterinarian",
+    "animal": "veterinarian",
+    "pet": "veterinarian",
+    "account": "accountant",
+    "cpa": "accountant",
+    "tax": "accountant",
+    "bookkeep": "accountant",
+}
+
+
+def _resolve_category_key(category: str) -> str:
+    lower = (category or "").lower()
+    for kw, bucket in _CATEGORY_KEYWORDS.items():
+        if kw in lower:
+            return bucket
+    return "default"
+
+
 class ImageGenerationService:
     """
-    Service for generating images using Google's Gemini image generation API.
-    Uses gemini-2.5-flash-image (Nano Banana) for fast, cost-effective generation.
+    Generates 3 contextual images per website using Gemini 2.5 Flash Image.
+    Images are JPEG-compressed to ~200-350 KB each and saved to disk.
     """
-    
+
+    MODEL = "gemini-2.5-flash-image"
+    BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
+    TARGET_JPEG_KB = 350          # max target size after compression
+    JPEG_QUALITY_START = 82       # starting JPEG quality; lowered if still too large
+
     def __init__(self):
         self.api_key = settings.GEMINI_API_KEY
-        self.model = "gemini-2.5-flash-image"
-        self.base_url = "https://generativelanguage.googleapis.com/v1beta"
-        
-    async def generate_hero_image(
+        if not self.api_key:
+            logger.warning("[ImageGen] GEMINI_API_KEY is not set — image generation disabled")
+
+    # ── Public API ────────────────────────────────────────────────────────────
+
+    async def generate_images_for_site(
         self,
         business_name: str,
         category: str,
-        brand_archetype: str,
-        color_palette: Dict[str, str],
-        aspect_ratio: str = "16:9"
-    ) -> Optional[bytes]:
+        subdomain: str,
+        brand_colors: Optional[Dict[str, str]] = None,
+    ) -> List[Dict[str, Any]]:
         """
-        Generate a hero image for the website.
-        
-        Args:
-            business_name: Name of the business
-            category: Business category (e.g., "restaurant", "spa")
-            brand_archetype: Brand archetype (e.g., "Explorer", "Caregiver")
-            color_palette: Dict with primary, secondary, accent colors
-            aspect_ratio: Image aspect ratio (default: 16:9)
-            
-        Returns:
-            Image bytes (PNG format) or None if generation fails
+        Generate 3 images for a site in parallel.
+
+        Returns a list of dicts:
+        [
+          {"slot": "hero",     "filename": "img/hero.jpg",     "saved": True},
+          {"slot": "about",    "filename": "img/about.jpg",    "saved": True},
+          {"slot": "services", "filename": "img/services.jpg", "saved": True},
+        ]
+        Files are saved under SITES_BASE_PATH/{subdomain}/img/.
         """
-        prompt = self._build_hero_prompt(
-            business_name, 
-            category, 
-            brand_archetype, 
-            color_palette
+        if not self.api_key:
+            logger.warning("[ImageGen] Skipping — no API key")
+            return []
+
+        bucket = _resolve_category_key(category)
+        prompt_specs = _CATEGORY_PROMPTS[bucket]
+        color_hint = self._color_hint(brand_colors)
+
+        logger.info(
+            f"[ImageGen] Generating {len(prompt_specs)} images for '{business_name}' "
+            f"(category={category}, bucket={bucket})"
         )
-        
-        return await self._generate_image(
-            prompt=prompt,
-            aspect_ratio=aspect_ratio,
-            response_modalities=["IMAGE"]  # Image only, no text
-        )
-    
-    async def generate_section_background(
+
+        tasks = [
+            self._generate_and_save(
+                spec=spec,
+                business_name=business_name,
+                color_hint=color_hint,
+                subdomain=subdomain,
+            )
+            for spec in prompt_specs
+        ]
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        output = []
+        for spec, res in zip(prompt_specs, results):
+            if isinstance(res, Exception):
+                logger.error(f"[ImageGen] Failed {spec['slot']}: {res}")
+                output.append({"slot": spec["slot"], "filename": None, "saved": False})
+            else:
+                output.append(res)
+
+        saved = sum(1 for r in output if r.get("saved"))
+        logger.info(f"[ImageGen] {saved}/{len(prompt_specs)} images saved for {subdomain}")
+        return output
+
+    # ── Private helpers ───────────────────────────────────────────────────────
+
+    async def _generate_and_save(
         self,
-        section_type: str,
-        mood: str,
-        color_palette: Dict[str, str],
-        aspect_ratio: str = "16:9"
-    ) -> Optional[bytes]:
-        """
-        Generate a background image for a specific section.
-        
-        Args:
-            section_type: Type of section (e.g., "services", "about", "testimonials")
-            mood: Desired mood (e.g., "warm", "professional", "energetic")
-            color_palette: Color palette for the image
-            aspect_ratio: Image aspect ratio
-            
-        Returns:
-            Image bytes or None
-        """
-        prompt = self._build_background_prompt(section_type, mood, color_palette)
-        
-        return await self._generate_image(
-            prompt=prompt,
-            aspect_ratio=aspect_ratio,
-            response_modalities=["IMAGE"]
+        spec: Dict[str, str],
+        business_name: str,
+        color_hint: str,
+        subdomain: str,
+    ) -> Dict[str, Any]:
+        slot = spec["slot"]
+        aspect = spec["aspect"]
+
+        full_prompt = (
+            f"{spec['desc']} "
+            f"For a business called '{business_name}'. "
+            f"{color_hint} "
+            "No text overlays, no logos, no watermarks. "
+            "Ultra-realistic, high-fidelity, premium quality."
         )
-    
-    async def generate_product_image(
-        self,
-        product_description: str,
-        style: str = "professional",
-        aspect_ratio: str = "1:1"
-    ) -> Optional[bytes]:
-        """
-        Generate a product/service image.
-        
-        Args:
-            product_description: Description of the product/service
-            style: Visual style (e.g., "professional", "minimal", "artistic")
-            aspect_ratio: Image aspect ratio (default: 1:1 for products)
-            
-        Returns:
-            Image bytes or None
-        """
-        prompt = f"""A high-resolution, {style} product photograph of {product_description}. 
-        Studio lighting with soft shadows. Clean, professional composition. 
-        Ultra-realistic with sharp focus."""
-        
-        return await self._generate_image(
-            prompt=prompt,
-            aspect_ratio=aspect_ratio,
-            response_modalities=["IMAGE"]
-        )
-    
-    async def generate_icon(
-        self,
-        icon_description: str,
-        style: str = "modern minimalist"
-    ) -> Optional[bytes]:
-        """
-        Generate an icon or small graphic.
-        
-        Args:
-            icon_description: What the icon should represent
-            style: Visual style of the icon
-            
-        Returns:
-            Image bytes or None
-        """
-        prompt = f"""A {style} icon representing {icon_description}. 
-        Clean lines, simple design, professional quality. 
-        Transparent or white background. 
-        Suitable for web use at various sizes."""
-        
-        return await self._generate_image(
-            prompt=prompt,
-            aspect_ratio="1:1",
-            response_modalities=["IMAGE"]
-        )
-    
-    async def _generate_image(
-        self,
-        prompt: str,
-        aspect_ratio: str = "16:9",
-        response_modalities: List[str] = ["TEXT", "IMAGE"]
-    ) -> Optional[bytes]:
-        """
-        Core method to generate an image using Gemini API.
-        
-        Args:
-            prompt: Text prompt for image generation
-            aspect_ratio: Aspect ratio (1:1, 16:9, 4:3, etc.)
-            response_modalities: What to return (TEXT, IMAGE, or both)
-            
-        Returns:
-            Image bytes (PNG) or None if generation fails
-        """
-        url = f"{self.base_url}/models/{self.model}:generateContent"
-        
+
+        png_bytes = await self._call_gemini(full_prompt, aspect)
+        if not png_bytes:
+            return {"slot": slot, "filename": None, "saved": False}
+
+        jpeg_bytes = self._compress_to_jpeg(png_bytes)
+        filename = f"img/{slot}.jpg"
+        await self._save(jpeg_bytes, subdomain, f"{slot}.jpg")
+
+        size_kb = len(jpeg_bytes) / 1024
+        logger.info(f"[ImageGen] {slot}: {size_kb:.0f} KB saved → {filename}")
+        return {"slot": slot, "filename": filename, "saved": True}
+
+    async def _call_gemini(self, prompt: str, aspect_ratio: str) -> Optional[bytes]:
+        url = f"{self.BASE_URL}/models/{self.MODEL}:generateContent"
         headers = {
             "x-goog-api-key": self.api_key,
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
-        
         payload = {
-            "contents": [{
-                "parts": [{"text": prompt}]
-            }],
+            "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
-                "responseModalities": response_modalities,
-                "imageConfig": {
-                    "aspectRatio": aspect_ratio
-                }
-            }
+                "responseModalities": ["IMAGE"],
+                "imageConfig": {"aspectRatio": aspect_ratio},
+            },
         }
-        
+
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
-                response = await client.post(url, json=payload, headers=headers)
-                response.raise_for_status()
-                
-                data = response.json()
-                
-                # Extract image from response
-                if "candidates" in data and len(data["candidates"]) > 0:
-                    candidate = data["candidates"][0]
-                    
-                    # Check if content exists
-                    if "content" not in candidate:
-                        logger.error(f"No content in candidate. Response: {data}")
-                        return None
-                    
-                    parts = candidate["content"]["parts"]
-                    
-                    for part in parts:
-                        if "inlineData" in part:
-                            # Decode base64 image data
-                            image_data = part["inlineData"]["data"]
-                            image_bytes = base64.b64decode(image_data)
-                            logger.info(f"Successfully generated image ({len(image_bytes)} bytes)")
-                            return image_bytes
-                
-                logger.warning(f"No image data found in response. Candidates: {len(data.get('candidates', []))}")
+                resp = await client.post(url, json=payload, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+
+            candidates = data.get("candidates", [])
+            if not candidates:
+                logger.warning("[ImageGen] No candidates in response")
                 return None
-                
-        except httpx.HTTPError as e:
-            logger.error(f"HTTP error generating image: {str(e)}")
-            if hasattr(e, 'response') and e.response:
-                logger.error(f"Response body: {e.response.text}")
+
+            candidate = candidates[0]
+            if "content" not in candidate:
+                logger.error(f"[ImageGen] No content in candidate: {data}")
+                return None
+
+            for part in candidate["content"].get("parts", []):
+                if "inlineData" in part:
+                    return base64.b64decode(part["inlineData"]["data"])
+
+            logger.warning("[ImageGen] No inlineData in response parts")
             return None
-        except KeyError as e:
-            logger.error(f"KeyError accessing response data: {str(e)}")
-            logger.error(f"Response structure: {data if 'data' in locals() else 'No data'}")
+
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                f"[ImageGen] HTTP {e.response.status_code}: {e.response.text[:300]}"
+            )
             return None
         except Exception as e:
-            logger.error(f"Error generating image: {str(e)}")
+            logger.error(f"[ImageGen] Unexpected error: {e}")
             return None
-    
-    def _build_hero_prompt(
-        self,
-        business_name: str,
-        category: str,
-        brand_archetype: str,
-        color_palette: Dict[str, str]
-    ) -> str:
-        """Build an optimized prompt for hero image generation."""
-        
-        # Map archetypes to visual styles
-        archetype_styles = {
-            "Explorer": "adventurous, dynamic, expansive landscapes",
-            "Creator": "artistic, innovative, creative workshop atmosphere",
-            "Caregiver": "warm, nurturing, comfortable and welcoming",
-            "Ruler": "prestigious, authoritative, elegant and commanding",
-            "Hero": "powerful, courageous, bold and inspiring",
-            "Magician": "transformative, mystical, enchanting and visionary",
-            "Regular Guy": "relatable, authentic, down-to-earth and friendly",
-            "Lover": "passionate, intimate, sensual and romantic",
-            "Jester": "playful, fun, energetic and lighthearted",
-            "Sage": "wise, knowledgeable, thoughtful and educational",
-            "Innocent": "pure, optimistic, simple and wholesome",
-            "Outlaw": "rebellious, edgy, bold and unconventional"
-        }
-        
-        style_desc = archetype_styles.get(brand_archetype, "professional, high-quality")
-        
-        colors = f"with a color palette of {color_palette.get('primary', 'blue')}, " \
-                f"{color_palette.get('secondary', 'white')}, " \
-                f"and {color_palette.get('accent', 'orange')}"
-        
-        prompt = f"""A stunning, photorealistic hero image for a {category} business called '{business_name}'. 
-        The scene should be {style_desc}, {colors}. 
-        High-resolution, professional photography with perfect composition and lighting. 
-        Suitable as a website hero banner. 
-        Focus on visual impact and emotional connection. 
-        No text or logos in the image."""
-        
-        return prompt
-    
-    def _build_background_prompt(
-        self,
-        section_type: str,
-        mood: str,
-        color_palette: Dict[str, str]
-    ) -> str:
-        """Build a prompt for section background generation."""
-        
-        colors = f"using colors {color_palette.get('primary', 'blue')} and {color_palette.get('secondary', 'white')}"
-        
-        prompt = f"""A minimalist, abstract background image for a website {section_type} section. 
-        {mood} atmosphere, {colors}. 
-        Subtle texture and depth, suitable for text overlay. 
-        Significant negative space for content. 
-        Professional, modern design with soft gradients and minimal distractions. 
-        High resolution, optimized for web use."""
-        
-        return prompt
-    
-    async def save_image_to_disk(
-        self,
-        image_bytes: bytes,
-        filename: str,
-        subdomain: str
-    ) -> str:
-        """
-        Save generated image to the sites directory.
-        
-        Args:
-            image_bytes: Image data
-            filename: Name for the image file (e.g., "hero.png")
-            subdomain: Subdomain of the site
-            
-        Returns:
-            Relative path to the saved image
-        """
-        sites_path = Path(settings.SITES_BASE_PATH)
-        site_dir = sites_path / subdomain / "assets" / "images"
-        site_dir.mkdir(parents=True, exist_ok=True)
-        
-        image_path = site_dir / filename
-        
+
+    def _compress_to_jpeg(self, png_bytes: bytes) -> bytes:
+        """Convert PNG → JPEG and iteratively lower quality until ≤ TARGET_JPEG_KB."""
         try:
-            with open(image_path, "wb") as f:
-                f.write(image_bytes)
-            
-            logger.info(f"Saved image to: {image_path}")
-            return f"assets/images/{filename}"
-            
+            from PIL import Image
+
+            img = Image.open(io.BytesIO(png_bytes)).convert("RGB")
+            quality = self.JPEG_QUALITY_START
+
+            for _ in range(6):
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=quality, optimize=True)
+                result = buf.getvalue()
+                if len(result) <= self.TARGET_JPEG_KB * 1024:
+                    return result
+                quality -= 8
+
+            # Return last attempt even if slightly over target
+            return result
+
         except Exception as e:
-            logger.error(f"Error saving image: {str(e)}")
-            raise
+            logger.warning(f"[ImageGen] PIL compression failed ({e}), using raw PNG")
+            return png_bytes
+
+    async def _save(self, image_bytes: bytes, subdomain: str, filename: str) -> str:
+        img_dir = Path(settings.SITES_BASE_PATH) / subdomain / "img"
+        img_dir.mkdir(parents=True, exist_ok=True)
+        dest = img_dir / filename
+        dest.write_bytes(image_bytes)
+        return str(dest)
+
+    @staticmethod
+    def _color_hint(brand_colors: Optional[Dict[str, str]]) -> str:
+        if not brand_colors:
+            return ""
+        primary = brand_colors.get("primary", "")
+        secondary = brand_colors.get("secondary", "")
+        if primary or secondary:
+            return f"The image should subtly echo the brand palette: {primary}, {secondary}."
+        return ""

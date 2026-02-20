@@ -42,6 +42,9 @@ phonenumbers==8.13.27  # Phone number validation
 outscraper==6.0.0
 playwright==1.41.2
 
+# Image processing
+Pillow==10.2.0
+
 # Utilities
 python-slugify==8.0.1
 pytz==2024.1

@@ -5,7 +5,7 @@ Uses delimited output format instead of JSON for reliability
 import logging
 import re
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -57,13 +57,32 @@ class ArchitectAgentV2(BaseAgent):
         # STEP 1: Enhance business data with category intelligence
         enhanced_data = CategoryKnowledgeService.enhance_business_data(business_data)
         
-        # STEP 2: Prepare content
+        # STEP 2: Generate images with Nano Banana BEFORE building the LLM prompt
+        #         so the architect knows exactly which images are available.
+        generated_images: List[Dict[str, Any]] = []
+        if subdomain:
+            try:
+                from services.creative.image_service import ImageGenerationService
+                img_svc = ImageGenerationService()
+                # Pull brand colors from design_brief if available
+                colors = design_brief.get("colors", design_brief.get("color_palette", {}))
+                generated_images = await img_svc.generate_images_for_site(
+                    business_name=enhanced_data.get("name", ""),
+                    category=enhanced_data.get("category", ""),
+                    subdomain=subdomain,
+                    brand_colors=colors if isinstance(colors, dict) else {},
+                )
+            except Exception as img_err:
+                # Image generation is best-effort — never block site creation
+                logger.warning(f"[architect] Image generation failed (non-fatal): {img_err}")
+        
+        # STEP 3: Prepare content
         content = self._prepare_content(enhanced_data, creative_dna)
         
-        # STEP 3: Prepare services data
+        # STEP 4: Prepare services data
         services_data = self._prepare_services_data(enhanced_data)
         
-        # STEP 4: Build prompts
+        # STEP 5: Build prompts
         system_prompt, user_prompt = await self.prompt_builder.build_prompts(
             agent_name="architect",
             data={
@@ -87,7 +106,10 @@ class ArchitectAgentV2(BaseAgent):
             }
         )
         
-        # STEP 5: Modify prompt to request delimited output
+        # Append image availability context to the prompt
+        user_prompt += self._build_image_context(generated_images)
+        
+        # STEP 6: Append delimited-output format instructions
         user_prompt += """
 
 **OUTPUT FORMAT (CRITICAL)**:
@@ -159,6 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
 5. Use SEMANTIC HTML class names (.hero, .nav-link, .service-card) — NEVER Tailwind utility classes
 6. COLOR CONTRAST IS MANDATORY — every text element MUST have a contrast ratio of at least 4.5:1 against its background (WCAG AA). Never place gray, light, or muted text on a dark or colored background without verifying readability. On dark/colored sections (hero, banners, footers), always set text to #ffffff or a near-white color explicitly — do NOT rely on inheritance.
 7. HERO BUTTONS — the secondary/outline button in the hero section MUST use white text and a white/semi-transparent border, never the primary color. The hero has a dark or saturated background, so `color: var(--color-primary)` makes an invisible button. Always define `.hero .btn-secondary` (or a dedicated `.btn-outline-light` class) with `color: rgba(255,255,255,0.9)`, `border-color: rgba(255,255,255,0.6)`, and `background: rgba(255,255,255,0.08)`. On hover: `background: rgba(255,255,255,0.18)`, `color: #ffffff`, `border-color: white`. NEVER put a dark-colored outline button on a dark or colored hero background.
+8. IMAGES — if AI-generated images are provided (img/hero.jpg, img/about.jpg, img/services.jpg), they MUST be used as prominent, full-width or large-area visuals — NOT tiny thumbnails. The hero image MUST fill the entire hero width. The about image must be at least 40 % section width on desktop. Add `object-fit: cover` to `<img>` elements placed in fixed-size containers. When using a background-image on the hero, add a CSS overlay: `background: linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.35) 100%)` so text remains readable (4.5:1 contrast). Service cards must NOT use emojis as the primary icon — use CSS styling instead.
 
 **IMPORTANT**:
 1. The HTML MUST include `<link rel="stylesheet" href="styles.css">` in the <head>
@@ -166,31 +189,34 @@ document.addEventListener('DOMContentLoaded', () => {
 3. Use exactly these delimiters: === HTML ===, === CSS ===, === JS ===, === METADATA ===
 """
         
-        # STEP 6: Generate code using text (not JSON)
+        # STEP 7: Generate code using text (not JSON)
         raw_output = await self.generate(system_prompt, user_prompt, max_tokens=64000)
         
-        # STEP 7: Parse delimited output using LLM-friendly parsing
+        # STEP 8: Parse delimited output using LLM-friendly parsing
         website = self._parse_delimited_output(raw_output, enhanced_data)
         
-        # STEP 8: Post-process — enforce CSS variables, strip Tailwind CDN, inject SEO head
+        # STEP 9: Post-process — enforce CSS variables, strip Tailwind CDN, inject SEO head
         slug = enhanced_data.get("slug") or self._generate_slug(enhanced_data.get("name", ""))
         website["css"] = self._enforce_css_variables(website.get("css", ""), design_brief)
         website["html"] = self._strip_external_css_frameworks(website.get("html", ""))
         website["html"] = self._inject_seo_head(website.get("html", ""), enhanced_data, slug)
         
-        # STEP 9: Inject proper claim bar with checkout link
+        # STEP 10: Inject proper claim bar with checkout link
         website["html"] = self._inject_claim_bar(website.get("html", ""), slug)
         website["css"] = self._add_claim_bar_css(website.get("css", ""))
         website["js"] = self._add_claim_bar_js(website.get("js", ""), slug)
         
-        # STEP 10: Extract generation context for edit pipeline
+        # STEP 11: Extract generation context for edit pipeline
         website["generation_context"] = self._extract_generation_context(
             css=website.get("css", ""),
             metadata=website.get("metadata", {}),
             design_brief=design_brief,
         )
         
-        # STEP 11: Validate
+        # Attach image manifest so callers know what was generated
+        website["generated_images"] = generated_images
+        
+        # STEP 13: Validate
         if not website.get('html'):
             raise ValidationException("No HTML generated")
         
@@ -202,6 +228,70 @@ document.addEventListener('DOMContentLoaded', () => {
         
         return website
     
+    # ── Image context ─────────────────────────────────────────────────────────
+
+    def _build_image_context(self, images: List[Dict[str, Any]]) -> str:
+        """
+        Build the image-context block that is appended to the user prompt.
+        If no images were generated, we still instruct the architect to avoid
+        emoji-heavy service cards and use CSS styling instead.
+        """
+        slot_labels = {
+            "hero":     "hero banner",
+            "about":    "about / team section",
+            "services": "services / work section",
+        }
+
+        if not images or not any(img.get("saved") for img in images):
+            return """
+
+**IMAGE GUIDANCE** (no AI images were pre-generated for this run):
+- Service cards MUST NOT use emojis as the primary visual element.
+  Use a solid colored icon area with a relevant Unicode symbol (max 1 per card, 1.5rem), 
+  or a pure CSS icon shape. Keep cards clean and modern.
+- Hero section should use a rich CSS gradient background — NOT a flat color.
+"""
+
+        saved = [img for img in images if img.get("saved") and img.get("filename")]
+
+        lines = [
+            "",
+            "**AI-GENERATED IMAGES (Nano Banana / Gemini 2.5 Flash)**",
+            "The following photorealistic images have been pre-generated and are saved",
+            "at the paths shown. Use them in the HTML using their relative path as the `src`.",
+            "These are real JPEG files — use them to create a visually stunning, image-rich website.",
+            "",
+        ]
+
+        for img in saved:
+            slot = img["slot"]
+            path = img["filename"]   # e.g. "img/hero.jpg"
+            label = slot_labels.get(slot, slot)
+            lines.append(f"- **{slot.upper()} image** → `{path}` — place in the **{label}**")
+
+        lines += [
+            "",
+            "**IMAGE USAGE RULES:**",
+            "1. Hero section: use the hero image as a full-width background via",
+            "   `<img class=\"hero-img\" src=\"img/hero.jpg\" alt=\"...\" loading=\"eager\">` overlaid",
+            "   with a semi-transparent gradient overlay so text remains readable.",
+            "   OR use it as CSS `background-image: url('img/hero.jpg')` with `background-size: cover`.",
+            "2. About section: place the about image as a prominent visual element (right column",
+            "   on desktop, above content on mobile) — at least 40 % of the section width.",
+            "3. Services section: place the services image as an ambient background or a featured",
+            "   visual near the top of the section. Service CARDS themselves should be clean CSS",
+            "   cards — no emojis as primary visuals. A single tasteful Unicode symbol (≤1 per card)",
+            "   is acceptable ONLY if the card has no dedicated illustration.",
+            "4. Always include `alt` attributes that describe the image subject for accessibility.",
+            "5. Add `loading=\"lazy\"` to about and services images; `loading=\"eager\"` on the hero.",
+            "6. The images show attractive, photorealistic subjects — style them to be prominent and",
+            "   visually impactful, not small thumbnails.",
+        ]
+
+        return "\n".join(lines) + "\n"
+
+    # ── Parsing ───────────────────────────────────────────────────────────────
+
     def _parse_delimited_output(
         self,
         raw_output: str,
