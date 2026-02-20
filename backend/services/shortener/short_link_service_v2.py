@@ -20,7 +20,7 @@ from sqlalchemy import select, and_
 from sqlalchemy.dialects.postgresql import insert
 
 from models.short_link import ShortLink
-from services.shortener.slug_generator import generate_slug
+from services.shortener.slug_generator import generate_slug, generate_business_slug
 from services.system_settings_service import SystemSettingsService
 from services.shortener.short_link_service import ShortLinkService
 
@@ -70,10 +70,24 @@ class ShortLinkServiceV2:
         return f"{protocol}://{domain}/{slug}"
 
     @staticmethod
-    async def _generate_unique_slug(db: AsyncSession, length: int = 6) -> str:
-        """Generate a slug that does not collide with existing ones."""
+    async def _generate_unique_slug(
+        db: AsyncSession,
+        length: int = 6,
+        business_name: Optional[str] = None,
+    ) -> str:
+        """
+        Generate a slug that does not collide with existing ones.
+
+        If `business_name` is provided, uses generate_business_slug() for a
+        human-readable prefix (e.g. "redwx7k").  Falls back to pure-random
+        generate_slug() otherwise.
+        """
         for attempt in range(MAX_SLUG_RETRIES):
-            slug = generate_slug(length)
+            if business_name:
+                slug = generate_business_slug(business_name)
+            else:
+                slug = generate_slug(length)
+
             exists = await db.execute(
                 select(ShortLink.id).where(ShortLink.slug == slug)
             )
@@ -94,27 +108,32 @@ class ShortLinkServiceV2:
         business_id: Optional[UUID] = None,
         site_id: Optional[UUID] = None,
         campaign_id: Optional[UUID] = None,
+        business_name: Optional[str] = None,
     ) -> str:
         """
         Get existing short link or create new one (ATOMIC, race-condition-free).
-        
+
+        When `business_name` is supplied the slug will be human-readable
+        (e.g. "redwx7k" for "Redwood Plumbing") instead of pure random chars.
+
         Uses two-phase approach:
         1. Try to find existing active link
         2. If not found, try to insert (may fail if concurrent request won)
         3. If insert fails due to unique constraint, fetch the winner's link
-        
+
         This ensures only ONE active link per (destination + type) combination.
-        
+
         Args:
-            db: Database session
+            db:              Database session
             destination_url: Full destination URL
-            link_type: "site_preview", "campaign", etc.
-            business_id: Optional business FK
-            site_id: Optional site FK
-            campaign_id: Optional campaign FK
-            
+            link_type:       "site_preview", "campaign", etc.
+            business_id:     Optional business FK
+            site_id:         Optional site FK
+            campaign_id:     Optional campaign FK
+            business_name:   Optional name used to build a readable slug prefix
+
         Returns:
-            Full short URL (e.g., "https://lvsh.cc/a1B2c3")
+            Full short URL (e.g., "https://lvsh.cc/redwx7k")
         """
         config = await ShortLinkServiceV2._get_shortener_config(db)
         if not config["enabled"] or not config["domain"]:
@@ -132,7 +151,7 @@ class ShortLinkServiceV2:
             ).limit(1)
         )
         existing = result.scalar_one_or_none()
-        
+
         if existing and existing.is_resolvable:
             logger.debug(f"Reusing existing short link: {existing.slug}")
             return ShortLinkServiceV2._build_short_url(
@@ -143,7 +162,7 @@ class ShortLinkServiceV2:
         for attempt in range(MAX_SLUG_RETRIES):
             try:
                 slug = await ShortLinkServiceV2._generate_unique_slug(
-                    db, config["slug_length"]
+                    db, config["slug_length"], business_name=business_name
                 )
                 
                 # Atomic insert using PostgreSQL INSERT ... ON CONFLICT

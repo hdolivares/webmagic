@@ -53,7 +53,7 @@ class SMSGenerator:
         logger.info("SMS generator initialized")
     
     # Template variables available for custom messages (Settings > Messaging)
-    TEMPLATE_VARIABLES = ("business_name", "category", "site_url", "city", "state", "rating", "review_count")
+    TEMPLATE_VARIABLES = ("business_name", "category", "site_url", "short_url", "city", "state", "rating", "review_count")
 
     async def generate_sms(
         self,
@@ -243,6 +243,7 @@ Return ONLY the SMS message text — no quotes, no labels, no explanation."""
             template.replace("{{business_name}}", business_name)
             .replace("{{category}}", category)
             .replace("{{site_url}}", url)
+            .replace("{{short_url}}", url)   # alias for {{site_url}}
             .replace("{{city}}", city)
             .replace("{{state}}", state)
             .replace("{{rating}}", rating_str)
