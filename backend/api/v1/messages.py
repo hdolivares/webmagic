@@ -297,61 +297,6 @@ async def get_message_stats(
     )
 
 
-@router.get("/{message_id}", response_model=SMSMessageResponse)
-async def get_message(
-    message_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: AdminUser = Depends(get_current_user)
-):
-    """
-    Get a single SMS message by ID.
-    """
-    result = await db.execute(
-        select(SMSMessage).where(SMSMessage.id == message_id)
-    )
-    message = result.scalar_one_or_none()
-    
-    if not message:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Message not found")
-    
-    msg_dict = {
-        "id": message.id,
-        "campaign_id": message.campaign_id,
-        "business_id": message.business_id,
-        "direction": message.direction,
-        "from_phone": message.from_phone,
-        "to_phone": message.to_phone,
-        "body": message.body,
-        "status": message.status,
-        "telnyx_message_id": message.telnyx_message_id,
-        "segments": message.segments,
-        "cost": float(message.cost) if message.cost else None,
-        "error_code": message.error_code,
-        "error_message": message.error_message,
-        "received_at": message.received_at,
-        "sent_at": message.sent_at,
-        "delivered_at": message.delivered_at,
-        "created_at": message.created_at,
-        "business_name": None,
-        "business_city": None,
-        "business_state": None,
-    }
-    
-    # Get business info if linked
-    if message.business_id:
-        bus_result = await db.execute(
-            select(Business).where(Business.id == message.business_id)
-        )
-        business = bus_result.scalar_one_or_none()
-        if business:
-            msg_dict["business_name"] = business.name
-            msg_dict["business_city"] = business.city
-            msg_dict["business_state"] = business.state
-    
-    return SMSMessageResponse(**msg_dict)
-
-
 @router.get("/conversations", response_model=ConversationListResponse)
 async def list_conversations(
     search: Optional[str] = Query(None, description="Filter by phone or business name"),
@@ -436,6 +381,60 @@ async def get_conversation_thread(
         page_size=len(response_messages),
         pages=1,
     )
+
+
+@router.get("/{message_id}", response_model=SMSMessageResponse)
+async def get_message(
+    message_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Get a single SMS message by ID.
+    """
+    result = await db.execute(
+        select(SMSMessage).where(SMSMessage.id == message_id)
+    )
+    message = result.scalar_one_or_none()
+    
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    msg_dict = {
+        "id": message.id,
+        "campaign_id": message.campaign_id,
+        "business_id": message.business_id,
+        "direction": message.direction,
+        "from_phone": message.from_phone,
+        "to_phone": message.to_phone,
+        "body": message.body,
+        "status": message.status,
+        "telnyx_message_id": message.telnyx_message_id,
+        "segments": message.segments,
+        "cost": float(message.cost) if message.cost else None,
+        "error_code": message.error_code,
+        "error_message": message.error_message,
+        "received_at": message.received_at,
+        "sent_at": message.sent_at,
+        "delivered_at": message.delivered_at,
+        "created_at": message.created_at,
+        "business_name": None,
+        "business_city": None,
+        "business_state": None,
+    }
+    
+    # Get business info if linked
+    if message.business_id:
+        bus_result = await db.execute(
+            select(Business).where(Business.id == message.business_id)
+        )
+        business = bus_result.scalar_one_or_none()
+        if business:
+            msg_dict["business_name"] = business.name
+            msg_dict["business_city"] = business.city
+            msg_dict["business_state"] = business.state
+    
+    return SMSMessageResponse(**msg_dict)
 
 
 @router.get("/business/{business_id}", response_model=SMSMessageListResponse)
