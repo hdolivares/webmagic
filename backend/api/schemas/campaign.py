@@ -91,6 +91,15 @@ class EmailTestRequest(BaseModel):
     subject: str = "Test Email from WebMagic"
 
 
+class SMSTestRequest(BaseModel):
+    """Test SMS request."""
+    to_phone: str = Field(..., description="Recipient phone in E.164 or local format (e.g. +15551234567)")
+    message: str = Field(
+        default="Hi! This is a test message from Lavish Solutions / WebMagic. If you received this, SMS is working correctly.",
+        description="Message body to send"
+    )
+
+
 class TrackingEvent(BaseModel):
     """Tracking event (for webhooks)."""
     campaign_id: UUID
