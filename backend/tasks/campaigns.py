@@ -188,6 +188,11 @@ async def send_pending_campaigns(self):
     Send all pending/scheduled campaigns.
     Scheduled task that runs periodically.
     """
+    from utils.autopilot_guard import check_autopilot_async
+    guard = await check_autopilot_async("send_pending_campaigns")
+    if guard:
+        return guard
+
     logger.info("Starting send_pending_campaigns task")
     
     try:
@@ -232,6 +237,11 @@ async def create_campaigns_for_new_sites(self):
     """
     Create campaigns for newly published sites.
     """
+    from utils.autopilot_guard import check_autopilot_async
+    guard = await check_autopilot_async("create_campaigns_for_new_sites")
+    if guard:
+        return guard
+
     logger.info("Starting create_campaigns_for_new_sites task")
     
     try:

@@ -4,7 +4,7 @@ System Settings API - Configure AI models, providers, and other system settings.
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any, List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from api.deps import get_db, get_current_user
 from models.user import AdminUser
@@ -80,6 +80,8 @@ async def update_setting(
             category = "messaging"
         elif request.key.startswith("shortener_"):
             category = "shortener"
+        elif request.key.startswith("autopilot_"):
+            category = "autopilot"
         
         setting = await SystemSettingsService.set_setting(
             db=db,
@@ -145,6 +147,49 @@ async def get_settings_by_category(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get settings: {str(e)}")
+
+
+# ── Autopilot Settings ───────────────────────────────────────────────────────
+
+class AutopilotSettingsResponse(BaseModel):
+    enabled: bool
+    target_businesses: int
+
+
+class AutopilotSettingsUpdate(BaseModel):
+    enabled: bool
+    target_businesses: int = Field(default=30, ge=1, le=500)
+
+
+@router.get("/autopilot", response_model=AutopilotSettingsResponse)
+async def get_autopilot_settings(
+    current_user: AdminUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get current autopilot mode configuration."""
+    try:
+        settings = await SystemSettingsService.get_autopilot_settings(db)
+        return AutopilotSettingsResponse(**settings)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/autopilot", response_model=AutopilotSettingsResponse)
+async def update_autopilot_settings(
+    request: AutopilotSettingsUpdate,
+    current_user: AdminUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Enable / disable autopilot and set the target business count."""
+    try:
+        saved = await SystemSettingsService.set_autopilot_settings(
+            db=db,
+            enabled=request.enabled,
+            target_businesses=request.target_businesses,
+        )
+        return AutopilotSettingsResponse(**saved)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ── Notification Settings ─────────────────────────────────────────────────────

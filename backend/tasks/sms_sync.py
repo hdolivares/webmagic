@@ -39,6 +39,11 @@ def process_scheduled_sms_campaigns(self):
     CampaignService.send_campaign via SMSComplianceService.check_can_send.
     """
     async def _run():
+        from utils.autopilot_guard import check_autopilot_async
+        guard = await check_autopilot_async("process_scheduled_sms_campaigns")
+        if guard:
+            return guard
+
         from core.database import get_db_session
         from sqlalchemy import select
         from models.campaign import Campaign

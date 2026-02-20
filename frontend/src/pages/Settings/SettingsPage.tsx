@@ -8,15 +8,16 @@
  */
 import { useState } from 'react'
 import { Card } from '@/components/ui'
-import { User, Key, Bot, MessageSquare, Link2, Bell } from 'lucide-react'
+import { User, Key, Bot, MessageSquare, Link2, Bell, Zap } from 'lucide-react'
 import { AccountSettings } from './AccountSettings'
 import { AISettingsTab } from './AISettingsTab'
 import { PromptsSettings } from './PromptsSettings'
 import { MessagingSettings } from './MessagingSettings'
 import { ShortenerSettings } from './ShortenerSettings'
 import { NotificationSettings } from './NotificationSettings'
+import { AutopilotSettings } from './AutopilotSettings'
 
-type SettingsTab = 'account' | 'ai' | 'prompts' | 'messaging' | 'shortener' | 'notifications'
+type SettingsTab = 'account' | 'ai' | 'prompts' | 'messaging' | 'shortener' | 'notifications' | 'autopilot'
 
 export const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('account')
@@ -27,6 +28,12 @@ export const SettingsPage = () => {
       label: 'Account Settings',
       icon: User,
       description: 'Manage your account and security',
+    },
+    {
+      id: 'autopilot' as SettingsTab,
+      label: 'Autopilot',
+      icon: Zap,
+      description: 'Enable fully automatic pipeline and set lead targets',
     },
     {
       id: 'ai' as SettingsTab,
@@ -92,6 +99,7 @@ export const SettingsPage = () => {
       {/* Tab Content */}
       <div className="page-content">
         {activeTab === 'account' && <AccountSettings />}
+        {activeTab === 'autopilot' && <AutopilotSettings />}
         {activeTab === 'ai' && <AISettingsTab />}
         {activeTab === 'messaging' && <MessagingSettings />}
         {activeTab === 'prompts' && <PromptsSettings />}

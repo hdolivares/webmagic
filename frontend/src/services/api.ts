@@ -634,6 +634,19 @@ class ApiClient {
     return response.data
   }
 
+  async getAutopilotSettings(): Promise<{ enabled: boolean; target_businesses: number }> {
+    const response = await this.client.get('/system/autopilot')
+    return response.data
+  }
+
+  async updateAutopilotSettings(
+    enabled: boolean,
+    target_businesses: number
+  ): Promise<{ enabled: boolean; target_businesses: number }> {
+    const response = await this.client.put('/system/autopilot', { enabled, target_businesses })
+    return response.data
+  }
+
   // ============================================
   // EDIT REQUESTS METHODS (Phase 4)
   // ============================================

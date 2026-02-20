@@ -117,6 +117,11 @@ async def scrape_pending_territories(self):
     Scrape all pending territories that are not on cooldown.
     Scheduled task that runs periodically.
     """
+    from utils.autopilot_guard import check_autopilot_async
+    guard = await check_autopilot_async("scrape_pending_territories", check_target=True)
+    if guard:
+        return guard
+
     logger.info("Starting scrape_pending_territories task")
     
     try:
