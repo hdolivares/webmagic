@@ -28,15 +28,11 @@ export const GeneratedSiteDetailPage = () => {
   const queryClient = useQueryClient()
   const [iframeFullscreen, setIframeFullscreen] = useState(false)
 
-  const { data, isLoading, error } = useQuery({
+  const { data: site, isLoading, error } = useQuery({
     queryKey: ['generated-site-detail', siteId],
-    queryFn: () => api.getGeneratedSites({ limit: 200 }).then(res =>
-      res.sites.find((s: any) => s.id === siteId)
-    ),
+    queryFn: () => api.getSite(siteId!),
     enabled: !!siteId,
   })
-
-  const site = data
   const business = site?.business
   const liveUrl = site?.subdomain
     ? `https://sites.lavish.solutions/${site.subdomain}`

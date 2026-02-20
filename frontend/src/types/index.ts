@@ -81,22 +81,49 @@ export * from './draftCampaign'
 // SITE TYPES
 // ============================================
 
+export interface GeneratedSiteBusiness {
+  id: string
+  name: string
+  category?: string
+  phone?: string
+  address?: string
+  city?: string
+  state?: string
+  rating?: number | null
+  review_count?: number
+  website_url?: string
+  gmb_place_id?: string
+}
+
 export interface GeneratedSite {
   id: string
   business_id: string
   subdomain: string
-  html_content: string
-  css_content?: string
-  js_content?: string
+  html_content?: string | null
+  css_content?: string | null
+  js_content?: string | null
   brand_analysis?: Record<string, any>
   brand_concept?: Record<string, any>
   design_brief?: Record<string, any>
-  status: 'generating' | 'completed' | 'failed' | 'published'
+  status: 'generating' | 'completed' | 'failed' | 'published' | 'draft'
+  version?: number
+  deployed_at?: string | null
+  sold_at?: string | null
+  lighthouse_score?: number | null
+  load_time_ms?: number | null
+  screenshot_desktop_url?: string | null
+  screenshot_mobile_url?: string | null
+  short_url?: string | null
+  custom_domain?: string | null
+  full_url?: string
+  is_live?: boolean
+  assets_urls?: string[]
   generation_started_at?: string
   generation_completed_at?: string
   error_message?: string
   created_at: string
   updated_at: string
+  business?: GeneratedSiteBusiness | null
 }
 
 export interface GenerateSiteRequest {

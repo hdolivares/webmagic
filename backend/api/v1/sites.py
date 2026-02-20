@@ -220,14 +220,51 @@ async def get_site(
     db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_user)
 ):
-    """Get a specific site by ID with full content."""
+    """Get a specific site by ID with full content and business data."""
     service = SiteService(db)
     site = await service.get_site(site_id)
     
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     
-    return SiteDetailResponse.model_validate(site)
+    site_dict = {
+        "id": site.id,
+        "business_id": site.business_id,
+        "subdomain": site.subdomain,
+        "custom_domain": site.custom_domain,
+        "short_url": site.short_url,
+        "status": site.status,
+        "version": site.version,
+        "deployed_at": site.deployed_at,
+        "sold_at": site.sold_at,
+        "lighthouse_score": site.lighthouse_score,
+        "load_time_ms": site.load_time_ms,
+        "screenshot_desktop_url": site.screenshot_desktop_url,
+        "screenshot_mobile_url": site.screenshot_mobile_url,
+        "created_at": site.created_at,
+        "updated_at": site.updated_at,
+        "full_url": site.full_url,
+        "is_live": site.is_live,
+        "html_content": site.html_content,
+        "css_content": site.css_content,
+        "js_content": site.js_content,
+        "design_brief": site.design_brief,
+        "assets_urls": site.assets_urls or [],
+        "business": {
+            "id": str(site.business.id),
+            "name": site.business.name,
+            "category": site.business.category,
+            "phone": site.business.phone,
+            "address": site.business.address,
+            "city": site.business.city,
+            "state": site.business.state,
+            "rating": float(site.business.rating) if site.business.rating else None,
+            "review_count": site.business.review_count,
+            "website_url": site.business.website_url,
+            "gmb_place_id": site.business.gmb_place_id,
+        } if site.business else None,
+    }
+    return SiteDetailResponse.model_validate(site_dict)
 
 
 @router.patch("/{site_id}", response_model=SiteResponse)

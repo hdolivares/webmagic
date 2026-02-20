@@ -40,11 +40,11 @@ class SiteResponse(BaseModel):
 
 class SiteDetailResponse(SiteResponse):
     """Detailed site response with content."""
-    html_content: str
-    css_content: Optional[str]
-    js_content: Optional[str]
-    design_brief: Optional[Dict[str, Any]]
-    assets_urls: List[str]
+    html_content: Optional[str] = None
+    css_content: Optional[str] = None
+    js_content: Optional[str] = None
+    design_brief: Optional[Dict[str, Any]] = None
+    assets_urls: List[str] = []
 
 
 class SiteListResponse(BaseModel):
