@@ -219,7 +219,8 @@ async def generate_site_for_business(self, business_id: str):
                 db=db,
                 site_url=site_url,
                 business_id=business.id,
-                site_id=site.id
+                site_id=site.id,
+                business_name=business.name,
             )
             
             # Step 6: Update site with content and short link

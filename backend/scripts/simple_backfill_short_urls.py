@@ -13,7 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
 from models.site import GeneratedSite
+from models.business import Business
 from services.shortener.short_link_service_v2 import ShortLinkServiceV2
+from sqlalchemy.future import select as sa_select
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,25 +35,34 @@ def build_full_url(subdomain: str) -> str:
 async def backfill_one_site(db: AsyncSession, site: GeneratedSite) -> bool:
     """
     Backfill short URL for a single site.
-    
+
     Args:
         db: Database session
         site: GeneratedSite instance
-        
+
     Returns:
         True if successful, False if failed
     """
     try:
+        # Resolve business name for readable slug (e.g. "redwx7k")
+        business_name = None
+        if site.business_id:
+            biz_result = await db.execute(
+                sa_select(Business.name).where(Business.id == site.business_id)
+            )
+            business_name = biz_result.scalar_one_or_none()
+
         # Build full URL
         full_url = build_full_url(site.subdomain)
-        
-        # Create short link
+
+        # Create short link with business-name prefix
         short_url = await ShortLinkServiceV2.get_or_create_short_link(
             db=db,
             destination_url=full_url,
             link_type="site_preview",
             business_id=site.business_id,
             site_id=site.id,
+            business_name=business_name,
         )
         
         # Update site record

@@ -147,22 +147,27 @@ async def create_short_link_for_site(
     db: AsyncSession,
     site_url: str,
     business_id: UUID,
-    site_id: UUID
+    site_id: UUID,
+    business_name: Optional[str] = None,
 ) -> str:
     """
     Create a short link for a generated site.
-    
+
     Uses ShortLinkServiceV2 (race-condition-free).
     Falls back to full URL if shortener fails.
-    
+
+    When `business_name` is provided the slug will be human-readable,
+    e.g. "https://lvsh.cc/redwx7k" instead of "https://lvsh.cc/a1B2c3".
+
     Args:
-        db: Database session
-        site_url: Full site URL to shorten
-        business_id: Business UUID
-        site_id: Site UUID
-        
+        db:            Database session
+        site_url:      Full site URL to shorten
+        business_id:   Business UUID
+        site_id:       Site UUID
+        business_name: Business name used to build a readable slug prefix
+
     Returns:
-        Short URL (e.g., "https://lvsh.cc/a1B2c3") or original URL on failure
+        Short URL (e.g., "https://lvsh.cc/redwx7k") or original URL on failure
     """
     try:
         short_url = await ShortLinkServiceV2.get_or_create_short_link(
@@ -171,10 +176,11 @@ async def create_short_link_for_site(
             link_type=LINK_TYPE_SITE_PREVIEW,
             business_id=business_id,
             site_id=site_id,
+            business_name=business_name,
         )
         logger.info(f"Created short link for site {site_id}: {short_url}")
         return short_url
-        
+
     except Exception as e:
         logger.warning(
             f"Failed to create short link for site {site_id}, "
