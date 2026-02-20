@@ -192,10 +192,16 @@ async def send_pending_campaigns(self):
     
     try:
         async with get_db_session() as db:
-            # Find draft/scheduled campaigns
+            # Find pending/scheduled campaigns that are due now
+            # "scheduled" campaigns only fire when scheduled_for <= now (UTC)
+            # "draft" campaigns (no scheduled_for) can fire immediately
+            now = datetime.utcnow()
             result = await db.execute(
                 select(Campaign)
-                .where(Campaign.status.in_(["draft", "scheduled"]))
+                .where(
+                    Campaign.status.in_(["draft", "scheduled"]),
+                    (Campaign.scheduled_for == None) | (Campaign.scheduled_for <= now),
+                )
                 .limit(20)  # Send up to 20 per run to avoid rate limits
             )
             campaigns = result.scalars().all()

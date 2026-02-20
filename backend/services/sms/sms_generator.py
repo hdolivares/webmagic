@@ -171,13 +171,13 @@ RESEARCH-BACKED RULES (from analysis of 25B+ SMS messages and 100k+ sales conver
 7. Use "your" and "you" throughout — second-person language outperforms first-person
 8. NO spam triggers: free, limited time, act now, click here, congratulations, winner
 9. NO exclamation marks after the opening greeting
-10. Compliance footer: "Reply STOP to opt out" (required — do NOT omit)
+10. Opt-out must be woven into the closing sentence naturally — do NOT add "Reply STOP to opt out" as a separate robotic sentence. Instead fold it into the soft question: e.g. "Want to personalize it? Just reply NO if not for you." or "Interested? Reply NO if not your thing." The opt-out must feel like a natural conversational out, not a legal disclaimer bolted on.
 
 PSYCHOLOGICAL STRUCTURE (follow this order):
-[Greeting with business name] → [Compliment their reviews — show you looked them up] → [Name the gap: no website] → [Value: built one for them + URL] → [Soft question inviting dialogue] → [Opt-out]
+[Greeting with business name] → [Compliment their reviews — show you looked them up] → [Name the gap: no website] → [Value: built one for them + URL] → [Soft question + natural opt-out woven in]
 
 EXAMPLE OUTPUT (friendly variant, ~155 chars):
-"Hi {business_name}! Saw your {rating}⭐ Google reviews — nice work. No website yet so I built one: {site_url or '[URL]'}. Want to personalize it? Reply STOP to opt out."
+"Hi {business_name}! Saw your {rating}⭐ Google reviews — nice work. No website yet so I built one: {site_url or '[URL]'}. Want to personalize it? Just reply NO if not for you."
 
 AVOID:
 - "We created a preview website" (sounds like a blast)
@@ -201,13 +201,13 @@ Return ONLY the SMS message text — no quotes, no labels, no explanation."""
             SMS with compliance footer if not present
         """
         # Check if compliance text is already present
-        compliance_keywords = ["stop", "opt out", "unsubscribe", "opt-out"]
+        compliance_keywords = ["stop", "opt out", "unsubscribe", "opt-out", "reply no", "just no", "not for you", "not interested"]
         
         if any(keyword in sms_body.lower() for keyword in compliance_keywords):
             return sms_body
         
-        # Add compliance footer
-        footer = " Reply STOP to opt out."
+        # Add compliance footer — natural phrasing that doesn't break conversational tone
+        footer = " Just reply NO if not for you."
         
         # If adding footer exceeds limit, truncate message
         if len(sms_body) + len(footer) > self.SINGLE_SEGMENT_LIMIT:
@@ -280,16 +280,16 @@ Return ONLY the SMS message text — no quotes, no labels, no explanation."""
         template = (
             f"Hi {business_name}! {review_hook} — nice work. "
             f"No website yet, so I built one: {url_display}. "
-            f"Want to personalize it? Reply STOP to opt out."
+            f"Want to personalize it? Just reply NO if not for you."
         )
 
         if len(template) <= self.SINGLE_SEGMENT_LIMIT:
             return template
 
-        # Short version — drop the question
+        # Short version — drop some words
         template = (
             f"Hi {business_name}! {review_hook} — built you a site: "
-            f"{url_display}. Want it customized? Reply STOP to opt out."
+            f"{url_display}. Want it customized? Reply NO if not."
         )
 
         if len(template) <= self.SINGLE_SEGMENT_LIMIT:
@@ -300,7 +300,7 @@ Return ONLY the SMS message text — no quotes, no labels, no explanation."""
         short_name = business_name[:max_name].rsplit(" ", 1)[0] if len(business_name) > max_name else business_name
         template = (
             f"Hi {short_name}! {review_hook} — I built you a site: "
-            f"{url_display}. Reply STOP to opt out."
+            f"{url_display}. Reply NO if not interested."
         )
 
         return template[:self.SINGLE_SEGMENT_LIMIT]
