@@ -42,9 +42,18 @@ class SMSComplianceService:
         "stopit", "no", "remove", "optout", "opt-out", "opt out"
     ]
     
-    # Business hours (local time)
-    BUSINESS_HOURS_START = time(9, 0)   # 9:00 AM
-    BUSINESS_HOURS_END = time(21, 0)    # 9:00 PM
+    # TCPA-mandated quiet hours (local time) — hard legal limits
+    BUSINESS_HOURS_START = time(9, 0)   # 9:00 AM  (TCPA: no earlier than 8 AM, we use 9)
+    BUSINESS_HOURS_END = time(21, 0)    # 9:00 PM  (TCPA: no later than 9 PM)
+
+    # Research-backed preferred send windows (local time).
+    # Priority order: 1st → 2nd → 3rd
+    # Source: Textla, Attentive, Klaviyo, SimpleTexting studies (100M+ messages)
+    PREFERRED_WINDOWS = [
+        (time(13, 0), time(17, 0)),   # 1 PM – 5 PM  (+33% engagement, #1 overall)
+        (time(19, 0), time(21, 0)),   # 7 PM – 9 PM  (relaxed, high scroll time, #2)
+        (time(10, 0), time(12, 0)),   # 10 AM – 12 PM (post-rush settle-in, #3)
+    ]
     
     def __init__(self, db: AsyncSession):
         """Initialize compliance service with database session."""
@@ -80,29 +89,38 @@ class SMSComplianceService:
     async def check_can_send(
         self,
         phone_number: str,
-        timezone_str: str = "America/Chicago"
+        timezone_str: str = "America/Chicago",
+        preferred_only: bool = False,
     ) -> Tuple[bool, Optional[str]]:
         """
         Comprehensive check if we can send SMS to this number.
-        
+
         Args:
-            phone_number: Phone in E.164 format
-            timezone_str: Recipient's timezone for business hours check
-        
+            phone_number:   Phone in E.164 format
+            timezone_str:   Recipient's timezone for business-hours check
+            preferred_only: When True (autopilot mode), also require the current
+                            time to be inside one of the three preferred windows:
+                              1 PM–5 PM, 7 PM–9 PM, or 10 AM–12 PM local time.
+                            Manual "Send Now" passes False so it always fires
+                            within the legal 9 AM–9 PM window.
+
         Returns:
             Tuple of (can_send, reason_if_not)
         """
         phone_number = self._normalize_phone(phone_number)
-        
+
         # Check 1: Opted out?
         if await self.is_opted_out(phone_number):
             return (False, "Recipient has opted out")
-        
-        # Check 2: Business hours?
+
+        # Check 2: TCPA quiet hours (9 AM – 9 PM local)
         if not self._is_business_hours(timezone_str):
-            return (False, "Outside business hours (9 AM - 9 PM local time)")
-        
-        # All checks passed
+            return (False, "Outside business hours (9 AM – 9 PM local time)")
+
+        # Check 3 (autopilot only): must be inside a preferred engagement window
+        if preferred_only and not self.is_preferred_window(timezone_str):
+            return (False, "Outside preferred send window (1–5 PM, 7–9 PM, or 10 AM–12 PM local)")
+
         return (True, None)
     
     # ========================================================================
@@ -272,6 +290,57 @@ class SMSComplianceService:
             # Default to allowing send if we can't check
             return True
     
+    def is_preferred_window(self, timezone_str: str = "America/Chicago") -> bool:
+        """
+        Check whether the current local time falls inside one of the three
+        research-backed preferred send windows:
+          1st: 1 PM – 5 PM  (best overall engagement)
+          2nd: 7 PM – 9 PM  (relaxed evening scroll)
+          3rd: 10 AM – 12 PM (post-morning-rush)
+
+        Used by autopilot scheduling to target quality send times, not just
+        legal minimums.  Manual "Send Now" does NOT call this check.
+        """
+        try:
+            tz = pytz.timezone(timezone_str)
+            local_time = datetime.now(tz).time()
+            return any(start <= local_time <= end for start, end in self.PREFERRED_WINDOWS)
+        except Exception as e:
+            logger.error(f"Error checking preferred window: {e}")
+            return True  # Fail open — don't block
+
+    def get_next_preferred_send_time(self, timezone_str: str = "America/Chicago") -> datetime:
+        """
+        Return the start of the next preferred send window in the given timezone,
+        converted back to a naive UTC datetime for DB storage.
+
+        Window priority: 1 PM → 7 PM → 10 AM (next day).
+        """
+        try:
+            tz = pytz.timezone(timezone_str)
+            now = datetime.now(tz)
+            current_time = now.time()
+
+            for window_start, _ in self.PREFERRED_WINDOWS:
+                if current_time < window_start:
+                    next_dt = now.replace(
+                        hour=window_start.hour, minute=0, second=0, microsecond=0
+                    )
+                    # Convert to naive UTC
+                    return next_dt.astimezone(pytz.utc).replace(tzinfo=None)
+
+            # All windows passed for today — next is 1 PM tomorrow
+            tomorrow = now + timedelta(days=1)
+            first_window_start = self.PREFERRED_WINDOWS[0][0]
+            next_dt = tomorrow.replace(
+                hour=first_window_start.hour, minute=0, second=0, microsecond=0
+            )
+            return next_dt.astimezone(pytz.utc).replace(tzinfo=None)
+
+        except Exception as e:
+            logger.error(f"Error calculating next preferred send time: {e}")
+            return datetime.utcnow()
+
     def get_next_send_time(self, timezone_str: str = "America/Chicago") -> datetime:
         """
         Get the next valid time to send SMS (within business hours).

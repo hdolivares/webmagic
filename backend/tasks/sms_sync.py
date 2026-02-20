@@ -77,12 +77,14 @@ def process_scheduled_sms_campaigns(self):
             for campaign in campaigns:
                 results["checked"] += 1
                 try:
-                    sent = await campaign_service.send_campaign(campaign.id)
+                    # preferred_only=True: autopilot only sends during 1–5 PM,
+                    # 7–9 PM, or 10 AM–12 PM in the business's local timezone.
+                    sent = await campaign_service.send_campaign(campaign.id, preferred_only=True)
                     if sent:
                         results["sent"] += 1
                     else:
                         results["skipped"] += 1
-                        logger.info(f"[SMS-Sync] Campaign {campaign.id} skipped (outside hours or opted-out)")
+                        logger.info(f"[SMS-Sync] Campaign {campaign.id} deferred (outside preferred window)")
                 except Exception as e:
                     results["failed"] += 1
                     results["errors"].append({"campaign_id": str(campaign.id), "error": str(e)})
