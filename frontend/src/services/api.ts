@@ -31,6 +31,46 @@ import type {
   BulkCampaignCreateResponse,
 } from '@/types'
 
+// ─── Conversation types ────────────────────────────────────────────────────
+
+export interface ConversationSummary {
+  contact_phone: string
+  business_id: string | null
+  business_name: string | null
+  business_category: string | null
+  business_city: string | null
+  last_message_body: string
+  last_message_direction: 'inbound' | 'outbound'
+  last_message_at: string
+  message_count: number
+  inbound_count: number
+}
+
+export interface SMSMessageItem {
+  id: string
+  campaign_id: string | null
+  business_id: string | null
+  direction: 'inbound' | 'outbound'
+  from_phone: string
+  to_phone: string
+  body: string
+  status: string
+  telnyx_message_id: string | null
+  segments: number | null
+  cost: number | null
+  error_code: string | null
+  error_message: string | null
+  received_at: string | null
+  sent_at: string | null
+  delivered_at: string | null
+  created_at: string
+  business_name: string | null
+  business_city: string | null
+  business_state: string | null
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
 class ApiClient {
@@ -1120,6 +1160,35 @@ class ApiClient {
     page_size?: number
   }): Promise<any> {
     const response = await this.client.get(`/messages/business/${businessId}`, { params })
+    return response.data
+  }
+
+  /**
+   * Get conversation list — one summary per unique contact phone, newest first
+   */
+  async getConversations(params?: {
+    search?: string
+    limit?: number
+  }): Promise<{
+    conversations: ConversationSummary[]
+    total: number
+  }> {
+    const response = await this.client.get('/messages/conversations', { params })
+    return response.data
+  }
+
+  /**
+   * Get the full message thread for a single contact phone number
+   */
+  async getConversationThread(contactPhone: string): Promise<{
+    messages: SMSMessageItem[]
+    total: number
+    page: number
+    page_size: number
+    pages: number
+  }> {
+    const encoded = encodeURIComponent(contactPhone)
+    const response = await this.client.get(`/messages/conversations/${encoded}`)
     return response.data
   }
 

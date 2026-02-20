@@ -23,6 +23,7 @@ from api.deps import get_db
 from models.campaign import Campaign
 from models.sms_message import SMSMessage
 from services.sms import SMSComplianceService
+from services.sms.conversation_service import ConversationService
 from services.pitcher.sms_campaign_helper import SMSCampaignHelper
 from services.pitcher.email_sender import EmailSender
 from services.crm import BusinessLifecycleService
@@ -351,15 +352,27 @@ async def handle_incoming_sms(
         
         if not campaigns:
             logger.warning(f"No campaigns found for phone: {from_phone}")
-            # Save the inbound message without campaign link
+
+            # Fuzzy-match the phone number to a known business as a fallback
+            matched_business = await ConversationService().match_phone_to_business(
+                db=db, phone=from_phone
+            )
+            if matched_business:
+                inbound_message.business_id = matched_business.business_id \
+                    if hasattr(matched_business, "business_id") \
+                    else matched_business.id
+                logger.info(
+                    f"Fuzzy-matched inbound {from_phone} → {matched_business.name}"
+                )
+
             db.add(inbound_message)
             await db.commit()
 
-            # Still notify admin even if no campaign is linked
+            # Notify admin, including business name if we found a fuzzy match
             await _notify_admin_reply(
                 from_phone=from_phone,
                 message_body=message_body,
-                business_name=None,
+                business_name=matched_business.name if matched_business else None,
                 action="reply",
             )
 

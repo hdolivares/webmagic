@@ -172,17 +172,350 @@
   font-size: var(--font-sm);
 }
 
-/* Responsive */
+/* ─── Two-panel inbox layout ──────────────────────────────────────────────── */
+
+.inbox-panel {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: var(--spacing-md);
+  height: calc(100vh - 340px);
+  min-height: 480px;
+}
+
+.inbox-panel__thread {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.inbox-panel__placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-secondary);
+  gap: var(--spacing-xs);
+}
+
+/* ─── Conversation list (left panel) ─────────────────────────────────────── */
+
+.convo-list {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.convo-list__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md) var(--spacing-md) var(--spacing-sm);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.convo-list__title {
+  font-weight: 600;
+  font-size: var(--font-md);
+  color: var(--text-primary);
+}
+
+.convo-list__refresh-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.convo-list__refresh-btn:hover {
+  color: var(--primary);
+  background: var(--primary-50);
+}
+
+.convo-list__search {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.convo-list__search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: var(--font-sm);
+  color: var(--text-primary);
+}
+
+.convo-list__search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.convo-list__items {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.convo-list__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xl);
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+}
+
+.convo-list__item {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.convo-list__item:hover {
+  background: var(--background);
+}
+
+.convo-list__item--active {
+  background: var(--primary-50);
+  border-left: 3px solid var(--primary);
+}
+
+.convo-list__item--has-reply {
+  /* subtle indicator — the badge inside already communicates it */
+}
+
+.convo-list__direction-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.convo-list__item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.convo-list__item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--spacing-xs);
+  margin-bottom: 2px;
+}
+
+.convo-list__contact-name {
+  font-weight: 600;
+  font-size: var(--font-sm);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.convo-list__timestamp {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.convo-list__phone-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.convo-list__preview {
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.convo-list__badge {
+  display: inline-block;
+  margin-top: var(--spacing-xs);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--info);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* ─── Conversation thread (right panel) ──────────────────────────────────── */
+
+.convo-thread {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.convo-thread__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.convo-thread__contact-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.convo-thread__contact-name {
+  font-weight: 600;
+  font-size: var(--font-md);
+  color: var(--text-primary);
+}
+
+.convo-thread__contact-sub {
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+}
+
+.convo-thread__messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.convo-thread__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: var(--spacing-sm);
+  color: var(--text-secondary);
+}
+
+/* ─── Chat bubbles ────────────────────────────────────────────────────────── */
+
+.convo-bubble {
+  display: flex;
+  max-width: 72%;
+}
+
+.convo-bubble--out {
+  align-self: flex-end;
+}
+
+.convo-bubble--in {
+  align-self: flex-start;
+}
+
+.convo-bubble__content {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-lg);
+  max-width: 100%;
+}
+
+.convo-bubble--out .convo-bubble__content {
+  background: var(--primary);
+  color: #fff;
+  border-bottom-right-radius: var(--radius-xs);
+}
+
+.convo-bubble--in .convo-bubble__content {
+  background: var(--background);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-bottom-left-radius: var(--radius-xs);
+}
+
+.convo-bubble__body {
+  line-height: 1.5;
+  word-break: break-word;
+  margin-bottom: var(--spacing-xs);
+}
+
+.convo-bubble__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.convo-bubble--out .convo-bubble__meta {
+  color: rgba(255, 255, 255, 0.85);
+  justify-content: flex-end;
+}
+
+.convo-bubble--in .convo-bubble__meta {
+  color: var(--text-secondary);
+}
+
+.convo-bubble__cost {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.convo-bubble__error {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-xs);
+  color: var(--error);
+  margin-top: var(--spacing-xs);
+}
+
+/* ─── Spin animation (refresh button) ────────────────────────────────────── */
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinning {
+  animation: spin 0.8s linear infinite;
+}
+
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
+
 @media (max-width: 768px) {
-  .message-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--spacing-sm);
+  .inbox-panel {
+    grid-template-columns: 1fr;
+    height: auto;
   }
 
-  .message-meta {
-    width: 100%;
-    justify-content: space-between;
+  .convo-list {
+    max-height: 40vh;
+  }
+
+  .inbox-panel__thread {
+    height: 60vh;
   }
 
   .grid-cols-6 {

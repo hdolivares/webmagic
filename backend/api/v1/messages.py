@@ -1,9 +1,9 @@
 """
 SMS Messages API endpoints - Inbox functionality.
 
-Provides endpoints to view and manage SMS messages.
+Provides endpoints to view and manage SMS messages and conversation threads.
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc, case
 from typing import Optional, List
@@ -16,6 +16,7 @@ from api.deps import get_current_user
 from models.sms_message import SMSMessage
 from models.business import Business
 from models.user import AdminUser
+from services.sms.conversation_service import ConversationService
 
 router = APIRouter(prefix="/messages", tags=["SMS Messages"])
 
@@ -60,6 +61,26 @@ class SMSMessageListResponse(BaseModel):
     page: int
     page_size: int
     pages: int
+
+
+class ConversationSummaryResponse(BaseModel):
+    """One conversation thread summary (latest message + metadata)."""
+    contact_phone: str
+    business_id: Optional[UUID] = None
+    business_name: Optional[str] = None
+    business_category: Optional[str] = None
+    business_city: Optional[str] = None
+    last_message_body: str
+    last_message_direction: str
+    last_message_at: datetime
+    message_count: int
+    inbound_count: int
+
+
+class ConversationListResponse(BaseModel):
+    """List of conversation threads."""
+    conversations: List[ConversationSummaryResponse]
+    total: int
 
 
 class SMSStatsResponse(BaseModel):
@@ -329,6 +350,92 @@ async def get_message(
             msg_dict["business_state"] = business.state
     
     return SMSMessageResponse(**msg_dict)
+
+
+@router.get("/conversations", response_model=ConversationListResponse)
+async def list_conversations(
+    search: Optional[str] = Query(None, description="Filter by phone or business name"),
+    limit: int = Query(100, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user),
+):
+    """
+    Return one conversation summary per unique external phone number,
+    sorted by most-recent message.
+
+    Used by the two-panel conversation inbox in the Messages UI.
+    """
+    service = ConversationService()
+    summaries = await service.get_conversations(db=db, search=search, limit=limit)
+    return ConversationListResponse(
+        conversations=[ConversationSummaryResponse(**vars(s)) for s in summaries],
+        total=len(summaries),
+    )
+
+
+@router.get("/conversations/{contact_phone:path}", response_model=SMSMessageListResponse)
+async def get_conversation_thread(
+    contact_phone: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user),
+):
+    """
+    Return the full message thread for a single contact phone number,
+    oldest message first.
+    """
+    service = ConversationService()
+    messages = await service.get_thread(db=db, contact_phone=contact_phone)
+    if not messages:
+        raise HTTPException(status_code=404, detail="No messages found for this phone number")
+
+    # Resolve business data once for all messages in thread
+    business_cache: dict[UUID, Business] = {}
+
+    async def _get_business(biz_id: Optional[UUID]) -> Optional[Business]:
+        if biz_id is None:
+            return None
+        if biz_id not in business_cache:
+            result = await db.execute(select(Business).where(Business.id == biz_id))
+            biz = result.scalar_one_or_none()
+            if biz:
+                business_cache[biz_id] = biz
+        return business_cache.get(biz_id)
+
+    response_messages = []
+    for msg in messages:
+        biz = await _get_business(msg.business_id)
+        response_messages.append(
+            SMSMessageResponse(
+                id=msg.id,
+                campaign_id=msg.campaign_id,
+                business_id=msg.business_id,
+                direction=msg.direction,
+                from_phone=msg.from_phone,
+                to_phone=msg.to_phone,
+                body=msg.body,
+                status=msg.status,
+                telnyx_message_id=msg.telnyx_message_id,
+                segments=msg.segments,
+                cost=float(msg.cost) if msg.cost else None,
+                error_code=msg.error_code,
+                error_message=msg.error_message,
+                received_at=msg.received_at,
+                sent_at=msg.sent_at,
+                delivered_at=msg.delivered_at,
+                created_at=msg.created_at,
+                business_name=biz.name if biz else None,
+                business_city=biz.city if biz else None,
+                business_state=biz.state if biz else None,
+            )
+        )
+
+    return SMSMessageListResponse(
+        messages=response_messages,
+        total=len(response_messages),
+        page=1,
+        page_size=len(response_messages),
+        pages=1,
+    )
 
 
 @router.get("/business/{business_id}", response_model=SMSMessageListResponse)

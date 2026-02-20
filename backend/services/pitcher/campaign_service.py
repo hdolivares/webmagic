@@ -20,7 +20,7 @@ from services.pitcher.email_generator import EmailGenerator
 from services.pitcher.email_sender import EmailSender
 from services.pitcher.tracking import EmailTracker
 from services.pitcher.sms_campaign_helper import SMSCampaignHelper
-from services.sms import SMSGenerator, SMSSender, PhoneValidator, SMSComplianceService
+from services.sms import SMSGenerator, SMSSender, PhoneValidator, SMSComplianceService, NumberLookupService
 from services.system_settings_service import SystemSettingsService
 # ShortLinkServiceV2 import removed - short links now created at site generation, not campaign time
 from services.crm import BusinessLifecycleService
@@ -347,14 +347,27 @@ class CampaignService:
         scheduled_for: Optional[datetime]
     ) -> Campaign:
         """Create SMS campaign with compliance checks."""
-        # Validate phone number
+        # Validate phone format
         is_valid, formatted_phone, error = PhoneValidator.validate_and_format(
             business.phone
         )
-        
         if not is_valid:
             raise ValidationException(f"Invalid phone number: {error}")
-        
+
+        # Check phone line type — skip if already looked up recently (cache on Business)
+        if business.phone_line_type is None:
+            lookup = await NumberLookupService().lookup(formatted_phone)
+            business.phone_line_type = lookup.line_type
+            business.phone_lookup_at = datetime.utcnow()
+            # Flush so the cache is persisted even if campaign creation rolls back
+            await self.db.flush()
+
+        if business.phone_line_type in {"landline", "toll_free", "premium_rate"}:
+            raise ValidationException(
+                f"Cannot send SMS to {business.phone_line_type} number {formatted_phone}. "
+                "Only mobile and VoIP numbers can receive SMS."
+            )
+
         # Check compliance (opt-out, business hours) using business's actual state timezone
         can_send, reason = await self.sms_compliance.check_can_send(
             phone_number=formatted_phone,
