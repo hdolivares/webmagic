@@ -126,6 +126,11 @@ class Business(BaseModel):
     )
     
     scraped_at = Column(DateTime, nullable=True)
+
+    # Phone line-type cache (populated by NumberLookupService before first SMS campaign)
+    phone_line_type = Column(String(20), nullable=True, index=True)
+    # Values: mobile | landline | voip | toll_free | premium_rate | unknown
+    phone_lookup_at = Column(DateTime, nullable=True)
     
     # Relationships
     # coverage_grid = relationship("CoverageGrid", back_populates="businesses")
