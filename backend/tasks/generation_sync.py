@@ -21,6 +21,40 @@ from services.creative.orchestrator import CreativeOrchestrator
 logger = logging.getLogger(__name__)
 
 
+# Minimum HTML size (bytes) — anything below this is almost certainly truncated
+_MIN_HTML_BYTES = 20_000
+
+# Keywords expected near the top of <body> for a valid full-page generation
+_HERO_KEYWORDS = ["hero", 'class="hero', "id=\"hero", "class='hero", "id='hero"]
+_NAV_KEYWORDS  = [
+    "nav-link", "nav-logo", "nav-brand", "nav-content", "nav-menu",
+    "<a href", "logo", "hamburger", "menu-toggle",
+]
+
+
+def _is_html_complete(html: str | None) -> bool:
+    """
+    Return True only if the HTML looks like a full-page generation.
+
+    Checks:
+    1. Minimum byte size (_MIN_HTML_BYTES)
+    2. Presence of a <body> tag
+    3. Hero or nav content in the first 2000 chars of <body>
+    """
+    if not html or len(html) < _MIN_HTML_BYTES:
+        return False
+
+    lower = html.lower()
+    body_pos = lower.find("<body")
+    if body_pos == -1:
+        return False
+
+    body_start = lower[body_pos: body_pos + 2_000]
+    has_hero = any(kw in body_start for kw in _HERO_KEYWORDS)
+    has_nav  = any(kw in body_start for kw in _NAV_KEYWORDS)
+    return has_hero or has_nav
+
+
 def run_async(coro):
     """
     Helper to run async code in sync context.
@@ -96,15 +130,25 @@ def generate_site_for_business(self, business_id: str):
                 existing_site = site_result.scalar_one_or_none()
                 
                 if existing_site and existing_site.status == "completed":
-                    logger.info(f"Site already exists for business {business_id}")
-                    business.generation_completed_at = datetime.utcnow()
-                    business.website_status = 'generated'
-                    await db.commit()
-                    return {
-                        "status": "skipped",
-                        "reason": "already_exists",
-                        "site_id": str(existing_site.id)
-                    }
+                    # Validate the existing completed site isn't broken (truncated/empty HTML)
+                    if _is_html_complete(existing_site.html_content):
+                        logger.info(f"Valid completed site already exists for business {business_id}")
+                        business.generation_completed_at = datetime.utcnow()
+                        business.website_status = 'generated'
+                        await db.commit()
+                        return {
+                            "status": "skipped",
+                            "reason": "already_exists",
+                            "site_id": str(existing_site.id)
+                        }
+                    else:
+                        logger.warning(
+                            f"Existing 'completed' site for {business_id} has broken/truncated HTML "
+                            f"({len(existing_site.html_content or '')} bytes). Re-generating."
+                        )
+                        existing_site.status = "failed"
+                        existing_site.error_message = "HTML validation failed: missing hero or nav content"
+                        await db.flush()
                 
                 # Create or update site record
                 if existing_site:
@@ -145,9 +189,21 @@ def generate_site_for_business(self, business_id: str):
                 # Update site with generated content
                 # CRITICAL FIX: Orchestrator returns website content in result["website"]
                 website = result.get("website", {})
-                site.html_content = website.get("html")
-                site.css_content = website.get("css")
-                site.js_content = website.get("js")
+                html_content = website.get("html")
+                css_content = website.get("css")
+                js_content = website.get("js")
+
+                # Validate HTML quality before saving — never mark a broken site as completed
+                if not _is_html_complete(html_content):
+                    html_len = len(html_content or "")
+                    raise ValueError(
+                        f"Generated HTML failed quality check: {html_len} bytes, "
+                        "missing hero or nav content. Site will not be saved."
+                    )
+
+                site.html_content = html_content
+                site.css_content = css_content
+                site.js_content = js_content
                 site.brand_analysis = result.get("analysis")
                 site.brand_concept = result.get("concepts", {}).get("creative_dna")
                 site.design_brief = result.get("design_brief")
@@ -173,13 +229,20 @@ def generate_site_for_business(self, business_id: str):
                 logger.error(f"Error generating site for business {business_id}: {str(e)}", exc_info=True)
                 await db.rollback()
                 
-                # Mark site as failed
-                if 'site' in locals() and site:
-                    site.status = "failed"
-                    site.error_message = str(e)
+                # Mark site as failed and reset business status so it can be re-queued
+                try:
+                    if 'site' in locals() and site and site.id:
+                        site.status = "failed"
+                        site.error_message = str(e)[:500]
+                    if 'business' in locals() and business:
+                        # Reset to queued so retry_failed_generations can pick it up
+                        business.website_status = 'queued'
+                        business.generation_started_at = None
                     await db.commit()
+                except Exception as db_err:
+                    logger.error(f"Failed to persist failure state: {db_err}")
                 
-                raise  # Re-raise for Celery retry
+                raise  # Re-raise for Celery auto-retry
     
     # Run the async function synchronously
     try:
@@ -298,9 +361,18 @@ def retry_failed_generations(self):
             # Queue retry tasks
             retries_queued = 0
             for site in sites:
-                # Reset status
+                # Reset site status
                 site.status = "generating"
                 site.error_message = None
+
+                # Also reset the business so it won't be stuck in 'generating'/'queued' limbo
+                biz_result = await db.execute(
+                    select(Business).where(Business.id == site.business_id)
+                )
+                biz = biz_result.scalar_one_or_none()
+                if biz:
+                    biz.website_status = 'queued'
+                    biz.generation_started_at = None
                 
                 # Queue task
                 generate_site_for_business.delay(str(site.business_id))
