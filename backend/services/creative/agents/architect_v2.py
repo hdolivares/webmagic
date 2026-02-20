@@ -158,6 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
 4. NEVER use hardcoded hex colors like `color: #1e40af` outside of `:root` — always reference variables
 5. Use SEMANTIC HTML class names (.hero, .nav-link, .service-card) — NEVER Tailwind utility classes
 6. COLOR CONTRAST IS MANDATORY — every text element MUST have a contrast ratio of at least 4.5:1 against its background (WCAG AA). Never place gray, light, or muted text on a dark or colored background without verifying readability. On dark/colored sections (hero, banners, footers), always set text to #ffffff or a near-white color explicitly — do NOT rely on inheritance.
+7. HERO BUTTONS — the secondary/outline button in the hero section MUST use white text and a white/semi-transparent border, never the primary color. The hero has a dark or saturated background, so `color: var(--color-primary)` makes an invisible button. Always define `.hero .btn-secondary` (or a dedicated `.btn-outline-light` class) with `color: rgba(255,255,255,0.9)`, `border-color: rgba(255,255,255,0.6)`, and `background: rgba(255,255,255,0.08)`. On hover: `background: rgba(255,255,255,0.18)`, `color: #ffffff`, `border-color: white`. NEVER put a dark-colored outline button on a dark or colored hero background.
 
 **IMPORTANT**:
 1. The HTML MUST include `<link rel="stylesheet" href="styles.css">` in the <head>
