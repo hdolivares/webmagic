@@ -71,9 +71,12 @@ class SiteService:
             raise DatabaseException(f"Failed to create site: {str(e)}")
     
     async def get_site(self, site_id: UUID) -> Optional[GeneratedSite]:
-        """Get site by ID."""
+        """Get site by ID (includes business relationship)."""
+        from sqlalchemy.orm import joinedload
         result = await self.db.execute(
-            select(GeneratedSite).where(GeneratedSite.id == site_id)
+            select(GeneratedSite)
+            .options(joinedload(GeneratedSite.business))
+            .where(GeneratedSite.id == site_id)
         )
         return result.scalar_one_or_none()
     
