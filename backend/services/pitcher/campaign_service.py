@@ -217,26 +217,27 @@ class CampaignService:
     
     async def _get_site_url(self, site_id: UUID) -> Optional[str]:
         """
-        Get site URL by ID.
-        
-        Returns the pre-generated short_url (created at site generation time).
-        Falls back to full_url for legacy sites without short links.
+        Return the short URL for a site.
+
+        Always prefers the pre-generated short link (lvsh.cc/…).
+        Falls back to the canonical sites.lavish.solutions URL only for sites
+        that pre-date the shortener migration — this path should never be hit
+        in production once all sites are backfilled.
         """
         result = await self.db.execute(
             select(GeneratedSite).where(GeneratedSite.id == site_id)
         )
         site = result.scalar_one_or_none()
-        
+
         if not site:
             return None
-        
-        # Use pre-generated short link (created at site generation)
+
         if site.short_url:
             return site.short_url
-        
-        # Fallback for legacy sites (generated before migration)
-        logger.warning(f"Site {site_id} has no short_url, using full_url")
-        return site.full_url
+
+        # Safety fallback — builds the long URL from subdomain if short_url is missing
+        logger.warning(f"Site {site_id} has no short_url — using long URL fallback")
+        return f"https://sites.lavish.solutions/{site.subdomain}"
     
     def _select_channel(self, requested_channel: str, business: Business) -> str:
         """
