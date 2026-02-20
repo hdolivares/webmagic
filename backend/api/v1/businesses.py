@@ -796,7 +796,7 @@ async def queue_businesses_for_generation(
     return {
         "queued": result["queued"],
         "already_queued": result["already_queued"],
-        "failed": result["failed"],
+        "failed": result.get("errors", result.get("failed", 0)),
         "total": len(ids_to_queue),
         "message": f"Queued {result['queued']} businesses for website generation"
     }
