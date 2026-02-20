@@ -169,6 +169,11 @@ async def _serve_generated_site(
         html_content = _remove_claim_bar(html_content)
         html_content = _inject_canonical_claim_bar(html_content, subdomain)
     
+    # Inject <base> tag so relative image paths (img/hero.jpg) resolve correctly.
+    # The page is served at /{subdomain} (no trailing slash), so without the base
+    # tag relative URLs would resolve to the site root instead of /{subdomain}/.
+    html_content = _inject_base_tag(html_content, subdomain)
+
     # Build complete HTML
     complete_html = _build_complete_html(
         html=html_content,
@@ -312,6 +317,24 @@ def _inject_canonical_claim_bar(html: str, slug: str) -> str:
         body_pos = html.lower().rfind("</body>")
         return html[:body_pos] + claim_bar_html + "\n" + html[body_pos:]
     return html + claim_bar_html
+
+
+def _inject_base_tag(html: str, subdomain: str) -> str:
+    """
+    Inject a <base href="/{subdomain}/"> into the <head> so that relative
+    image paths like img/hero.jpg resolve to /{subdomain}/img/hero.jpg.
+
+    Without this, a page served at /{subdomain} (no trailing slash) would
+    resolve img/hero.jpg to /img/hero.jpg — the site root, not the subdomain.
+    """
+    base_tag = f'<base href="/{subdomain}/">'
+    if '<base ' in html:
+        return html  # already has a base tag, don't double-inject
+    if '<head>' in html:
+        return html.replace('<head>', f'<head>\n    {base_tag}', 1)
+    if '<HEAD>' in html:
+        return html.replace('<HEAD>', f'<HEAD>\n    {base_tag}', 1)
+    return html
 
 
 def _remove_claim_bar(html: str) -> str:
