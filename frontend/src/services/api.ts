@@ -277,7 +277,7 @@ class ApiClient {
   }
 
   async getSite(id: string): Promise<GeneratedSite> {
-    const response = await this.client.get<GeneratedSite>(`/sites/${id}`)
+    const response = await this.client.get<GeneratedSite>(`/sites/detail/${id}`)
     return response.data
   }
 

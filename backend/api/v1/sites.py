@@ -214,7 +214,7 @@ async def get_site_stats(
     return SiteStats(**stats)
 
 
-@router.get("/{site_id}", response_model=SiteDetailResponse)
+@router.get("/detail/{site_id}", response_model=SiteDetailResponse)
 async def get_site(
     site_id: UUID,
     db: AsyncSession = Depends(get_db),
