@@ -8,6 +8,11 @@ import { api } from '@/services/api'
 import { Card } from '@/components/ui'
 import './MessagingSettings.css'
 
+const SUPPORTED_COUNTRIES = [
+  { code: 'US', flag: '🇺🇸', label: 'United States (+1)' },
+  { code: 'MX', flag: '🇲🇽', label: 'Mexico (+52)' },
+]
+
 const TEMPLATE_KEYS = {
   friendly: 'messaging_sms_template_friendly',
   professional: 'messaging_sms_template_professional',
@@ -33,6 +38,10 @@ export const MessagingSettings: React.FC = () => {
     professional: '',
     urgent: '',
   })
+  const [testPhone, setTestPhone] = useState('')
+  const [testMessage, setTestMessage] = useState('')
+  const [testResult, setTestResult] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [isSendingTest, setIsSendingTest] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: ['messaging-templates'],
@@ -65,6 +74,24 @@ export const MessagingSettings: React.FC = () => {
 
   const handleChange = (tone: ToneKey, value: string) => {
     setLocal(prev => ({ ...prev, [tone]: value }))
+  }
+
+  const handleSendTest = async () => {
+    if (!testPhone.trim()) return
+    setIsSendingTest(true)
+    setTestResult(null)
+    try {
+      const result = await api.sendTestSms(testPhone.trim(), testMessage.trim() || undefined)
+      setTestResult({
+        type: 'success',
+        text: `Sent! Message ID: ${result.message_id}. From ${result.from} → ${result.to}`,
+      })
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || err?.message || 'Unknown error'
+      setTestResult({ type: 'error', text: typeof detail === 'string' ? detail : JSON.stringify(detail) })
+    } finally {
+      setIsSendingTest(false)
+    }
   }
 
   if (isLoading) {
@@ -125,6 +152,78 @@ export const MessagingSettings: React.FC = () => {
             </div>
           </div>
         ))}
+      </Card>
+
+      <Card>
+        <div className="messaging-settings__intro">
+          <h2 className="messaging-settings__title">Send a test SMS</h2>
+          <p className="messaging-settings__description">
+            Verify that Telnyx is correctly configured and messages are delivered before running campaigns.
+          </p>
+        </div>
+
+        <div className="messaging-settings__test-info">
+          <div className="messaging-settings__test-info-row">
+            <span className="messaging-settings__test-info-label">Sending from</span>
+            <code className="messaging-settings__test-info-value">+1 (415) 863-7488</code>
+          </div>
+          <div className="messaging-settings__test-info-row">
+            <span className="messaging-settings__test-info-label">Supported countries</span>
+            <span className="messaging-settings__test-info-countries">
+              {SUPPORTED_COUNTRIES.map(c => (
+                <span key={c.code} className="messaging-settings__country-badge">
+                  {c.flag} {c.label}
+                </span>
+              ))}
+            </span>
+          </div>
+        </div>
+
+        <div className="messaging-settings__test-form">
+          <div className="messaging-settings__test-field">
+            <label className="messaging-settings__label">
+              Recipient phone number <span className="messaging-settings__required">*</span>
+            </label>
+            <input
+              type="tel"
+              className="messaging-settings__input"
+              value={testPhone}
+              onChange={e => setTestPhone(e.target.value)}
+              placeholder="+1 (555) 123-4567  or  +52 55 1234 5678"
+            />
+          </div>
+
+          <div className="messaging-settings__test-field">
+            <label className="messaging-settings__label">
+              Custom message <span className="messaging-settings__optional">(optional)</span>
+            </label>
+            <textarea
+              className="messaging-settings__textarea"
+              value={testMessage}
+              onChange={e => setTestMessage(e.target.value)}
+              placeholder="Leave blank to use the default test message"
+              rows={3}
+            />
+          </div>
+
+          {testResult && (
+            <div className={`messaging-settings__test-result messaging-settings__test-result--${testResult.type}`}>
+              {testResult.type === 'success' ? '✓ ' : '✗ '}
+              {testResult.text}
+            </div>
+          )}
+
+          <div className="messaging-settings__actions">
+            <button
+              type="button"
+              className="messaging-settings__btn messaging-settings__btn--send-test"
+              onClick={handleSendTest}
+              disabled={isSendingTest || !testPhone.trim()}
+            >
+              {isSendingTest ? 'Sending…' : 'Send test message'}
+            </button>
+          </div>
+        </div>
       </Card>
     </div>
   )

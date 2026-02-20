@@ -515,6 +515,17 @@ class ApiClient {
     return response.data
   }
 
+  /**
+   * Send a test SMS to verify Telnyx configuration
+   */
+  async sendTestSms(toPhone: string, message?: string): Promise<{ status: string; message: string; from: string; to: string; message_id: string }> {
+    const response = await this.client.post('/campaigns/test-sms', {
+      to_phone: toPhone,
+      ...(message ? { message } : {})
+    })
+    return response.data
+  }
+
   // ============================================
   // CUSTOMER & PAYMENT METHODS
   // ============================================
