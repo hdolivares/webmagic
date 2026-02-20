@@ -271,11 +271,14 @@ def _inject_canonical_claim_bar(html: str, slug: str) -> str:
         var resp = await fetch('{checkout_url}', {{
           method: 'POST',
           headers: {{'Content-Type': 'application/json'}},
-          body: JSON.stringify({{ email: document.getElementById('wm-email').value, name: document.getElementById('wm-name').value }})
+          body: JSON.stringify({{ customer_email: document.getElementById('wm-email').value, customer_name: document.getElementById('wm-name').value }})
         }});
         var data = await resp.json();
         if (data.checkout_url) {{ window.location.href = data.checkout_url; }}
-        else {{ document.getElementById('wm-msg').style.display='block'; document.getElementById('wm-msg').style.color='#ef4444'; document.getElementById('wm-msg').textContent = data.detail || 'Something went wrong. Please try again.'; btn.disabled=false; btn.textContent='Claim for $497'; }}
+        else {{
+          var errMsg = Array.isArray(data.detail) ? data.detail.map(function(e){{ return e.msg || JSON.stringify(e); }}).join(', ') : (data.detail || 'Something went wrong. Please try again.');
+          document.getElementById('wm-msg').style.display='block'; document.getElementById('wm-msg').style.color='#ef4444'; document.getElementById('wm-msg').textContent = errMsg; btn.disabled=false; btn.textContent='Claim for $497';
+        }}
       }} catch(err) {{ document.getElementById('wm-msg').style.display='block'; document.getElementById('wm-msg').style.color='#ef4444'; document.getElementById('wm-msg').textContent='Network error. Please try again.'; btn.disabled=false; btn.textContent='Claim for $497'; }}
     }});
   }}
@@ -393,6 +396,14 @@ def _build_complete_html(
     """
     # If HTML already contains <!DOCTYPE html>, inject CSS and JS into it
     if html.strip().lower().startswith('<!doctype html>'):
+        import re
+        # Strip external <link rel="stylesheet"> and <script src="..."> refs that
+        # would 404 — the content is already inlined below.
+        html = re.sub(r'<link\b[^>]*\brel=["\']stylesheet["\'][^>]*>', '', html, flags=re.IGNORECASE)
+        html = re.sub(r'<script\b[^>]*\bsrc=["\'][^"\']+["\'][^>]*>\s*</script>', '', html, flags=re.IGNORECASE)
+        # Also strip favicon links since we don't host them
+        html = re.sub(r'<link\b[^>]*\brel=["\'](?:icon|shortcut icon|apple-touch-icon)["\'][^>]*>', '', html, flags=re.IGNORECASE)
+
         # Find the closing </head> tag and inject CSS before it
         if css and '</head>' in html:
             html = html.replace('</head>', f'<style>{css}</style>\n</head>', 1)
