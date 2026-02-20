@@ -30,6 +30,48 @@ from core.config import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+# Maps US state abbreviations to their primary IANA timezone.
+# Hawaii and Alaska use their own zones; continental US covers ET/CT/MT/PT.
+_STATE_TIMEZONE: dict[str, str] = {
+    # Eastern
+    "CT": "America/New_York", "DE": "America/New_York", "FL": "America/New_York",
+    "GA": "America/New_York", "ME": "America/New_York", "MD": "America/New_York",
+    "MA": "America/New_York", "MI": "America/New_York", "NH": "America/New_York",
+    "NJ": "America/New_York", "NY": "America/New_York", "NC": "America/New_York",
+    "OH": "America/New_York", "PA": "America/New_York", "RI": "America/New_York",
+    "SC": "America/New_York", "VT": "America/New_York", "VA": "America/New_York",
+    "WV": "America/New_York", "DC": "America/New_York",
+    # Central
+    "AL": "America/Chicago", "AR": "America/Chicago", "IL": "America/Chicago",
+    "IA": "America/Chicago", "KS": "America/Chicago", "KY": "America/Chicago",
+    "LA": "America/Chicago", "MN": "America/Chicago", "MS": "America/Chicago",
+    "MO": "America/Chicago", "NE": "America/Chicago", "ND": "America/Chicago",
+    "OK": "America/Chicago", "SD": "America/Chicago", "TN": "America/Chicago",
+    "TX": "America/Chicago", "WI": "America/Chicago",
+    # Mountain
+    "AZ": "America/Phoenix", "CO": "America/Denver", "ID": "America/Denver",
+    "MT": "America/Denver", "NM": "America/Denver", "UT": "America/Denver",
+    "WY": "America/Denver",
+    # Pacific
+    "CA": "America/Los_Angeles", "NV": "America/Los_Angeles",
+    "OR": "America/Los_Angeles", "WA": "America/Los_Angeles",
+    # Non-contiguous
+    "AK": "America/Anchorage",
+    "HI": "Pacific/Honolulu",
+    # Indiana — most counties are Eastern, but the state is split; default ET
+    "IN": "America/Indiana/Indianapolis",
+}
+
+
+def _get_business_timezone(state: Optional[str]) -> str:
+    """Return the IANA timezone string for a US state abbreviation.
+    Falls back to America/Chicago (Central) if state is unknown."""
+    if state:
+        tz = _STATE_TIMEZONE.get(state.strip().upper())
+        if tz:
+            return tz
+    return "America/Chicago"
+
 
 class CampaignService:
     """
@@ -313,10 +355,10 @@ class CampaignService:
         if not is_valid:
             raise ValidationException(f"Invalid phone number: {error}")
         
-        # Check compliance (opt-out, business hours)
+        # Check compliance (opt-out, business hours) using business's actual state timezone
         can_send, reason = await self.sms_compliance.check_can_send(
             phone_number=formatted_phone,
-            timezone_str="America/Chicago"  # TODO: Get from business location
+            timezone_str=_get_business_timezone(business.state)
         )
         
         if not can_send:

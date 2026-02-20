@@ -286,6 +286,34 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({
         </div>
       </div>
 
+      {/* Best time to send — shown when SMS is in the channel mix */}
+      {(channel === 'sms' || channel === 'auto') && channelBreakdown.sms > 0 && (
+        <div
+          style={{
+            margin: 'var(--campaigns-spacing-lg) 0 0',
+            padding: 'var(--campaigns-spacing-md)',
+            background: 'rgba(99, 102, 241, 0.06)',
+            border: '1px solid rgba(99, 102, 241, 0.2)',
+            borderRadius: 'var(--campaigns-radius-md)',
+            fontSize: '0.8rem',
+            color: 'var(--color-text-secondary)',
+          }}
+        >
+          <div style={{ fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+            <span>📊</span> Best times to send SMS
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.375rem 1rem' }}>
+            <div><span style={{ opacity: 0.6 }}>Best days</span> — Tue, Wed, Thu</div>
+            <div><span style={{ opacity: 0.6 }}>Best windows</span> — 1–5 PM · 7–9 PM local</div>
+            <div><span style={{ opacity: 0.6 }}>Avoid</span> — Mon AM, Fri PM, weekends</div>
+            <div><span style={{ opacity: 0.6 }}>Auto-blocked</span> — before 9 AM & after 9 PM</div>
+          </div>
+          <div style={{ marginTop: '0.375rem', opacity: 0.75 }}>
+            The system uses each business's state timezone — California and New York won't get the same send time.
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="campaigns-card__footer">
         <div style={{ display: 'flex', gap: 'var(--campaigns-spacing-sm)', justifyContent: 'flex-end' }}>

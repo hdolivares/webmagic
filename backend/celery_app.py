@@ -48,42 +48,58 @@ celery_app.autodiscover_tasks([
 ])
 
 # Periodic task schedule (using SYNC tasks only)
+# All times are UTC. Compliance / quiet-hours enforcement is handled per-business
+# inside SMSComplianceService using the business's actual US state timezone.
 celery_app.conf.beat_schedule = {
-    # Scrape new territories every 6 hours
+    # ── Stage 1: Scrape new territories every 6 hours ───────────────────────
     "scrape-territories": {
         "task": "tasks.scraping.scrape_pending_territories",
-        "schedule": crontab(minute=0, hour="*/6"),  # Every 6 hours
+        "schedule": crontab(minute=0, hour="*/6"),
     },
-    # Generate sites for qualified leads every hour (using SYNC task)
-    # DISABLED: Temporarily disabled until website detection is fixed
-    # "generate-sites": {
-    #     "task": "tasks.generation_sync.generate_pending_sites",
-    #     "schedule": crontab(minute=0),  # Every hour
-    # },
-    # Send pending campaigns every 30 minutes
+
+    # ── Stage 2: Generate sites for qualified leads every hour ───────────────
+    # Re-enabled: website detection pipeline is stable (ScrapingDog + LLM country check)
+    "generate-sites": {
+        "task": "tasks.generation_sync.generate_pending_sites",
+        "schedule": crontab(minute=0),  # Top of every hour
+    },
+
+    # ── Stage 3: Auto-create campaigns for newly published sites ─────────────
+    # Runs every 30 min; picks published sites that don't yet have a campaign
+    "create-campaigns-for-new-sites": {
+        "task": "tasks.campaigns.create_campaigns_for_new_sites",
+        "schedule": crontab(minute="*/30"),
+    },
+
+    # ── Stage 4a: Send pending (non-scheduled) campaigns every 30 minutes ───
+    # Only fires campaigns where scheduled_for IS NULL or scheduled_for <= now
     "send-campaigns": {
         "task": "tasks.campaigns.send_pending_campaigns",
-        "schedule": crontab(minute="*/30"),  # Every 30 minutes
+        "schedule": crontab(minute="*/30"),
     },
-    # Process scheduled SMS campaigns every 5 minutes (using SYNC task, reduced frequency)
+
+    # ── Stage 4b: Process time-scheduled SMS campaigns every 5 minutes ──────
+    # Picks campaigns with status='scheduled' and scheduled_for <= now (UTC).
+    # TCPA quiet-hours are enforced per recipient local timezone inside the task.
+    # Best-practice send windows (Tue–Thu, 1–5 PM or 7–9 PM local) are set at
+    # campaign creation time via scheduled_for; this task just executes them.
     "process-scheduled-sms": {
         "task": "tasks.sms_sync.process_scheduled_sms_campaigns",
-        "schedule": crontab(minute="*/5"),  # Every 5 minutes (reduced from 1)
+        "schedule": crontab(minute="*/5"),
     },
-    # Calculate SMS stats daily (using SYNC task)
+
+    # ── Maintenance ──────────────────────────────────────────────────────────
     "calculate-sms-stats": {
         "task": "tasks.sms_sync.calculate_sms_campaign_stats",
-        "schedule": crontab(minute=0, hour=2),  # 2 AM daily
+        "schedule": crontab(minute=0, hour=2),  # 2 AM UTC daily
     },
-    # Clean up old cooldowns daily
     "cleanup-cooldowns": {
         "task": "tasks.scraping.cleanup_expired_cooldowns",
-        "schedule": crontab(minute=0, hour=3),  # 3 AM daily
+        "schedule": crontab(minute=0, hour=3),  # 3 AM UTC daily
     },
-    # Health check every 10 minutes (using SYNC task, reduced frequency)
     "health-check": {
         "task": "tasks.monitoring_sync.health_check",
-        "schedule": crontab(minute="*/10"),  # Every 10 minutes (reduced from 5)
+        "schedule": crontab(minute="*/10"),
     },
 }
 

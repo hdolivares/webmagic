@@ -61,33 +61,33 @@ MESSAGING_DEFAULT_TEMPLATES = {
     "messaging_sms_template_friendly": (
         "Hi {{business_name}}! Saw your {{rating}} Google reviews — nice work. "
         "No website yet, so I built one: {{site_url}}. "
-        "Want to personalize it? Reply STOP to opt out."
+        "Want to personalize it? Just reply NO if not for you."
     ),
 
     # Professional — polite and personal, suitable for formal service businesses
     "messaging_sms_template_professional": (
         "Hi {{business_name}}, I came across your {{rating}} Google rating and noticed "
         "you don't have a website yet. I built a preview for your {{category}} business: "
-        "{{site_url}}. Would you like it customized? Reply STOP to opt out."
+        "{{site_url}}. Would you like it customized? Reply NO if not interested."
     ),
 
     # Value-First — ultra-short, lowest cost (1 segment guaranteed)
     "messaging_sms_template_value_first": (
         "Hi {{business_name}} — {{rating}} stars on Google, no website yet. "
-        "I made one for you: {{site_url}}. Want it? Reply STOP to opt out."
+        "I made one for you: {{site_url}}. Want it? Reply NO if not your thing."
     ),
 
     # Local Community — mentions city for hyper-local feel
     "messaging_sms_template_local_community": (
         "Hi {{business_name}}! Noticed your great reputation in {{city}} but no website. "
-        "I built a free preview: {{site_url}}. Want to customize it? Reply STOP to opt out."
+        "I built a free preview: {{site_url}}. Want to customize it? Just reply NO if not."
     ),
 
     # Urgent — direct and confident, for emergency/on-demand services
     "messaging_sms_template_urgent": (
         "{{business_name}} — {{rating}} stars but no website. "
         "I built one for your {{category}} business: {{site_url}}. "
-        "Interested? Reply STOP to opt out."
+        "Interested? Reply NO to pass."
     ),
 }
 
