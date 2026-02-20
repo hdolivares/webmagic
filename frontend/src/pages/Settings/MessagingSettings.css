@@ -160,3 +160,132 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* ── Test SMS section ──────────────────────────────────────── */
+.messaging-settings__test-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: var(--messaging-spacing);
+  background: var(--messaging-bg-secondary);
+  border: 1px solid var(--messaging-section-border);
+  border-radius: var(--messaging-radius);
+  margin-bottom: var(--messaging-spacing-lg);
+}
+
+.messaging-settings__test-info-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.messaging-settings__test-info-label {
+  color: var(--color-text-secondary);
+  min-width: 130px;
+  flex-shrink: 0;
+}
+
+.messaging-settings__test-info-value {
+  background: var(--messaging-bg-surface);
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--color-primary-600);
+  border: 1px solid var(--messaging-section-border);
+}
+
+.messaging-settings__test-info-countries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.messaging-settings__country-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  background: var(--messaging-bg-surface);
+  border: 1px solid var(--messaging-section-border);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  color: var(--color-text-primary);
+}
+
+.messaging-settings__test-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--messaging-spacing);
+}
+
+.messaging-settings__test-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.messaging-settings__input {
+  width: 100%;
+  padding: 0.6rem var(--messaging-spacing);
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--color-text-primary);
+  background: var(--messaging-bg-surface);
+  border: 2px solid var(--messaging-input-border);
+  border-radius: var(--messaging-radius);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+}
+
+.messaging-settings__input:focus {
+  outline: none;
+  border-color: var(--messaging-input-border-focus);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+}
+
+.messaging-settings__input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.8;
+}
+
+.messaging-settings__required {
+  color: #ef4444;
+  margin-left: 0.2rem;
+}
+
+.messaging-settings__optional {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+  font-size: 0.8125rem;
+}
+
+.messaging-settings__test-result {
+  padding: 0.75rem var(--messaging-spacing);
+  border-radius: var(--messaging-radius);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.messaging-settings__test-result--success {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  color: #166534;
+}
+
+.messaging-settings__test-result--error {
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  color: #991b1b;
+}
+
+.messaging-settings__btn--send-test {
+  background: #059669;
+  color: white;
+  padding: 0.6rem 1.25rem;
+}
+
+.messaging-settings__btn--send-test:hover:not(:disabled) {
+  background: #047857;
+}
