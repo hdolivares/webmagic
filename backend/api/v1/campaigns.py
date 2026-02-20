@@ -177,8 +177,8 @@ async def get_ready_businesses(
     
     Returns businesses that:
     - Have a completed generated site
-    - Don't already have an existing website
-    - Meet qualification criteria (score >= 70)
+    - Don't already have an existing website (triple_verified or confirmed_no_website)
+    - Rating >= 4.0 (or unrated — good-review businesses only)
     - Have at least one contact method (email or phone)
     - Are located in the United States (US only - SMS integration limitation)
     
@@ -186,14 +186,21 @@ async def get_ready_businesses(
     """
     from fastapi.responses import JSONResponse
     
+    from sqlalchemy import or_
     result = await db.execute(
         select(Business, GeneratedSite)
         .join(GeneratedSite, GeneratedSite.business_id == Business.id)
         .where(
             and_(
-                Business.website_validation_status == 'triple_verified',
+                or_(
+                    Business.website_validation_status == 'triple_verified',
+                    Business.website_validation_status == 'confirmed_no_website',
+                ),
                 Business.website_url.is_(None),
-                Business.qualification_score >= 70,
+                or_(
+                    Business.rating.is_(None),
+                    Business.rating >= 4.0,
+                ),
                 GeneratedSite.status == 'completed',
                 Business.country == 'US'  # SMS integration only works for US
             )
