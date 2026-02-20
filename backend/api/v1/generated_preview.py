@@ -125,10 +125,14 @@ async def _serve_generated_site(
     # Get HTML content
     html_content = site.html_content
     
-    # Remove claim bar if site is owned
     if is_owned:
+        # Remove claim bar entirely for purchased sites
         html_content = _remove_claim_bar(html_content)
         logger.info(f"Removed claim bar from owned generated site: {subdomain}")
+    else:
+        # Always strip and re-inject claim bar so style fixes apply to existing sites
+        html_content = _remove_claim_bar(html_content)
+        html_content = _inject_canonical_claim_bar(html_content, subdomain)
     
     # Build complete HTML
     complete_html = _build_complete_html(
@@ -163,11 +167,14 @@ async def _serve_purchase_site(
     # Get HTML content
     html_content = version.html_content
     
-    # Remove claim bar if site is owned
+    # Remove claim bar if site is owned, otherwise re-inject canonical version
     is_owned = site.status == 'owned'
     if is_owned:
         html_content = _remove_claim_bar(html_content)
         logger.info(f"Removed claim bar from owned purchase site: {slug}")
+    else:
+        html_content = _remove_claim_bar(html_content)
+        html_content = _inject_canonical_claim_bar(html_content, slug)
     
     # Build complete HTML
     complete_html = _build_complete_html(
@@ -178,6 +185,46 @@ async def _serve_purchase_site(
     
     logger.info(f"Serving purchase site: {slug} (status: {site.status})")
     return HTMLResponse(content=complete_html)
+
+
+def _inject_canonical_claim_bar(html: str, slug: str) -> str:
+    """
+    Inject the canonical, always-up-to-date claim bar into site HTML.
+
+    Called at serve time (not generation time) so styling fixes apply
+    immediately to ALL existing sites without a DB migration.
+    Uses explicit colors and `all: unset` on every text element so the
+    site's own CSS can never override the claim bar's text color.
+    """
+    from core.config import get_settings
+    api_url = get_settings().API_URL
+    checkout_url = f"{api_url}/api/v1/sites/{slug}/purchase"
+
+    claim_bar_html = f'''
+<!-- WebMagic Claim Bar - Official -->
+<div id="webmagic-claim-bar" style="position:fixed;bottom:0;left:0;right:0;z-index:9999;all:initial;display:block;">
+  <div style="all:unset;display:flex;background:linear-gradient(135deg,#1e40af 0%,#7c3aed 100%);padding:12px 20px;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;box-shadow:0 -4px 20px rgba(0,0,0,0.25);">
+    <div style="all:unset;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <span style="all:unset;font-size:20px;line-height:1;">🏢</span>
+      <div style="all:unset;display:block;">
+        <p style="all:unset;display:block;margin:0;font-weight:700;font-size:15px;color:#ffffff!important;text-shadow:0 1px 3px rgba(0,0,0,0.4);font-family:system-ui,sans-serif;line-height:1.4;">Is this your business?</p>
+        <p style="all:unset;display:block;margin:0;font-size:13px;color:#e0e7ff!important;text-shadow:0 1px 2px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;line-height:1.4;">Claim this website for only <strong style="color:#ffffff!important;font-weight:700;">$497</strong> &middot; Then just $97/month for hosting, maintenance &amp; updates</p>
+        <a href="https://web.lavish.solutions/how-it-works" target="_blank" rel="noopener noreferrer" style="all:unset;display:inline-block;color:#bfdbfe!important;font-size:12px;text-decoration:underline;margin-top:3px;font-family:system-ui,sans-serif;cursor:pointer;">See what&#39;s included &rarr;</a>
+      </div>
+    </div>
+    <button id="webmagic-claim-btn"
+      onclick="(function(){{var m=document.createElement('div');m.id='webmagic-claim-modal';m.style='position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);';m.innerHTML='<div style=\\'background:#fff;border-radius:16px;padding:40px;max-width:480px;width:90%;position:relative;\\'>  <button onclick=\\'this.closest(\\\"#webmagic-claim-modal\\\").remove()\\' style=\\'position:absolute;top:16px;right:16px;background:none;border:none;font-size:24px;cursor:pointer;color:#666;\\'>&times;</button>  <h2 style=\\'margin:0 0 8px;font-size:24px;color:#1e3a5f;\\'>Claim Your Website</h2>  <p style=\\'color:#666;margin:0 0 24px;\\'>Enter your details and we will contact you within 24 hours.</p>  <form id=\\'webmagic-claim-form\\' style=\\'display:flex;flex-direction:column;gap:12px;\\'>    <input type=\\'email\\' id=\\'claim-email\\' placeholder=\\'Your email address *\\' required style=\\'padding:14px 16px;border:2px solid #e2e8f0;border-radius:8px;font-size:15px;\\'>    <input type=\\'text\\' id=\\'claim-name\\' placeholder=\\'Your full name *\\' required style=\\'padding:14px 16px;border:2px solid #e2e8f0;border-radius:8px;font-size:15px;\\'>    <button type=\\'submit\\' style=\\'background:#7c3aed;color:#fff;border:none;padding:16px;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;\\'>Claim for $497</button>  </form></div>';document.body.appendChild(m);document.getElementById('webmagic-claim-form').addEventListener('submit',async function(e){{e.preventDefault();var email=document.getElementById('claim-email').value;var name=document.getElementById('claim-name').value;try{{var r=await fetch('{checkout_url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:email,name:name}})}});var d=await r.json();if(d.checkout_url){{window.location.href=d.checkout_url;}}else{{alert('Something went wrong. Please try again.');}};}}catch(err){{alert('Something went wrong. Please try again.');}}}});}})()"
+      style="all:unset;display:inline-block;background:#fbbf24;color:#1e3a5f!important;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;font-family:system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+      CLAIM FOR $497
+    </button>
+  </div>
+</div>
+'''
+
+    if "</body>" in html.lower():
+        body_pos = html.lower().rfind("</body>")
+        return html[:body_pos] + claim_bar_html + "\n" + html[body_pos:]
+    return html + claim_bar_html
 
 
 def _remove_claim_bar(html: str) -> str:
