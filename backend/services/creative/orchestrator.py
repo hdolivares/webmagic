@@ -52,7 +52,8 @@ class CreativeOrchestrator:
     async def generate_website(
         self,
         business_data: Dict[str, Any],
-        save_intermediate: bool = True
+        save_intermediate: bool = True,
+        subdomain: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Generate complete website through multi-agent pipeline.
@@ -157,7 +158,8 @@ class CreativeOrchestrator:
             website = await self.architect.generate_website(
                 business_data,
                 concepts.get("creative_dna", {}),
-                design_brief
+                design_brief,
+                subdomain=subdomain,
             )
             results["website"] = website
             results["stage_4_duration_ms"] = (time.time() - stage_start) * 1000
@@ -233,7 +235,7 @@ class CreativeOrchestrator:
             website = await self.architect.generate_website(
                 business_data,
                 creative_dna,
-                design_brief
+                design_brief,
             )
             return {"website": website}
         

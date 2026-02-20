@@ -4,13 +4,16 @@ Generated Sites Preview API
 Serves HTML content for generated sites (from generated_sites table).
 This is a PUBLIC endpoint that serves the actual website HTML.
 """
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
 import logging
 
+from core.config import get_settings
 from core.database import get_db
 from models.site import GeneratedSite
 from models.site_models import Site, SiteVersion
@@ -18,6 +21,38 @@ import re
 
 router = APIRouter(tags=["generated-preview"])
 logger = logging.getLogger(__name__)
+_settings = get_settings()
+
+
+@router.get(
+    "/{subdomain}/img/{filename}",
+    summary="Serve AI-generated site image",
+    description="PUBLIC — serves a Nano Banana image saved for a specific generated site.",
+)
+async def serve_site_image(subdomain: str, filename: str) -> FileResponse:
+    """
+    Serve pre-generated images (hero.jpg, about.jpg, services.jpg) for a site.
+    Images are saved at SITES_BASE_PATH/{subdomain}/img/{filename} during generation.
+    """
+    # Sanitise filename — only allow alphanumeric, hyphens, underscores, dots
+    safe_name = re.sub(r"[^a-zA-Z0-9_\-.]", "", filename)
+    if not safe_name or safe_name != filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    img_path = Path(_settings.SITES_BASE_PATH) / subdomain / "img" / safe_name
+
+    if not img_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Image not found: {subdomain}/img/{safe_name}",
+        )
+
+    media_type = "image/jpeg" if safe_name.lower().endswith(".jpg") else "image/png"
+    return FileResponse(
+        path=str(img_path),
+        media_type=media_type,
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
 
 
 @router.get(

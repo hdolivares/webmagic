@@ -151,13 +151,18 @@ def generate_site_for_business(self, business_id: str):
                         await db.flush()
                 
                 # Create or update site record
+                subdomain = (
+                    existing_site.subdomain
+                    if existing_site
+                    else f"{business.slug}-{str(business.id)[:8]}"
+                )
                 if existing_site:
                     site = existing_site
                     site.status = "generating"
                 else:
                     site = GeneratedSite(
                         business_id=business.id,
-                        subdomain=f"{business.slug}-{str(business.id)[:8]}",
+                        subdomain=subdomain,
                         status="generating"
                     )
                     db.add(site)
@@ -184,7 +189,11 @@ def generate_site_for_business(self, business_id: str):
                     "reviews_summary": business.reviews_summary,
                 }
                 
-                result = await orchestrator.generate_website(business_data)
+                # Pass subdomain so architect can generate and save images
+                result = await orchestrator.generate_website(
+                    business_data,
+                    subdomain=subdomain,
+                )
                 
                 # Update site with generated content
                 # CRITICAL FIX: Orchestrator returns website content in result["website"]
