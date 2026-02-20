@@ -157,6 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
 3. EVERY color, font, and brand value MUST be a CSS variable in `:root { }` — use var(--...) everywhere
 4. NEVER use hardcoded hex colors like `color: #1e40af` outside of `:root` — always reference variables
 5. Use SEMANTIC HTML class names (.hero, .nav-link, .service-card) — NEVER Tailwind utility classes
+6. COLOR CONTRAST IS MANDATORY — every text element MUST have a contrast ratio of at least 4.5:1 against its background (WCAG AA). Never place gray, light, or muted text on a dark or colored background without verifying readability. On dark/colored sections (hero, banners, footers), always set text to #ffffff or a near-white color explicitly — do NOT rely on inheritance.
 
 **IMPORTANT**:
 1. The HTML MUST include `<link rel="stylesheet" href="styles.css">` in the <head>
@@ -683,17 +684,17 @@ h1 {{ margin: 0 0 0.5rem; font-family: var(--font-heading); font-size: 2.5rem; c
         
         claim_bar_html = f'''
 <!-- WebMagic Claim Bar - Official -->
-<div id="webmagic-claim-bar" style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 9999;">
-    <div style="background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%); color: white; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; box-shadow: 0 -4px 20px rgba(0,0,0,0.15);">
-        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-            <span style="font-size: 20px;">🏢</span>
-            <div>
-                <p style="margin: 0; font-weight: 600; font-size: 15px;">Is this your business?</p>
-                <p style="margin: 0; font-size: 13px; opacity: 0.9;">Claim this website for only <strong>$497</strong> · Then just $97/month for hosting, maintenance & updates</p>
-                <a href="https://web.lavish.solutions/how-it-works" target="_blank" rel="noopener noreferrer" style="color: #bfdbfe; font-size: 12px; text-decoration: underline; margin-top: 2px; display: inline-block;">See what's included →</a>
+<div id="webmagic-claim-bar" style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 9999; all: initial; display: block;">
+    <div style="all: unset; display: flex; background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%); padding: 12px 20px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; box-shadow: 0 -4px 20px rgba(0,0,0,0.25);">
+        <div style="all: unset; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <span style="all: unset; font-size: 20px; line-height: 1;">🏢</span>
+            <div style="all: unset; display: block;">
+                <p style="all: unset; display: block; margin: 0; font-weight: 700; font-size: 15px; color: #ffffff !important; text-shadow: 0 1px 3px rgba(0,0,0,0.4); font-family: system-ui, sans-serif; line-height: 1.4;">Is this your business?</p>
+                <p style="all: unset; display: block; margin: 0; font-size: 13px; color: #e0e7ff !important; text-shadow: 0 1px 2px rgba(0,0,0,0.3); font-family: system-ui, sans-serif; line-height: 1.4;">Claim this website for only <strong style="color: #ffffff !important; font-weight: 700;">$497</strong> · Then just $97/month for hosting, maintenance &amp; updates</p>
+                <a href="https://web.lavish.solutions/how-it-works" target="_blank" rel="noopener noreferrer" style="all: unset; display: inline-block; color: #bfdbfe !important; font-size: 12px; text-decoration: underline; margin-top: 3px; font-family: system-ui, sans-serif; cursor: pointer;">See what&#39;s included →</a>
             </div>
         </div>
-        <button id="webmagic-claim-btn" style="background: #fbbf24; color: #1e3a5f; border: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px;">
+        <button id="webmagic-claim-btn" style="all: unset; display: inline-block; background: #fbbf24; color: #1e3a5f !important; border: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px; font-family: system-ui, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
             Claim for $497
         </button>
     </div>
