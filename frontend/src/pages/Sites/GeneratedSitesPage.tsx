@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
 import { Card, CardHeader, CardBody, CardTitle, Badge, Button } from '@/components/ui'
-import { Wand2, Search, ExternalLink, Eye, Calendar, TrendingUp, ChevronDown, ChevronUp, ExternalLink as LinkIcon, Play, AlertCircle } from 'lucide-react'
+import { Wand2, Search, ExternalLink, Eye, Calendar, TrendingUp, ChevronDown, ChevronUp, ExternalLink as LinkIcon, Play, AlertCircle, RefreshCw } from 'lucide-react'
 
 export const GeneratedSitesPage = () => {
   const navigate = useNavigate()
@@ -44,6 +44,18 @@ export const GeneratedSitesPage = () => {
     onError: (error: any) => {
       alert(`❌ Failed to queue businesses: ${error.message}`)
     }
+  })
+
+  // Retry a single failed site
+  const retryMutation = useMutation({
+    mutationFn: (businessId: string) =>
+      api.queueBusinessesForGeneration({ business_ids: [businessId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['generated-sites'] })
+    },
+    onError: (error: any) => {
+      alert(`❌ Failed to retry: ${error.message}`)
+    },
   })
   
   // Sort sites by created_at descending (most recent first) and filter
@@ -337,26 +349,45 @@ export const GeneratedSitesPage = () => {
                   <div className="flex flex-col gap-2 mt-3">
                     {(site.status === 'completed' || site.status === 'published') && site.subdomain && (
                       <div className="flex gap-2">
+                        {/* View = in-app detail page with iframe + business data */}
                         <Button
                           variant="secondary"
                           size="sm"
                           className="flex-1 flex items-center justify-center gap-1 text-xs"
                           onClick={() => navigate(`/sites/generated/${site.id}`)}
+                          title="View site details inside the admin panel"
                         >
                           <Eye className="w-3 h-3" />
                           View
                         </Button>
-                        
+
+                        {/* Preview = open live site in a new browser tab */}
                         <Button
                           variant="primary"
                           size="sm"
                           className="flex-1 flex items-center justify-center gap-1 text-xs"
                           onClick={() => window.open(site.short_url || `https://sites.lavish.solutions/${site.subdomain}`, '_blank')}
+                          title="Open live site in a new tab"
                         >
                           <ExternalLink className="w-3 h-3" />
                           Preview
                         </Button>
                       </div>
+                    )}
+
+                    {/* Retry button for failed sites */}
+                    {site.status === 'failed' && site.business?.id && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="w-full flex items-center justify-center gap-1 text-xs text-warning-700 border-warning-300 hover:bg-warning-50"
+                        onClick={() => retryMutation.mutate(site.business.id)}
+                        disabled={retryMutation.isPending}
+                        title="Re-queue this site for generation"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${retryMutation.isPending ? 'animate-spin' : ''}`} />
+                        {retryMutation.isPending ? 'Retrying…' : 'Retry Generation'}
+                      </Button>
                     )}
                     
                     {/* Show short link if available */}
