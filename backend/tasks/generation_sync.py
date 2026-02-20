@@ -195,6 +195,11 @@ def generate_pending_sites(self):
     Generate sites for qualified businesses that don't have sites yet.
     Scheduled task that runs periodically.
     """
+    from utils.autopilot_guard import check_autopilot
+    guard = check_autopilot("generate_pending_sites")
+    if guard:
+        return guard
+
     logger.info("[Celery Task] Starting generate_pending_sites")
     
     async def _generate_pending():

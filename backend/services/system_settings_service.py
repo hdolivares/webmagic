@@ -224,6 +224,61 @@ class SystemSettingsService:
         """Return default template text for Settings UI when user has not saved yet."""
         return dict(MESSAGING_DEFAULT_TEMPLATES)
 
+    # ── Autopilot ─────────────────────────────────────────────────────────────
+
+    AUTOPILOT_DEFAULTS = {
+        "autopilot_enabled": False,
+        "autopilot_target_businesses": 30,
+    }
+
+    @staticmethod
+    async def get_autopilot_settings(db: AsyncSession) -> Dict[str, Any]:
+        """Return the current autopilot settings, falling back to safe defaults."""
+        enabled_raw = await SystemSettingsService.get_setting(db, "autopilot_enabled", default=None)
+        target_raw  = await SystemSettingsService.get_setting(db, "autopilot_target_businesses", default=None)
+
+        # Coerce stored string values back to the right types
+        if enabled_raw is None:
+            enabled = False
+        elif isinstance(enabled_raw, bool):
+            enabled = enabled_raw
+        else:
+            enabled = str(enabled_raw).lower() in ("true", "1", "yes")
+
+        try:
+            target = int(target_raw) if target_raw is not None else 30
+        except (ValueError, TypeError):
+            target = 30
+
+        return {"enabled": enabled, "target_businesses": target}
+
+    @staticmethod
+    async def set_autopilot_settings(
+        db: AsyncSession,
+        enabled: bool,
+        target_businesses: int,
+    ) -> Dict[str, Any]:
+        """Persist autopilot settings and return the saved values."""
+        await SystemSettingsService.set_setting(
+            db=db,
+            key="autopilot_enabled",
+            value=str(enabled).lower(),
+            value_type="boolean",
+            category="autopilot",
+            label="Autopilot Enabled",
+            description="When true, Celery Beat tasks run automatically on schedule.",
+        )
+        await SystemSettingsService.set_setting(
+            db=db,
+            key="autopilot_target_businesses",
+            value=str(max(1, target_businesses)),
+            value_type="integer",
+            category="autopilot",
+            label="Autopilot Target Businesses",
+            description="Stop scraping new territories when this many businesses are queued for generation.",
+        )
+        return {"enabled": enabled, "target_businesses": target_businesses}
+
     @staticmethod
     async def get_available_providers() -> Dict[str, Any]:
         """Get list of available AI providers and their models."""
