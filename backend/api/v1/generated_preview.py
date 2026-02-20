@@ -191,35 +191,87 @@ def _inject_canonical_claim_bar(html: str, slug: str) -> str:
     """
     Inject the canonical, always-up-to-date claim bar into site HTML.
 
-    Called at serve time (not generation time) so styling fixes apply
-    immediately to ALL existing sites without a DB migration.
-    Uses explicit colors and `all: unset` on every text element so the
-    site's own CSS can never override the claim bar's text color.
+    Called at serve time so styling fixes apply immediately to ALL existing
+    sites without a DB migration. The JS is in a separate <script> block —
+    no inline onclick — to avoid any quote-escaping issues.
     """
     from core.config import get_settings
     api_url = get_settings().API_URL
     checkout_url = f"{api_url}/api/v1/sites/{slug}/purchase"
 
-    claim_bar_html = f'''
+    # All JS lives in this script block. No inline onclick anywhere.
+    claim_script = f"""<script>
+(function() {{
+  function wmClaim() {{
+    if (document.getElementById('wm-claim-modal')) return;
+    var overlay = document.createElement('div');
+    overlay.id = 'wm-claim-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:10001;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.65);font-family:system-ui,sans-serif;';
+    overlay.innerHTML = [
+      '<div style="background:#fff;border-radius:16px;padding:40px;max-width:480px;width:90%;position:relative;">',
+        '<button id="wm-close-btn" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:26px;cursor:pointer;color:#999;line-height:1;">&times;</button>',
+        '<h2 style="margin:0 0 8px;font-size:24px;color:#1e3a5f;font-weight:700;">Claim Your Website</h2>',
+        '<p style="color:#666;margin:0 0 24px;font-size:15px;">Enter your details and we will contact you within 24 hours.</p>',
+        '<form id="wm-claim-form" style="display:flex;flex-direction:column;gap:12px;">',
+          '<input type="email" id="wm-email" placeholder="Your email address *" required style="padding:14px 16px;border:2px solid #e2e8f0;border-radius:8px;font-size:15px;outline:none;">',
+          '<input type="text"  id="wm-name"  placeholder="Your full name *"      required style="padding:14px 16px;border:2px solid #e2e8f0;border-radius:8px;font-size:15px;outline:none;">',
+          '<button type="submit" style="background:#7c3aed;color:#fff;border:none;padding:16px;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;">Claim for $497</button>',
+        '</form>',
+        '<p id="wm-msg" style="margin:12px 0 0;font-size:13px;color:#10b981;display:none;"></p>',
+      '</div>'
+    ].join('');
+    document.body.appendChild(overlay);
+    document.getElementById('wm-close-btn').addEventListener('click', function() {{ overlay.remove(); }});
+    overlay.addEventListener('click', function(e) {{ if (e.target === overlay) overlay.remove(); }});
+    document.getElementById('wm-claim-form').addEventListener('submit', async function(e) {{
+      e.preventDefault();
+      var btn = this.querySelector('button[type=submit]');
+      btn.disabled = true; btn.textContent = 'Processing...';
+      try {{
+        var resp = await fetch('{checkout_url}', {{
+          method: 'POST',
+          headers: {{'Content-Type': 'application/json'}},
+          body: JSON.stringify({{ email: document.getElementById('wm-email').value, name: document.getElementById('wm-name').value }})
+        }});
+        var data = await resp.json();
+        if (data.checkout_url) {{ window.location.href = data.checkout_url; }}
+        else {{ document.getElementById('wm-msg').style.display='block'; document.getElementById('wm-msg').style.color='#ef4444'; document.getElementById('wm-msg').textContent = data.detail || 'Something went wrong. Please try again.'; btn.disabled=false; btn.textContent='Claim for $497'; }}
+      }} catch(err) {{ document.getElementById('wm-msg').style.display='block'; document.getElementById('wm-msg').style.color='#ef4444'; document.getElementById('wm-msg').textContent='Network error. Please try again.'; btn.disabled=false; btn.textContent='Claim for $497'; }}
+    }});
+  }}
+  window.wmClaim = wmClaim;
+}})();
+</script>"""
+
+    claim_bar_html = f"""{claim_script}
 <!-- WebMagic Claim Bar - Official -->
-<div id="webmagic-claim-bar" style="position:fixed;bottom:0;left:0;right:0;z-index:9999;all:initial;display:block;">
-  <div style="all:unset;display:flex;background:linear-gradient(135deg,#1e40af 0%,#7c3aed 100%);padding:12px 20px;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;box-shadow:0 -4px 20px rgba(0,0,0,0.25);">
-    <div style="all:unset;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <span style="all:unset;font-size:20px;line-height:1;">🏢</span>
-      <div style="all:unset;display:block;">
-        <p style="all:unset;display:block;margin:0;font-weight:700;font-size:15px;color:#ffffff!important;text-shadow:0 1px 3px rgba(0,0,0,0.4);font-family:system-ui,sans-serif;line-height:1.4;">Is this your business?</p>
-        <p style="all:unset;display:block;margin:0;font-size:13px;color:#e0e7ff!important;text-shadow:0 1px 2px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;line-height:1.4;">Claim this website for only <strong style="color:#ffffff!important;font-weight:700;">$497</strong> &middot; Then just $97/month for hosting, maintenance &amp; updates</p>
-        <a href="https://web.lavish.solutions/how-it-works" target="_blank" rel="noopener noreferrer" style="all:unset;display:inline-block;color:#bfdbfe!important;font-size:12px;text-decoration:underline;margin-top:3px;font-family:system-ui,sans-serif;cursor:pointer;">See what&#39;s included &rarr;</a>
+<div id="webmagic-claim-bar" style="position:fixed;bottom:0;left:0;right:0;z-index:9999;">
+  <div style="background:linear-gradient(135deg,#1e40af 0%,#7c3aed 100%);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;box-shadow:0 -4px 20px rgba(0,0,0,0.25);">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <span style="font-size:20px;line-height:1;flex-shrink:0;">&#x1f3e2;</span>
+      <div>
+        <p style="margin:0;font-weight:700;font-size:15px;color:#ffffff;text-shadow:0 1px 3px rgba(0,0,0,0.4);font-family:system-ui,sans-serif;line-height:1.4;">Is this your business?</p>
+        <p style="margin:0;font-size:13px;color:#e0e7ff;text-shadow:0 1px 2px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;line-height:1.4;">Claim this website for only <strong style="color:#ffffff;font-weight:700;">$497</strong> &middot; Then just $97/month for hosting, maintenance &amp; updates</p>
+        <a href="https://web.lavish.solutions/how-it-works" target="_blank" rel="noopener noreferrer" style="color:#bfdbfe;font-size:12px;text-decoration:underline;margin-top:3px;display:inline-block;font-family:system-ui,sans-serif;">See what&#39;s included &rarr;</a>
       </div>
     </div>
-    <button id="webmagic-claim-btn"
-      onclick="(function(){{var m=document.createElement('div');m.id='webmagic-claim-modal';m.style='position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);';m.innerHTML='<div style=\\'background:#fff;border-radius:16px;padding:40px;max-width:480px;width:90%;position:relative;\\'>  <button onclick=\\'this.closest(\\\"#webmagic-claim-modal\\\").remove()\\' style=\\'position:absolute;top:16px;right:16px;background:none;border:none;font-size:24px;cursor:pointer;color:#666;\\'>&times;</button>  <h2 style=\\'margin:0 0 8px;font-size:24px;color:#1e3a5f;\\'>Claim Your Website</h2>  <p style=\\'color:#666;margin:0 0 24px;\\'>Enter your details and we will contact you within 24 hours.</p>  <form id=\\'webmagic-claim-form\\' style=\\'display:flex;flex-direction:column;gap:12px;\\'>    <input type=\\'email\\' id=\\'claim-email\\' placeholder=\\'Your email address *\\' required style=\\'padding:14px 16px;border:2px solid #e2e8f0;border-radius:8px;font-size:15px;\\'>    <input type=\\'text\\' id=\\'claim-name\\' placeholder=\\'Your full name *\\' required style=\\'padding:14px 16px;border:2px solid #e2e8f0;border-radius:8px;font-size:15px;\\'>    <button type=\\'submit\\' style=\\'background:#7c3aed;color:#fff;border:none;padding:16px;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;\\'>Claim for $497</button>  </form></div>';document.body.appendChild(m);document.getElementById('webmagic-claim-form').addEventListener('submit',async function(e){{e.preventDefault();var email=document.getElementById('claim-email').value;var name=document.getElementById('claim-name').value;try{{var r=await fetch('{checkout_url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{email:email,name:name}})}});var d=await r.json();if(d.checkout_url){{window.location.href=d.checkout_url;}}else{{alert('Something went wrong. Please try again.');}};}}catch(err){{alert('Something went wrong. Please try again.');}}}});}})()"
-      style="all:unset;display:inline-block;background:#fbbf24;color:#1e3a5f!important;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;font-family:system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+    <button onclick="wmClaim()" style="background:#fbbf24;color:#1e3a5f;border:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;font-family:system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,0.2);flex-shrink:0;">
       CLAIM FOR $497
     </button>
   </div>
 </div>
-'''
+<style>
+  #webmagic-claim-bar p, #webmagic-claim-bar a, #webmagic-claim-bar span {{ color: inherit; }}
+  #webmagic-claim-bar > div > div:first-child > div > p:first-child {{ color: #ffffff !important; }}
+  #webmagic-claim-bar > div > div:first-child > div > p:last-of-type {{ color: #e0e7ff !important; }}
+  #webmagic-claim-bar > div > div:first-child > div > a {{ color: #bfdbfe !important; }}
+  #webmagic-claim-bar button[onclick] {{ background: #fbbf24 !important; color: #1e3a5f !important; }}
+  #webmagic-claim-bar button[onclick]:hover {{ background: #f59e0b !important; transform: scale(1.03); }}
+  @media (max-width: 640px) {{
+    #webmagic-claim-bar > div {{ flex-direction: column; text-align: center; }}
+    #webmagic-claim-bar button[onclick] {{ width: 100%; }}
+  }}
+</style>"""
 
     if "</body>" in html.lower():
         body_pos = html.lower().rfind("</body>")
