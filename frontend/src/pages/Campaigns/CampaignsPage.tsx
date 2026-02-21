@@ -14,7 +14,7 @@ import { Card, CardHeader, CardBody, CardTitle, Badge } from '@/components/ui'
 import { Mail, Eye, MousePointer, MessageSquare } from 'lucide-react'
 import ReadyBusinessesPanel from './ReadyBusinessesPanel'
 import CampaignCreator from './CampaignCreator'
-import type { ReadyBusiness } from '@/types'
+import type { ReadyBusiness, CampaignStats } from '@/types'
 import './Campaigns.css'
 
 /**
@@ -46,7 +46,7 @@ export const CampaignsPage: React.FC = () => {
   })
 
   // Fetch campaign stats
-  const { data: stats } = useQuery({
+  const { data: stats } = useQuery<CampaignStats>({
     queryKey: ['campaign-stats'],
     queryFn: () => api.getCampaignStats(),
     retry: false,
@@ -116,7 +116,7 @@ export const CampaignsPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--campaigns-spacing-sm)' }}>
             <Mail size={20} style={{ color: 'var(--campaigns-channel-email)' }} />
             <div>
-              <div className="campaigns-stat__value">{stats?.sent || 0}</div>
+              <div className="campaigns-stat__value">{stats?.total_sent || 0}</div>
               <div className="campaigns-stat__label">Campaigns Sent</div>
             </div>
           </div>
@@ -150,7 +150,7 @@ export const CampaignsPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--campaigns-spacing-sm)' }}>
             <MessageSquare size={20} style={{ color: 'var(--campaigns-channel-sms)' }} />
             <div>
-              <div className="campaigns-stat__value">{stats?.clicked || 0}</div>
+              <div className="campaigns-stat__value">{stats?.total_clicked || 0}</div>
               <div className="campaigns-stat__label">Clicked</div>
             </div>
           </div>
@@ -290,20 +290,22 @@ export const CampaignsPage: React.FC = () => {
                         <td className="table-cell">
                           <div>
                             <p className="font-medium">
-                              {campaign.recipient_name || 'Unknown'}
+                              {campaign.business_name || campaign.recipient_name || 'Unknown'}
                             </p>
                             <p className="text-xs text-text-secondary">
-                              {campaign.recipient_email}
+                              {campaign.recipient_email || campaign.recipient_phone || '—'}
                             </p>
                           </div>
                         </td>
                         <td className="table-cell">
                           <Badge variant="info">
-                            {campaign.subject_line ? '📧' : '💬'}
+                            {campaign.channel === 'sms' ? '💬 SMS' : '📧 Email'}
                           </Badge>
                         </td>
-                        <td className="table-cell">
-                          {campaign.subject_line || 'SMS Campaign'}
+                        <td className="table-cell" style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {campaign.channel === 'sms'
+                            ? campaign.sms_body || 'SMS Campaign'
+                            : campaign.subject_line || '—'}
                         </td>
                         <td className="table-cell">{getStatusBadge(campaign.status)}</td>
                         <td className="table-cell text-text-secondary">

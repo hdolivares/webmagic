@@ -91,13 +91,25 @@ class SMSCampaignHelper:
             logger.info(
                 f"Sending SMS campaign {campaign.id} to {campaign.recipient_phone}"
             )
-            
+
             result = await sms_sender.send(
                 to_phone=campaign.recipient_phone,
                 body=campaign.sms_body,
                 status_callback=callback_url
             )
-            
+
+            # Validate Telnyx accepted and returned a message ID.
+            # Without a message_id we can never match the delivery webhook.
+            message_id = result.get("message_id")
+            if not message_id:
+                raise ExternalAPIException(
+                    "Telnyx returned no message_id despite a 2xx response — "
+                    "cannot track delivery status"
+                )
+
+            # cost is always None in the initial response; arrives via webhook
+            cost = result.get("cost")  # May be None — that is expected
+
             # Update campaign with success data
             await db.execute(
                 update(Campaign)
@@ -106,12 +118,12 @@ class SMSCampaignHelper:
                     status="sent",
                     sent_at=datetime.utcnow(),
                     sms_provider=result.get("provider"),
-                    sms_sid=result.get("message_id"),
+                    sms_sid=message_id,
                     sms_segments=result.get("segments", 1),
-                    sms_cost=result.get("cost")
+                    sms_cost=cost,  # None is fine; webhook will fill this in
                 )
             )
-            
+
             # Store outbound message in sms_messages table
             outbound_message = SMSMessage.create_outbound(
                 to_phone=campaign.recipient_phone,
@@ -119,22 +131,20 @@ class SMSCampaignHelper:
                 body=campaign.sms_body,
                 campaign_id=campaign.id,
                 business_id=campaign.business_id,
-                telnyx_message_id=result.get("message_id")
+                telnyx_message_id=message_id
             )
             outbound_message.status = "sent"
             outbound_message.segments = result.get("segments", 1)
-            outbound_message.cost = result.get("cost")
+            outbound_message.cost = cost
             db.add(outbound_message)
-            
+
             await db.commit()
-            
-            # CRM Integration: Update business contact status
-            # Note: SMS status will be updated to "delivered" by Twilio webhook
-            # Here we just mark it as sent (pending → sms_sent happens on delivery)
+
+            # CRM Integration: mark as sent (pending → sms_sent).
+            # Final status (delivered / failed) is updated by the Telnyx webhook.
             if campaign.business_id:
                 lifecycle_service = BusinessLifecycleService(db)
                 try:
-                    # Mark as sent - will be updated to delivered/failed by webhook
                     await lifecycle_service.mark_campaign_sent(
                         campaign.business_id,
                         channel="sms"
@@ -142,26 +152,27 @@ class SMSCampaignHelper:
                     await db.commit()
                     logger.info(
                         f"Updated business {campaign.business_id}: "
-                        f"contact_status=sms_sent (SMS queued at Twilio)"
+                        f"contact_status=sms_sent (SMS queued at Telnyx)"
                     )
                 except Exception as e:
                     logger.error(
                         f"Error updating CRM status for business {campaign.business_id}: {e}",
                         exc_info=True
                     )
-                    # Don't fail the campaign - SMS was already sent
+                    # Don't fail the campaign — SMS was already sent
             else:
                 logger.warning(
                     f"Campaign {campaign.id} has no business_id for CRM tracking"
                 )
-            
+
+            cost_display = f"${cost:.4f}" if cost is not None else "pending webhook"
             logger.info(
                 f"SMS campaign {campaign.id} sent successfully "
-                f"(SID: {result.get('message_id')}, "
-                f"segments: {result.get('segments')}, "
-                f"cost: ${result.get('cost', 0):.4f})"
+                f"(SID: {message_id}, "
+                f"segments: {result.get('segments', 1)}, "
+                f"cost: {cost_display})"
             )
-            
+
             return True
         
         except ExternalAPIException as e:

@@ -16,32 +16,40 @@ class CampaignCreate(BaseModel):
 
 
 class CampaignResponse(BaseModel):
-    """Campaign response schema."""
+    """Campaign response schema (supports email + SMS campaigns)."""
     id: UUID
     business_id: UUID
-    site_id: Optional[UUID]
-    subject_line: str
-    preview_text: Optional[str]
-    recipient_email: str
-    business_name: Optional[str]
+    site_id: Optional[UUID] = None
+    channel: str = "email"
+    # Email-only fields (None for SMS campaigns)
+    subject_line: Optional[str] = None
+    preview_text: Optional[str] = None
+    recipient_email: Optional[str] = None
+    # SMS-only fields (None for email campaigns)
+    recipient_phone: Optional[str] = None
+    sms_body: Optional[str] = None
+    sms_cost: Optional[float] = None
+    # Common fields
+    business_name: Optional[str] = None
+    recipient_name: Optional[str] = None
     status: str
-    variant: Optional[str]
-    sent_at: Optional[datetime]
-    delivered_at: Optional[datetime]
-    opened_at: Optional[datetime]
-    opened_count: int
-    clicked_at: Optional[datetime]
-    clicked_count: int
-    replied_at: Optional[datetime]
-    converted_at: Optional[datetime]
-    email_provider: Optional[str]
-    error_message: Optional[str]
-    retry_count: int
+    variant: Optional[str] = None
+    sent_at: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
+    opened_at: Optional[datetime] = None
+    opened_count: int = 0
+    clicked_at: Optional[datetime] = None
+    clicked_count: int = 0
+    replied_at: Optional[datetime] = None
+    converted_at: Optional[datetime] = None
+    email_provider: Optional[str] = None
+    error_message: Optional[str] = None
+    retry_count: int = 0
     created_at: datetime
     updated_at: datetime
     is_delivered: bool
     is_engaged: bool
-    
+
     class Config:
         from_attributes = True
 

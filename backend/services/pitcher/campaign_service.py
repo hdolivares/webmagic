@@ -172,11 +172,37 @@ class CampaignService:
         
         # Get business
         business = await self._get_business(business_id)
-        
+
         # Determine channel based on available contact methods
         selected_channel = self._select_channel(channel, business)
-        
-        # Get site URL if provided
+
+        # Auto-resolve site_id from the business's most recent completed site
+        # when the caller doesn't supply one (e.g. bulk campaign creation from UI).
+        if not site_id:
+            site_result = await self.db.execute(
+                select(GeneratedSite)
+                .where(
+                    and_(
+                        GeneratedSite.business_id == business_id,
+                        GeneratedSite.status == "completed"
+                    )
+                )
+                .order_by(GeneratedSite.created_at.desc())
+                .limit(1)
+            )
+            resolved_site = site_result.scalar_one_or_none()
+            if resolved_site:
+                site_id = resolved_site.id
+                logger.info(
+                    f"Auto-resolved site_id {site_id} for business {business_id}"
+                )
+            else:
+                logger.warning(
+                    f"No completed site found for business {business_id} — "
+                    "SMS will use [creating...] placeholder"
+                )
+
+        # Get site URL (short link preferred, long URL as fallback)
         site_url = await self._get_site_url(site_id) if site_id else None
         
         # Create campaign based on selected channel
