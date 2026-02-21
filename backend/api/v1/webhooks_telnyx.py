@@ -33,7 +33,7 @@ _settings = get_settings()
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/telnyx", tags=["Telnyx Webhooks"])
+router = APIRouter(prefix="/webhooks/telnyx", tags=["Telnyx Webhooks"])
 
 
 async def _notify_admin_reply(
