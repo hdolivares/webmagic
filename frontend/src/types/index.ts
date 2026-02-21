@@ -172,18 +172,36 @@ export interface PromptSettingUpdate {
 
 export interface Campaign {
   id: string
-  site_id: string
   business_id?: string
-  subject_line: string
-  email_body: string
-  recipient_email: string
+  site_id?: string
+  channel: string
+  // Email-only (null for SMS)
+  subject_line?: string
+  email_body?: string
+  preview_text?: string
+  recipient_email?: string
+  // SMS-only (null for email)
+  recipient_phone?: string
+  sms_body?: string
+  sms_cost?: number
+  // Common
+  business_name?: string
   recipient_name?: string
-  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed' | 'opened' | 'clicked'
+  status: string
+  variant?: string
   sent_at?: string
+  delivered_at?: string
   opened_at?: string
+  opened_count: number
   clicked_at?: string
+  clicked_count: number
+  replied_at?: string
+  converted_at?: string
+  email_provider?: string
   error_message?: string
-  tracking_pixel_id?: string
+  retry_count: number
+  is_delivered: boolean
+  is_engaged: boolean
   created_at: string
   updated_at: string
 }
@@ -199,8 +217,22 @@ export interface CreateCampaignRequest {
 export interface CampaignListResponse {
   campaigns: Campaign[]
   total: number
-  skip: number
-  limit: number
+  page: number
+  page_size: number
+  pages: number
+}
+
+export interface CampaignStats {
+  total_campaigns: number
+  by_status: Record<string, number>
+  sent_24h: number
+  total_sent: number
+  total_opened: number
+  total_clicked: number
+  total_replied: number
+  open_rate: number
+  click_rate: number
+  reply_rate: number
 }
 
 // ============================================

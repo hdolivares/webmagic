@@ -34,7 +34,7 @@ fi
 echo ""
 
 echo "🔄 Step 3: Restarting services..."
-sudo supervisorctl restart webmagic-api
+sudo supervisorctl restart all
 sleep 3
 echo "${GREEN}✅ Services restarted${NC}"
 echo ""

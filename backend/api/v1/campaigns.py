@@ -36,7 +36,8 @@ from services.system_settings_service import SystemSettingsService
 from models.user import AdminUser
 from models.business import Business
 from models.site import GeneratedSite
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, not_
+from models.campaign import Campaign as CampaignModel
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
@@ -188,8 +189,19 @@ async def get_ready_businesses(
     Returns plain JSON (no response_model) to avoid Pydantic V2 response validation issues.
     """
     from fastapi.responses import JSONResponse
-    
+
     from sqlalchemy import or_
+
+    # Subquery: business IDs that already have an active campaign
+    # (exclude failed/bounced so they can be retried)
+    already_contacted = (
+        select(CampaignModel.business_id)
+        .where(
+            CampaignModel.status.not_in(["failed", "bounced"])
+        )
+        .scalar_subquery()
+    )
+
     result = await db.execute(
         select(Business, GeneratedSite)
         .join(GeneratedSite, GeneratedSite.business_id == Business.id)
@@ -205,7 +217,8 @@ async def get_ready_businesses(
                     Business.rating >= 4.0,
                 ),
                 GeneratedSite.status == 'completed',
-                Business.country == 'US'  # SMS integration only works for US
+                Business.country == 'US',  # SMS integration only works for US
+                not_(Business.id.in_(already_contacted)),  # Skip already-contacted businesses
             )
         )
         .order_by(GeneratedSite.created_at.desc())

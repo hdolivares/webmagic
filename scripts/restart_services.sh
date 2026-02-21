@@ -1,40 +1,41 @@
 #!/bin/bash
 #
 # Restart All WebMagic Services
-# 
-# This script safely restarts all WebMagic backend services by:
-# 1. Gracefully stopping all services in reverse dependency order
-# 2. Waiting to ensure clean shutdown
-# 3. Starting services in correct dependency order with health checks
 #
-# Usage: ./scripts/restart_services.sh
+# Usage: sudo ./scripts/restart_services.sh
 #
-
-set -e
-
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Colors
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
+
+if [ "$EUID" -ne 0 ]; then
+    echo -e "${RED}❌ Error: This script must be run as root or with sudo${NC}"
+    echo "   Usage: sudo ./scripts/restart_services.sh"
+    exit 1
+fi
 
 echo ""
 echo -e "${BLUE}♻️  Restarting WebMagic Services${NC}"
 echo "=================================="
 echo ""
 
-# Stop services
-bash "$SCRIPT_DIR/stop_services.sh"
-
-echo ""
-echo "⏳ Waiting 3 seconds for clean shutdown..."
+supervisorctl restart all
 sleep 3
-echo ""
 
-# Start services
-bash "$SCRIPT_DIR/start_services.sh"
+echo ""
+echo "=================================="
+echo "📊 Final Status:"
+echo "=================================="
+supervisorctl status | grep webmagic
 
 echo ""
 echo -e "${GREEN}✅ Restart complete!${NC}"
-
+echo ""
+echo -e "${YELLOW}💡 Check logs with:${NC}"
+echo "   supervisorctl tail -f webmagic-api stderr"
+echo "   supervisorctl tail -f webmagic-celery stderr"
+echo "   supervisorctl tail -f webmagic-celery-beat stderr"

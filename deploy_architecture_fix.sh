@@ -101,16 +101,17 @@ echo ""
 echo -e "${BLUE}Step 6: Restart services${NC}"
 echo "------------------------"
 
-supervisorctl restart webmagic-api
-sleep 2
+supervisorctl restart all
+sleep 3
 
-API_STATUS=$(supervisorctl status webmagic-api | grep -c RUNNING || echo "0")
+ALL_RUNNING=$(supervisorctl status | grep -c RUNNING || echo "0")
 
-if [ "$API_STATUS" -eq 1 ]; then
-    echo -e "${GREEN}✓${NC} API restarted successfully"
+if [ "$ALL_RUNNING" -ge 3 ]; then
+    echo -e "${GREEN}✓${NC} All services restarted successfully"
 else
-    echo -e "${RED}ERROR: API failed to start${NC}"
-    echo "Check logs: tail -f /var/log/webmagic/api.log"
+    echo -e "${RED}ERROR: One or more services failed to start${NC}"
+    supervisorctl status
+    echo "Check logs: supervisorctl tail -100 webmagic-api stderr"
     exit 1
 fi
 
