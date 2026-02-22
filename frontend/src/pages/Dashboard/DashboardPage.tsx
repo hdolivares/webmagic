@@ -39,19 +39,19 @@ export const DashboardPage = () => {
     },
     {
       label: 'Campaigns Sent',
-      value: campaignStats?.sent || 0,
+      value: campaignStats?.total_sent || 0,
       icon: Mail,
       color: 'info',
     },
     {
       label: 'Open Rate',
-      value: `${((campaignStats?.open_rate || 0) * 100).toFixed(1)}%`,
+      value: `${(campaignStats?.open_rate || 0).toFixed(1)}%`,
       icon: TrendingUp,
       color: 'warning',
     },
     {
       label: 'Click Rate',
-      value: `${((campaignStats?.click_rate || 0) * 100).toFixed(1)}%`,
+      value: `${(campaignStats?.click_rate || 0).toFixed(1)}%`,
       icon: Globe,
       color: 'secondary',
     },
