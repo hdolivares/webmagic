@@ -515,14 +515,7 @@ class ApiClient {
     return response.data
   }
 
-  async getCampaignStats(): Promise<{
-    total: number
-    sent: number
-    opened: number
-    clicked: number
-    open_rate: number
-    click_rate: number
-  }> {
+  async getCampaignStats(): Promise<import('@/types').CampaignStats> {
     const response = await this.client.get('/campaigns/stats')
     return response.data
   }
