@@ -527,8 +527,8 @@ class ApiClient {
   /**
    * Get businesses ready for campaigns (with completed sites)
    */
-  async getReadyBusinesses(): Promise<ReadyBusinessesResponse> {
-    const response = await this.client.get<ReadyBusinessesResponse>('/campaigns/ready-businesses')
+  async getReadyBusinesses(params?: { include_contacted?: boolean }): Promise<ReadyBusinessesResponse> {
+    const response = await this.client.get<ReadyBusinessesResponse>('/campaigns/ready-businesses', { params })
     return response.data
   }
 

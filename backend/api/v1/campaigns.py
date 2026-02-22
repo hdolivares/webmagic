@@ -36,7 +36,7 @@ from services.system_settings_service import SystemSettingsService
 from models.user import AdminUser
 from models.business import Business
 from models.site import GeneratedSite
-from sqlalchemy import select, and_, not_
+from sqlalchemy import select, and_, not_, func
 from models.campaign import Campaign as CampaignModel
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
@@ -173,56 +173,94 @@ async def get_campaign_stats(
 # Static paths MUST be declared before /{campaign_id} or "ready-businesses" is matched as campaign_id (422)
 @router.get("/ready-businesses")
 async def get_ready_businesses(
+    include_contacted: bool = Query(False, description="Include businesses that already have active campaigns"),
     db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_user)
 ):
     """
     Get businesses with completed generated sites ready for campaigns.
-    
+
     Returns businesses that:
     - Have a completed generated site
     - Don't already have an existing website (triple_verified or confirmed_no_website)
     - Rating >= 4.0 (or unrated — good-review businesses only)
     - Have at least one contact method (email or phone)
     - Are located in the United States (US only - SMS integration limitation)
-    
+
+    By default excludes businesses with active campaigns. Pass include_contacted=true
+    to show all businesses (with their last campaign status) for re-sending.
+
     Returns plain JSON (no response_model) to avoid Pydantic V2 response validation issues.
     """
     from fastapi.responses import JSONResponse
-
     from sqlalchemy import or_
 
-    # Subquery: business IDs that already have an active campaign
-    # (exclude failed/bounced so they can be retried)
-    already_contacted = (
-        select(CampaignModel.business_id)
-        .where(
-            CampaignModel.status.not_in(["failed", "bounced"])
-        )
-        .scalar_subquery()
+    # Base qualification conditions
+    base_conditions = and_(
+        or_(
+            Business.website_validation_status == 'triple_verified',
+            Business.website_validation_status == 'confirmed_no_website',
+        ),
+        Business.website_url.is_(None),
+        or_(
+            Business.rating.is_(None),
+            Business.rating >= 4.0,
+        ),
+        GeneratedSite.status == 'completed',
+        Business.country == 'US',
     )
+
+    if not include_contacted:
+        # Subquery: business IDs that already have an active campaign
+        # (failed/bounced are still retryable so they're excluded from the "contacted" set)
+        already_contacted = (
+            select(CampaignModel.business_id)
+            .where(CampaignModel.status.not_in(["failed", "bounced"]))
+            .scalar_subquery()
+        )
+        conditions = and_(base_conditions, not_(Business.id.in_(already_contacted)))
+    else:
+        conditions = base_conditions
 
     result = await db.execute(
         select(Business, GeneratedSite)
         .join(GeneratedSite, GeneratedSite.business_id == Business.id)
-        .where(
-            and_(
-                or_(
-                    Business.website_validation_status == 'triple_verified',
-                    Business.website_validation_status == 'confirmed_no_website',
-                ),
-                Business.website_url.is_(None),
-                or_(
-                    Business.rating.is_(None),
-                    Business.rating >= 4.0,
-                ),
-                GeneratedSite.status == 'completed',
-                Business.country == 'US',  # SMS integration only works for US
-                not_(Business.id.in_(already_contacted)),  # Skip already-contacted businesses
-            )
-        )
+        .where(conditions)
         .order_by(GeneratedSite.created_at.desc())
     )
+
+    # Fetch latest campaign status for each business in one query
+    business_ids_in_result = [row[0].id for row in result.all()]
+
+    # Re-execute to get the actual rows (result was consumed above)
+    result = await db.execute(
+        select(Business, GeneratedSite)
+        .join(GeneratedSite, GeneratedSite.business_id == Business.id)
+        .where(conditions)
+        .order_by(GeneratedSite.created_at.desc())
+    )
+
+    # Latest campaign per business (status + sent_at)
+    campaign_rows = await db.execute(
+        select(
+            CampaignModel.business_id,
+            CampaignModel.status,
+            CampaignModel.sent_at,
+            CampaignModel.channel,
+        )
+        .where(CampaignModel.business_id.in_(business_ids_in_result))
+        .order_by(CampaignModel.business_id, CampaignModel.created_at.desc())
+        .distinct(CampaignModel.business_id)
+    ) if business_ids_in_result else None
+
+    last_campaign: dict = {}
+    if campaign_rows:
+        for row in campaign_rows.all():
+            last_campaign[str(row.business_id)] = {
+                "status": row.status,
+                "sent_at": row.sent_at.isoformat() if row.sent_at else None,
+                "channel": row.channel,
+            }
     
     businesses_with_sites = result.all()
     ready_businesses = []
@@ -230,7 +268,8 @@ async def get_ready_businesses(
     with_phone = 0
     sms_only = 0
     email_only = 0
-    
+    already_contacted_count = 0
+
     for business, site in businesses_with_sites:
         has_email = bool(business.email)
         has_phone = bool(business.phone)
@@ -249,6 +288,11 @@ async def get_ready_businesses(
             sms_only += 1
         recommended_channel = "email" if has_email else "sms"
         site_url = f"https://sites.lavish.solutions/{site.subdomain}"
+
+        campaign_info = last_campaign.get(str(business.id))
+        if campaign_info:
+            already_contacted_count += 1
+
         ready_businesses.append({
             "id": str(business.id),
             "name": business.name or "",
@@ -267,6 +311,9 @@ async def get_ready_businesses(
             "site_created_at": site.created_at.isoformat() if site.created_at else None,
             "available_channels": available_channels,
             "recommended_channel": recommended_channel,
+            "last_campaign_status": campaign_info["status"] if campaign_info else None,
+            "last_campaign_at": campaign_info["sent_at"] if campaign_info else None,
+            "last_campaign_channel": campaign_info["channel"] if campaign_info else None,
         })
     
     return JSONResponse(content={
@@ -276,6 +323,7 @@ async def get_ready_businesses(
         "with_phone": with_phone,
         "sms_only": sms_only,
         "email_only": email_only,
+        "already_contacted": already_contacted_count,
     })
 
 

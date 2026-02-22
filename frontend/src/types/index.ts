@@ -257,6 +257,10 @@ export interface ReadyBusiness {
   site_created_at: string
   available_channels: string[]
   recommended_channel: string
+  // Campaign history (null if never contacted)
+  last_campaign_status?: string | null
+  last_campaign_at?: string | null
+  last_campaign_channel?: string | null
 }
 
 export interface ReadyBusinessesResponse {
@@ -266,6 +270,7 @@ export interface ReadyBusinessesResponse {
   with_phone: number
   sms_only: number
   email_only: number
+  already_contacted: number
 }
 
 export interface SMSPreviewRequest {

@@ -17,9 +17,24 @@ interface ReadyBusinessesPanelProps {
   onSelectionChange: (selectedIds: string[]) => void
   onBusinessClick?: (business: ReadyBusiness) => void
   isLoading: boolean
+  showContacted: boolean
+  onToggleContacted: () => void
+  alreadyContactedCount: number
 }
 
 type FilterType = 'all' | 'sms_only' | 'email_only' | 'both'
+
+const CAMPAIGN_STATUS_COLORS: Record<string, string> = {
+  delivered: '#16a34a',
+  sent: '#2563eb',
+  pending: '#d97706',
+  scheduled: '#7c3aed',
+  failed: '#dc2626',
+  bounced: '#dc2626',
+  opened: '#0891b2',
+  clicked: '#0891b2',
+  replied: '#16a34a',
+}
 
 /**
  * ReadyBusinessesPanel - Select businesses for campaign creation
@@ -31,6 +46,9 @@ export const ReadyBusinessesPanel: React.FC<ReadyBusinessesPanelProps> = ({
   onSelectionChange,
   onBusinessClick,
   isLoading,
+  showContacted,
+  onToggleContacted,
+  alreadyContactedCount,
 }) => {
   const [filter, setFilter] = useState<FilterType>('all')
 
@@ -136,7 +154,26 @@ export const ReadyBusinessesPanel: React.FC<ReadyBusinessesPanelProps> = ({
         <h3 className="campaigns-card__title">
           Ready for Campaigns ({filteredBusinesses.length})
         </h3>
-        <div style={{ display: 'flex', gap: 'var(--campaigns-spacing-sm)' }}>
+        <div style={{ display: 'flex', gap: 'var(--campaigns-spacing-sm)', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={onToggleContacted}
+            title={showContacted ? 'Hide already-contacted businesses' : `Show ${alreadyContactedCount} already-contacted`}
+            style={{
+              padding: '0.375rem 0.625rem',
+              fontSize: '0.7rem',
+              borderRadius: 'var(--campaigns-radius-md)',
+              border: '1px solid var(--color-border-primary)',
+              background: showContacted ? '#fef3c7' : 'transparent',
+              color: showContacted ? '#92400e' : 'var(--color-text-secondary)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+            }}
+          >
+            {showContacted ? '✓ Showing contacted' : `+ ${alreadyContactedCount} contacted`}
+          </button>
           <button
             type="button"
             className="campaigns-button campaigns-button--secondary"
@@ -295,6 +332,8 @@ interface BusinessItemProps {
 }
 
 const BusinessItem: React.FC<BusinessItemProps> = ({ business, isSelected, isPreviewing, onToggle, onClick }) => {
+  const campaignStatus = business.last_campaign_status
+  const statusColor = campaignStatus ? (CAMPAIGN_STATUS_COLORS[campaignStatus] ?? '#6b7280') : null
   const handleClick = (e: React.MouseEvent) => {
     // If clicking the checkbox area, toggle selection
     if ((e.target as HTMLElement).closest('.business-item__checkbox')) {
@@ -348,6 +387,22 @@ const BusinessItem: React.FC<BusinessItemProps> = ({ business, isSelected, isPre
           {business.email && (
             <span className="business-item__badge business-item__badge--email">
               📧 Email
+            </span>
+          )}
+          {/* Last campaign status badge */}
+          {campaignStatus && statusColor && (
+            <span style={{
+              fontSize: '0.65rem',
+              padding: '0.1rem 0.4rem',
+              borderRadius: '9999px',
+              background: `${statusColor}18`,
+              color: statusColor,
+              border: `1px solid ${statusColor}40`,
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.03em',
+            }}>
+              {campaignStatus}
             </span>
           )}
         </div>
