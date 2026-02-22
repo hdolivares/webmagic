@@ -17,6 +17,8 @@ from core.database import get_db_session_sync, AsyncSessionLocal
 from models.business import Business
 from models.site import GeneratedSite
 from services.creative.orchestrator import CreativeOrchestrator
+from services.sms.number_lookup import NumberLookupService
+from services.sms.phone_validator import PhoneValidator
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +120,48 @@ def generate_site_for_business(self, business_id: str):
                         "website_url": business.website_url
                     }
                 
+                # ── Phone line-type check ─────────────────────────────────────
+                # Run before Claude to avoid wasting tokens on businesses we
+                # can never reach. Skips ONLY when phone is the sole contact
+                # method and it's a definitively non-SMS line type.
+                # Businesses with email can still get a site for email outreach.
+                if business.phone and business.phone_line_type is None:
+                    is_valid, formatted_phone, _ = PhoneValidator.validate_and_format(
+                        business.phone
+                    )
+                    if is_valid:
+                        lookup = await NumberLookupService().lookup(formatted_phone)
+                        business.phone_line_type = lookup.line_type
+                        business.phone_lookup_at = datetime.utcnow()
+                        await db.flush()
+                        logger.info(
+                            "Phone lookup for %s (%s): %s — sms_capable=%s",
+                            business.name, formatted_phone,
+                            lookup.line_type, lookup.is_sms_capable,
+                        )
+
+                # If the phone is blocked AND there is no email, skip generation.
+                # (Email-only path still gets a site; no-contact businesses are useless.)
+                _blocked_types = {"landline", "toll_free", "premium_rate"}
+                if (
+                    business.phone_line_type in _blocked_types
+                    and not business.email
+                ):
+                    logger.info(
+                        "Skipping site generation for %s — %s phone, no email",
+                        business.name, business.phone_line_type,
+                    )
+                    business.website_status = "ineligible"
+                    business.generation_queued_at = None
+                    await db.commit()
+                    return {
+                        "status": "skipped",
+                        "reason": "landline_no_email",
+                        "business_id": business_id,
+                        "line_type": business.phone_line_type,
+                    }
+                # ─────────────────────────────────────────────────────────────
+
                 # Mark generation as started
                 business.generation_started_at = datetime.utcnow()
                 business.website_status = 'generating'

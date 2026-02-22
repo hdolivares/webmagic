@@ -27,6 +27,8 @@ export const CampaignsPage: React.FC = () => {
   const [selectedBusinessIds, setSelectedBusinessIds] = useState<string[]>([])
   // Business clicked for message preview (show SMS preview in right panel)
   const [previewBusiness, setPreviewBusiness] = useState<ReadyBusiness | null>(null)
+  // Whether to include already-contacted businesses in the list
+  const [showContacted, setShowContacted] = useState(false)
 
   // Fetch ready businesses (with completed sites)
   const {
@@ -34,8 +36,8 @@ export const CampaignsPage: React.FC = () => {
     isLoading: isLoadingReady,
     refetch: refetchReady,
   } = useQuery({
-    queryKey: ['campaigns-ready-businesses'],
-    queryFn: () => api.getReadyBusinesses(),
+    queryKey: ['campaigns-ready-businesses', showContacted],
+    queryFn: () => api.getReadyBusinesses({ include_contacted: showContacted }),
   })
 
   // Fetch existing campaigns
@@ -247,6 +249,9 @@ export const CampaignsPage: React.FC = () => {
           onSelectionChange={setSelectedBusinessIds}
           onBusinessClick={handleBusinessClick}
           isLoading={isLoadingReady}
+          showContacted={showContacted}
+          onToggleContacted={() => setShowContacted(v => !v)}
+          alreadyContactedCount={readyData?.already_contacted ?? 0}
         />
 
         {/* Right: Campaign Creator + Message Preview (2/3 width) */}
