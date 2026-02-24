@@ -83,6 +83,7 @@ class CheckoutSession(Base):
     # Abandoned Cart Recovery
     reminder_sent_at = Column(DateTime(timezone=True), nullable=True, index=True)
     reminder_discount_code = Column(String(100), nullable=True)
+    recurrente_coupon_id = Column(String(255), nullable=True, index=True)
     
     # Analytics Metadata
     user_agent = Column(String(500), nullable=True)

@@ -413,7 +413,7 @@ class EmailService:
                                 <tr>
                                     <td style="background: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
                                         <p style="margin: 0 0 10px; font-size: 14px; color: #6b7280;">
-                                            This discount expires in <strong>48 hours</strong>. Don't miss out!
+                                            This discount expires in <strong>24 hours</strong>. Don't miss out!
                                         </p>
                                         <p style="margin: 0; font-size: 12px; color: #9ca3af;">
                                             © 2026 WebMagic by Lavish Solutions. All rights reserved.

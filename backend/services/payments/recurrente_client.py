@@ -17,7 +17,8 @@ from services.payments.recurrente_models import (
     CheckoutResponse,
     CheckoutItem,
     RecurrenteUser,
-    RecurrenteUserResponse
+    RecurrenteUserResponse,
+    RecurrenteCouponResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -369,9 +370,59 @@ class RecurrenteClient:
         """List users."""
         params = {"limit": limit, "offset": offset}
         return await self._request("GET", "/users", params=params)
-    
+
+    # ========================================
+    # COUPONS
+    # ========================================
+
+    async def create_coupon(
+        self,
+        name: str,
+        percent_off: int,
+        duration: Literal["once", "forever"] = "once",
+        expires_at: Optional[str] = None,
+        max_redemptions: Optional[int] = 1,
+        currency: Optional[str] = None,
+        amount_off_in_cents: Optional[int] = None,
+    ) -> RecurrenteCouponResponse:
+        """
+        Create a Recurrente coupon (POST /api/coupons).
+
+        Used for abandoned-cart recovery: 10% off, duration "once", max_redemptions 1,
+        optional expires_at (ISO 8601) for 24h validity.
+
+        Args:
+            name: Coupon code (e.g. SAVE10-BODYCAxy) — customer enters this at checkout.
+            percent_off: Discount percentage (e.g. 10 for 10%).
+            duration: "once" (first payment only) or "forever".
+            expires_at: Optional ISO 8601 datetime when coupon expires.
+            max_redemptions: Max uses (e.g. 1 for single-use).
+            currency: Required if using amount_off_in_cents.
+            amount_off_in_cents: Fixed amount off instead of percent_off.
+
+        Returns:
+            RecurrenteCouponResponse with id, name, status, etc.
+        """
+        payload = {
+            "coupon": {
+                "name": name,
+                "percent_off": percent_off,
+                "duration": duration,
+            }
+        }
+        if max_redemptions is not None:
+            payload["coupon"]["max_redemptions"] = max_redemptions
+        if expires_at is not None:
+            payload["coupon"]["expires_at"] = expires_at
+        if currency is not None:
+            payload["coupon"]["currency"] = currency
+        if amount_off_in_cents is not None:
+            payload["coupon"]["amount_off_in_cents"] = amount_off_in_cents
+        response = await self._request("POST", "/api/coupons", data=payload)
+        return RecurrenteCouponResponse(**response)
+
     # Subscriptions
-    
+
     async def get_subscription(self, subscription_id: str) -> Dict[str, Any]:
         """Get subscription details."""
         return await self._request("GET", f"/subscriptions/{subscription_id}")
