@@ -1,10 +1,27 @@
 """
 Campaign schemas for API validation.
 """
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from typing import Optional, List
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+from typing import Optional, List, Any
 from datetime import datetime
 from uuid import UUID
+
+
+def _coerce_optional_str(v: Any) -> Optional[str]:
+    """Coerce value to str or None for optional string fields (ORM may return non-str)."""
+    if v is None:
+        return None
+    return str(v) if not isinstance(v, str) else v
+
+
+def _coerce_optional_float(v: Any) -> Optional[float]:
+    """Coerce value to float or None (e.g. Decimal from DB)."""
+    if v is None:
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
 
 
 class CampaignCreate(BaseModel):
@@ -52,6 +69,29 @@ class CampaignResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+    # Coerce optional string/numeric fields from ORM (e.g. None, Decimal, non-str) to avoid ValidationError
+    @field_validator(
+        "recipient_email",
+        "recipient_phone",
+        "subject_line",
+        "preview_text",
+        "business_name",
+        "recipient_name",
+        "sms_body",
+        "variant",
+        "email_provider",
+        "error_message",
+        mode="before",
+    )
+    @classmethod
+    def coerce_optional_str_fields(cls, v: Any) -> Optional[str]:
+        return _coerce_optional_str(v)
+
+    @field_validator("sms_cost", mode="before")
+    @classmethod
+    def coerce_sms_cost(cls, v: Any) -> Optional[float]:
+        return _coerce_optional_float(v)
 
 
 class CampaignDetailResponse(CampaignResponse):

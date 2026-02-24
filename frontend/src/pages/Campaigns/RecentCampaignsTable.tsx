@@ -121,7 +121,16 @@ export const RecentCampaignsTable: React.FC<RecentCampaignsTableProps> = ({
                     ? (campaign.sms_body ?? 'SMS Campaign')
                     : (campaign.subject_line ?? '—')}
                 </td>
-                <td className="table-cell">{getStatusBadge(campaign.status)}</td>
+                <td className="table-cell">
+                  <div className="campaigns-table__status-cell">
+                    {getStatusBadge(campaign.status)}
+                    {campaign.status === 'failed' && campaign.error_message && (
+                      <p className="campaigns-table__error-message" title={campaign.error_message}>
+                        {campaign.error_message}
+                      </p>
+                    )}
+                  </div>
+                </td>
                 <td className="table-cell text-text-secondary">
                   {campaign.sent_at
                     ? new Date(campaign.sent_at).toLocaleDateString()

@@ -109,6 +109,7 @@ class SMSCampaignHelper:
 
             # cost is always None in the initial response; arrives via webhook
             cost = result.get("cost")  # May be None — that is expected
+            segments = result.get("segments") if result.get("segments") is not None else 1  # avoid None for formatting/logging
 
             # Update campaign with success data
             await db.execute(
@@ -119,22 +120,23 @@ class SMSCampaignHelper:
                     sent_at=datetime.utcnow(),
                     sms_provider=result.get("provider"),
                     sms_sid=message_id,
-                    sms_segments=result.get("segments", 1),
+                    sms_segments=segments,
                     sms_cost=cost,  # None is fine; webhook will fill this in
                 )
             )
 
             # Store outbound message in sms_messages table
+            from_phone = result.get("from") or settings.TELNYX_PHONE_NUMBER
             outbound_message = SMSMessage.create_outbound(
                 to_phone=campaign.recipient_phone,
-                from_phone=result.get("from", settings.TELNYX_PHONE_NUMBER),
+                from_phone=from_phone if from_phone else "",
                 body=campaign.sms_body,
                 campaign_id=campaign.id,
                 business_id=campaign.business_id,
                 telnyx_message_id=message_id
             )
             outbound_message.status = "sent"
-            outbound_message.segments = result.get("segments", 1)
+            outbound_message.segments = segments
             outbound_message.cost = cost
             db.add(outbound_message)
 
@@ -168,9 +170,7 @@ class SMSCampaignHelper:
             cost_display = f"${cost:.4f}" if cost is not None else "pending webhook"
             logger.info(
                 f"SMS campaign {campaign.id} sent successfully "
-                f"(SID: {message_id}, "
-                f"segments: {result.get('segments', 1)}, "
-                f"cost: {cost_display})"
+                f"(SID: {message_id}, segments: {segments}, cost: {cost_display})"
             )
 
             return True
