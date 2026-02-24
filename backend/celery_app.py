@@ -61,7 +61,7 @@ celery_app.conf.beat_schedule = {
     # Re-enabled: website detection pipeline is stable (ScrapingDog + LLM country check)
     "generate-sites": {
         "task": "tasks.generation_sync.generate_pending_sites",
-        "schedule": crontab(minute="*/5"),  # TEMP: every 5 min for image regen batch (revert to minute=0 after)
+        "schedule": crontab(minute=0),  # Top of every hour
     },
 
     # ── Stage 3: Auto-create campaigns for newly published sites ─────────────
