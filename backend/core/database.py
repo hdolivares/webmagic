@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from typing import AsyncGenerator
-from contextlib import contextmanager
+from contextlib import contextmanager, asynccontextmanager
 from .config import get_settings
 
 settings = get_settings()
@@ -93,6 +93,23 @@ async def init_db() -> None:
     """
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+@asynccontextmanager
+async def get_async_session():
+    """
+    Async context manager for database sessions (e.g. in Celery tasks that run async code).
+    Use: async with get_async_session() as db: ...
+    """
+    session = AsyncSessionLocal()
+    try:
+        yield session
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
+    finally:
+        await session.close()
 
 
 def get_db_session() -> AsyncSession:
