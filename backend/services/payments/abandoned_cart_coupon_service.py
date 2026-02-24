@@ -1,9 +1,9 @@
 """
 Abandoned cart coupon creation for Recurrente.
 
-Creates a single-use 10% coupon with a code derived from business name
-(business name capped at 6 chars + 2 random chars for deduplication).
-Duration "once" and max_redemptions 1 so it applies only to the first payment.
+Creates a single-use coupon: $49.70 off the first payment (10% of total first bill $497).
+Total first bill = $400 setup + $97 first month; 10% off = $49.70 applied to the setup payment.
+Customer pays $350.30 on step 1, then $97/month. One code, one application.
 """
 import logging
 import re
@@ -25,7 +25,9 @@ logger = logging.getLogger(__name__)
 COUPON_PREFIX = "SAVE10"
 BASE_LENGTH = 6
 RANDOM_LENGTH = 2
-PERCENT_OFF = 10
+# 10% of $497 (setup $400 + first month $97) = $49.70 off the first (setup) payment
+ABANDONED_CART_DISCOUNT_CENTS = 4970
+ABANDONED_CART_CURRENCY = "USD"
 
 
 def _sanitize_base(text: str, max_len: int = BASE_LENGTH) -> str:
@@ -61,33 +63,35 @@ async def create_abandoned_cart_coupon(
     session: CheckoutSession,
     db: AsyncSession,
     validity_hours: int,
+    business_name: Optional[str] = None,
 ) -> Tuple[str, Optional[str]]:
     """
     Create a Recurrente coupon for abandoned cart recovery.
 
-    Resolves business name from session.site_id -> Site -> Business.name.
-    Builds code SAVE10-{base6}{random2}, creates coupon with percent_off=10,
-    duration="once", max_redemptions=1, optional expires_at.
+    Creates coupon with $49.70 off the first (setup) payment, duration="once",
+    max_redemptions=1, optional expires_at.
 
     Returns:
         (discount_code, recurrente_coupon_id). coupon_id is None if Recurrente API fails.
     """
-    business_name: Optional[str] = None
-    if session.site_id:
-        site_result = await db.execute(select(Site).where(Site.id == session.site_id))
-        site = site_result.scalar_one_or_none()
-        if site and site.business_id:
-            biz_result = await db.execute(select(Business).where(Business.id == site.business_id))
-            business = biz_result.scalar_one_or_none()
-            if business and business.name:
-                business_name = business.name.strip()
+    if not business_name or not business_name.strip():
+        business_name = None
+        if session.site_id:
+            site_result = await db.execute(select(Site).where(Site.id == session.site_id))
+            site = site_result.scalar_one_or_none()
+            if site and site.business_id:
+                biz_result = await db.execute(select(Business).where(Business.id == site.business_id))
+                business = biz_result.scalar_one_or_none()
+                if business and business.name:
+                    business_name = business.name.strip()
     code = build_coupon_code(business_name, session.site_slug)
     expires_at = (datetime.now(timezone.utc) + timedelta(hours=validity_hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
     client = RecurrenteClient()
     try:
         coupon = await client.create_coupon(
             name=code,
-            percent_off=PERCENT_OFF,
+            amount_off_in_cents=ABANDONED_CART_DISCOUNT_CENTS,
+            currency=ABANDONED_CART_CURRENCY,
             duration="once",
             expires_at=expires_at,
             max_redemptions=1,

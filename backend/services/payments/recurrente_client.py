@@ -378,7 +378,7 @@ class RecurrenteClient:
     async def create_coupon(
         self,
         name: str,
-        percent_off: int,
+        percent_off: Optional[int] = None,
         duration: Literal["once", "forever"] = "once",
         expires_at: Optional[str] = None,
         max_redemptions: Optional[int] = 1,
@@ -386,38 +386,35 @@ class RecurrenteClient:
         amount_off_in_cents: Optional[int] = None,
     ) -> RecurrenteCouponResponse:
         """
-        Create a Recurrente coupon (POST /api/coupons).
+        Create a Recurrente coupon (POST /coupons).
 
-        Used for abandoned-cart recovery: 10% off, duration "once", max_redemptions 1,
-        optional expires_at (ISO 8601) for 24h validity.
+        Use either percent_off (e.g. 10 for 10%) or amount_off_in_cents + currency, not both.
+        When using amount_off_in_cents, currency is required and percent_off should be omitted.
 
         Args:
-            name: Coupon code (e.g. SAVE10-BODYCAxy) — customer enters this at checkout.
-            percent_off: Discount percentage (e.g. 10 for 10%).
+            name: Coupon code (e.g. SAVE10-BODYCAxy)
+            percent_off: Discount percentage (e.g. 10 for 10%). Omit when using amount_off_in_cents.
             duration: "once" (first payment only) or "forever".
             expires_at: Optional ISO 8601 datetime when coupon expires.
             max_redemptions: Max uses (e.g. 1 for single-use).
-            currency: Required if using amount_off_in_cents.
-            amount_off_in_cents: Fixed amount off instead of percent_off.
+            currency: Required when using amount_off_in_cents (e.g. "USD").
+            amount_off_in_cents: Fixed amount off in cents (e.g. 4970 for $49.70). Use instead of percent_off.
 
         Returns:
             RecurrenteCouponResponse with id, name, status, etc.
         """
-        payload = {
-            "coupon": {
-                "name": name,
-                "percent_off": percent_off,
-                "duration": duration,
-            }
-        }
+        payload = {"coupon": {"name": name, "duration": duration}}
+        if amount_off_in_cents is not None and currency:
+            payload["coupon"]["amount_off_in_cents"] = amount_off_in_cents
+            payload["coupon"]["currency"] = currency
+        elif percent_off is not None:
+            payload["coupon"]["percent_off"] = percent_off
+        else:
+            raise ValueError("Must provide either percent_off or (amount_off_in_cents and currency)")
         if max_redemptions is not None:
             payload["coupon"]["max_redemptions"] = max_redemptions
         if expires_at is not None:
             payload["coupon"]["expires_at"] = expires_at
-        if currency is not None:
-            payload["coupon"]["currency"] = currency
-        if amount_off_in_cents is not None:
-            payload["coupon"]["amount_off_in_cents"] = amount_off_in_cents
         # Base URL is already .../api, so endpoint must be /coupons (not /api/coupons)
         response = await self._request("POST", "/coupons", data=payload)
         # API may return percent_off as string "10.0"; coerce for our model
