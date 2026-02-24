@@ -31,7 +31,7 @@ _settings = get_settings()
 
 
 @shared_task(
-    name="tasks.check_abandoned_carts",
+    name="tasks.abandoned_cart_tasks.check_abandoned_carts",
     max_retries=3,
     default_retry_delay=300  # 5 minutes
 )
@@ -139,7 +139,7 @@ async def _process_abandoned_carts() -> Dict[str, int]:
         }
 
 
-@shared_task(name="tasks.cleanup_old_abandoned_carts")
+@shared_task(name="tasks.abandoned_cart_tasks.cleanup_old_abandoned_carts")
 def cleanup_old_abandoned_carts():
     """
     Cleanup task to archive very old abandoned carts.
