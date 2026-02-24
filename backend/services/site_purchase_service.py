@@ -121,6 +121,9 @@ class SitePurchaseService:
             business = biz_result.scalar_one_or_none()
             if business and business.name:
                 display_name = business.name.strip()
+        # Apply title case so ALL CAPS names read correctly in checkout
+        from core.text_utils import title_case
+        display_name = title_case(display_name) if (display_name and display_name.strip()) else (display_name or slug)
         shared_metadata = {
             "site_id": str(site.id),
             "site_slug": slug,

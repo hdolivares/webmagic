@@ -15,7 +15,7 @@ Date: February 14, 2026
 """
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from celery import shared_task
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +27,39 @@ from services.emails.email_service import get_email_service
 from services.payments.abandoned_cart_coupon_service import create_abandoned_cart_coupon
 
 logger = logging.getLogger(__name__)
+
+
+async def _get_business_name_for_site(db, site_slug: str, site_id=None) -> Optional[str]:
+    """
+    Resolve business name from site slug (sites table or generated_sites table).
+    Returns Business.name or None if not found.
+    """
+    from models.site_models import Site
+    from models.business import Business
+    from models.site import GeneratedSite
+
+    # Try sites table first (by slug or site_id)
+    if site_id:
+        site_result = await db.execute(select(Site).where(Site.id == site_id))
+    else:
+        site_result = await db.execute(select(Site).where(Site.slug == site_slug))
+    site = site_result.scalar_one_or_none()
+    if site and site.business_id:
+        biz_result = await db.execute(select(Business).where(Business.id == site.business_id))
+        biz = biz_result.scalar_one_or_none()
+        if biz and biz.name:
+            return biz.name
+    # Try generated_sites (subdomain = slug)
+    gen_result = await db.execute(
+        select(GeneratedSite).where(GeneratedSite.subdomain == site_slug)
+    )
+    gen_site = gen_result.scalar_one_or_none()
+    if gen_site and gen_site.business_id:
+        biz_result = await db.execute(select(Business).where(Business.id == gen_site.business_id))
+        biz = biz_result.scalar_one_or_none()
+        if biz and biz.name:
+            return biz.name
+    return None
 _settings = get_settings()
 
 
@@ -101,6 +134,10 @@ async def _process_abandoned_carts() -> Dict[str, int]:
                     session, db, validity_hours
                 )
 
+                business_name = await _get_business_name_for_site(
+                    db, session.site_slug, session.site_id
+                )
+
                 await email_service.send_abandoned_cart_email(
                     to_email=session.customer_email,
                     customer_name=session.customer_name,
@@ -109,6 +146,7 @@ async def _process_abandoned_carts() -> Dict[str, int]:
                     discount_code=discount_code,
                     purchase_amount=float(session.purchase_amount),
                     monthly_amount=float(session.monthly_amount),
+                    business_name=business_name,
                 )
 
                 session.reminder_sent_at = datetime.now(timezone.utc)
