@@ -95,7 +95,11 @@ class Settings(BaseSettings):
     
     # LLM Configuration for Website Validation
     LLM_MODEL: str = "claude-3-haiku-20240307"  # Fallback validation model (overridden by database settings)
-    
+
+    # Abandoned cart recovery
+    ABANDONED_CART_WINDOW_MINUTES: int = 15  # Treat checkout as abandoned after this many minutes
+    ABANDONED_CART_COUPON_VALIDITY_HOURS: int = 24  # Recurrente coupon expiry for recovery emails
+
     class Config:
         env_file = ".env"
         case_sensitive = True

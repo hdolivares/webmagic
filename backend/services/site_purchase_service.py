@@ -113,6 +113,14 @@ class SitePurchaseService:
         site_url = self.site_service.generate_site_url(slug)
         site_cancel_url = cancel_url or f"https://{settings.SITES_DOMAIN}/{slug}"
         site_title = site.site_title or slug
+        # Display name for Recurrente checkout (title/description): use business name when available
+        display_name = site_title
+        if site.business_id:
+            from models.business import Business
+            biz_result = await db.execute(select(Business).where(Business.id == site.business_id))
+            business = biz_result.scalar_one_or_none()
+            if business and business.name:
+                display_name = business.name.strip()
         shared_metadata = {
             "site_id": str(site.id),
             "site_slug": slug,
@@ -161,13 +169,13 @@ class SitePurchaseService:
 
         # Step 2 — subscription checkout (created FIRST so we have its URL)
         subscription_checkout = await self.recurrente.create_subscription_checkout(
-            name=f"Website Care Plan – {site_title}",
+            name=f"Website Care Plan – {display_name}",
             amount_cents=int(site.monthly_amount * 100),
             billing_interval="month",
             billing_interval_count=1,
             currency="USD",
             description=(
-                f"Monthly hosting, security, maintenance & content updates for {site_title}. "
+                f"Monthly hosting, security, maintenance & content updates for {display_name}. "
                 f"Keeps your site fast, secure, and continuously improved. Priority support included."
             ),
             success_url=success_url or f"{settings.FRONTEND_URL}/purchase-success?slug={slug}",
@@ -179,11 +187,11 @@ class SitePurchaseService:
 
         # Step 1 — setup fee checkout; its success_url IS the subscription checkout URL
         setup_checkout = await self.recurrente.create_one_time_checkout(
-            name=f"Premium Website Design & Launch – {site_title}",
+            name=f"Premium Website Design & Launch – {display_name}",
             amount_cents=int(site.purchase_amount * 100),
             currency="USD",
             description=(
-                f"Custom-designed, professionally built website for {site_title} — "
+                f"Custom-designed, professionally built website for {display_name} — "
                 f"delivered and live the same day. Includes premium design, full development, "
                 f"and on-brand copywriting. Monthly care plan (${site.monthly_amount}/mo) "
                 f"activates in the next step."

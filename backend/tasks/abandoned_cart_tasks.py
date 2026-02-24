@@ -21,10 +21,13 @@ from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_async_session
+from core.config import get_settings
 from models.checkout_session import CheckoutSession
 from services.emails.email_service import get_email_service
+from services.payments.abandoned_cart_coupon_service import create_abandoned_cart_coupon
 
 logger = logging.getLogger(__name__)
+_settings = get_settings()
 
 
 @shared_task(
@@ -65,43 +68,39 @@ def check_abandoned_carts():
 
 async def _process_abandoned_carts() -> Dict[str, int]:
     """Process all abandoned carts and send recovery emails."""
+    window_minutes = getattr(_settings, "ABANDONED_CART_WINDOW_MINUTES", 15)
+    validity_hours = getattr(_settings, "ABANDONED_CART_COUPON_VALIDITY_HOURS", 24)
+    abandonment_threshold = datetime.now(timezone.utc) - timedelta(minutes=window_minutes)
+
     async with get_async_session() as db:
-        # Find abandoned sessions
-        abandonment_threshold = datetime.now(timezone.utc) - timedelta(minutes=15)
-        
         query = select(CheckoutSession).where(
             and_(
-                CheckoutSession.status == 'checkout_created',
+                CheckoutSession.status == "checkout_created",
                 CheckoutSession.created_at < abandonment_threshold,
                 CheckoutSession.reminder_sent_at.is_(None),
-                CheckoutSession.completed_at.is_(None)
+                CheckoutSession.completed_at.is_(None),
             )
         ).order_by(CheckoutSession.created_at.asc())
-        
+
         result = await db.execute(query)
         abandoned_sessions: List[CheckoutSession] = result.scalars().all()
-        
+
         if not abandoned_sessions:
             logger.debug("No abandoned carts found")
-            return {
-                "processed": 0,
-                "emails_sent": 0,
-                "errors": 0
-            }
-        
+            return {"processed": 0, "emails_sent": 0, "errors": 0}
+
         logger.info(f"Found {len(abandoned_sessions)} abandoned checkout sessions")
-        
+
         emails_sent = 0
         errors = 0
-        
         email_service = get_email_service()
-        
+
         for session in abandoned_sessions:
             try:
-                # Generate 10% discount code
-                discount_code = _generate_discount_code(session)
-                
-                # Send recovery email
+                discount_code, recurrente_coupon_id = await create_abandoned_cart_coupon(
+                    session, db, validity_hours
+                )
+
                 await email_service.send_abandoned_cart_email(
                     to_email=session.customer_email,
                     customer_name=session.customer_name,
@@ -109,47 +108,35 @@ async def _process_abandoned_carts() -> Dict[str, int]:
                     checkout_url=session.checkout_url,
                     discount_code=discount_code,
                     purchase_amount=float(session.purchase_amount),
-                    monthly_amount=float(session.monthly_amount)
+                    monthly_amount=float(session.monthly_amount),
                 )
-                
-                # Mark as sent
+
                 session.reminder_sent_at = datetime.now(timezone.utc)
                 session.reminder_discount_code = discount_code
-                session.status = 'abandoned'  # Update status
-                
+                session.status = "abandoned"
+                if recurrente_coupon_id is not None:
+                    session.recurrente_coupon_id = recurrente_coupon_id
+
                 await db.commit()
-                
+
                 emails_sent += 1
                 logger.info(
                     f"Sent abandoned cart email to {session.customer_email} "
                     f"for site {session.site_slug} (discount: {discount_code})"
                 )
-            
             except Exception as e:
                 errors += 1
                 logger.error(
                     f"Failed to send abandoned cart email for session {session.session_id}: {e}",
-                    exc_info=True
+                    exc_info=True,
                 )
-                # Don't halt entire batch for one error
                 continue
-        
+
         return {
             "processed": len(abandoned_sessions),
             "emails_sent": emails_sent,
-            "errors": errors
+            "errors": errors,
         }
-
-
-def _generate_discount_code(session: CheckoutSession) -> str:
-    """
-    Generate a unique 10% discount code for abandoned cart.
-    
-    Format: SAVE10-{first_4_chars_of_session_id}
-    Example: SAVE10-CS7A
-    """
-    session_prefix = session.session_id.replace('cs_', '').upper()[:4]
-    return f"SAVE10-{session_prefix}"
 
 
 @shared_task(name="tasks.cleanup_old_abandoned_carts")

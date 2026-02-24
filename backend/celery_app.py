@@ -45,6 +45,7 @@ celery_app.autodiscover_tasks([
     "tasks.validation_tasks_enhanced",  # Enhanced V2 validation with metadata
     "tasks.discovery_tasks",  # Website discovery pipeline (ScrapingDog)
     "tasks.ticket_tasks",  # Support ticket AI processing
+    "tasks.abandoned_cart_tasks",  # Abandoned cart recovery (15min window, 24h coupon)
 ])
 
 # Periodic task schedule (using SYNC tasks only)
@@ -101,6 +102,16 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.monitoring_sync.health_check",
         "schedule": crontab(minute="*/10"),
     },
+
+    # Abandoned cart recovery: every 5 min; daily cleanup of old abandoned sessions
+    "check-abandoned-carts": {
+        "task": "tasks.abandoned_cart_tasks.check_abandoned_carts",
+        "schedule": crontab(minute="*/5"),
+    },
+    "cleanup-old-abandoned-carts": {
+        "task": "tasks.abandoned_cart_tasks.cleanup_old_abandoned_carts",
+        "schedule": crontab(minute=0, hour=3),
+    },
 }
 
 # Task routes (route tasks to dedicated queues for isolation)
@@ -124,6 +135,7 @@ celery_app.conf.task_routes = {
     "tasks.sms_sync.*": {"queue": "campaigns"},
     "tasks.monitoring_sync.*": {"queue": "monitoring"},
     "tasks.ticket_tasks.*": {"queue": "celery"},  # Default queue, low latency
+    "tasks.abandoned_cart_tasks.*": {"queue": "celery"},
 }
 
 # Enable priority support (0-10, 10 = highest)

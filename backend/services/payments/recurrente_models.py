@@ -92,3 +92,16 @@ class RecurrenteUserResponse(BaseModel):
     """Response from creating a Recurrente user."""
     id: str = Field(..., description="User ID (e.g., us_xxxxx)")
     email: str = Field(..., description="Customer email")
+
+
+class RecurrenteCouponResponse(BaseModel):
+    """Response from Recurrente coupon creation (POST /api/coupons)."""
+    id: str = Field(..., description="Coupon ID (e.g., coup_xxxxx)")
+    name: str = Field(..., description="Coupon code (what customer enters)")
+    percent_off: Optional[int] = Field(None, description="Percentage discount")
+    amount_off_in_cents: Optional[int] = Field(None, description="Fixed amount off in cents")
+    max_redemptions: Optional[int] = Field(None, description="Max uses (e.g. 1 for single-use)")
+    currency: Optional[str] = Field(None, description="Currency if amount_off_in_cents used")
+    duration: str = Field(..., description="once | forever")
+    expires_at: Optional[str] = Field(None, description="ISO 8601 expiry")
+    status: str = Field(..., description="e.g. active")
