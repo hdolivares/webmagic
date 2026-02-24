@@ -16,6 +16,7 @@ from typing import Optional, Dict, Any
 from pathlib import Path
 
 from core.config import get_settings
+from core.text_utils import title_case
 from .templates import EmailTemplates
 
 logger = logging.getLogger(__name__)
@@ -279,7 +280,8 @@ class EmailService:
         checkout_url: str,
         discount_code: str,
         purchase_amount: float,
-        monthly_amount: float
+        monthly_amount: float,
+        business_name: Optional[str] = None,
     ) -> bool:
         """
         Send abandoned cart recovery email with 10% discount.
@@ -292,6 +294,7 @@ class EmailService:
             discount_code: 10% discount code
             purchase_amount: Original one-time amount
             monthly_amount: Monthly subscription amount
+            business_name: Optional business name for subject (uses title case)
         
         Returns:
             True if sent successfully
@@ -299,6 +302,9 @@ class EmailService:
         try:
             site_preview_url = f"{settings.FRONTEND_URL}/site-preview/{site_slug}"
             discounted_amount = purchase_amount * 0.9  # 10% off
+            # Subject: use business name (title-cased) instead of slug when available
+            display_name = (business_name or site_slug).strip()
+            subject_display = title_case(display_name) if display_name else "Your Website"
             
             html_content = f"""
             <!DOCTYPE html>
@@ -431,7 +437,7 @@ class EmailService:
             
             return await self._send_email(
                 to_email=to_email,
-                subject=f"💼 Complete Your Purchase - Get 10% Off! ({site_slug})",
+                subject=f"💼 Complete Your Purchase - Get 10% Off! ({subject_display})",
                 html_content=html_content
             )
         
