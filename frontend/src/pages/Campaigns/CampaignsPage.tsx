@@ -7,13 +7,14 @@
  * Architecture: Smart component pattern with local state management
  * Following best practices: Separation of concerns, modular components, semantic styles
  */
-import React, { useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import React, { useState, useCallback } from 'react'
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { api } from '@/services/api'
-import { Card, CardHeader, CardBody, CardTitle, Badge } from '@/components/ui'
+import { Card, CardHeader, CardBody, CardTitle } from '@/components/ui'
 import { Mail, Eye, MousePointer, MessageSquare } from 'lucide-react'
 import ReadyBusinessesPanel from './ReadyBusinessesPanel'
 import CampaignCreator from './CampaignCreator'
+import RecentCampaignsTable from './RecentCampaignsTable'
 import type { ReadyBusiness, CampaignStats } from '@/types'
 import './Campaigns.css'
 
@@ -29,6 +30,8 @@ export const CampaignsPage: React.FC = () => {
   const [previewBusiness, setPreviewBusiness] = useState<ReadyBusiness | null>(null)
   // Whether to include already-contacted businesses in the list
   const [showContacted, setShowContacted] = useState(false)
+  // Campaign ID currently being sent (for per-row loading state)
+  const [sendingCampaignId, setSendingCampaignId] = useState<string | null>(null)
 
   // Fetch ready businesses (with completed sites)
   const {
@@ -79,19 +82,36 @@ export const CampaignsPage: React.FC = () => {
     setPreviewBusiness(null)
   }
 
-  // Get status badge styling
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, any> = {
-      sent: 'success',
-      delivered: 'success',
-      opened: 'info',
-      clicked: 'primary',
-      failed: 'error',
-      pending: 'warning',
-      draft: 'secondary',
-    }
-    return <Badge variant={variants[status] || 'secondary'}>{status}</Badge>
-  }
+  // Send a single draft/pending campaign
+  const sendCampaignMutation = useMutation({
+    mutationFn: (campaignId: string) => api.sendCampaign(campaignId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] })
+      queryClient.invalidateQueries({ queryKey: ['campaign-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['campaigns-ready-businesses'] })
+    },
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        (error instanceof Error ? error.message : 'Unknown error')
+      alert(`Failed to send campaign: ${message}`)
+    },
+    onSettled: () => {
+      setSendingCampaignId(null)
+    },
+  })
+
+  const handleSendCampaign = useCallback(
+    (campaignId: string) => {
+      const campaign = campaignsData?.campaigns.find((c) => c.id === campaignId)
+      const recipientName =
+        campaign?.business_name ?? campaign?.recipient_name ?? 'this recipient'
+      if (!window.confirm(`Send this campaign to ${recipientName} now?`)) return
+      setSendingCampaignId(campaignId)
+      sendCampaignMutation.mutate(campaignId)
+    },
+    [campaignsData?.campaigns, sendCampaignMutation]
+  )
 
   return (
     <div className="campaigns-page">
@@ -270,68 +290,15 @@ export const CampaignsPage: React.FC = () => {
       <div style={{ marginTop: 'var(--campaigns-spacing-xl)' }}>
         <Card>
           <CardHeader>
-            <CardTitle>Recent Campaigns ({campaignsData?.total || 0})</CardTitle>
+            <CardTitle>Recent Campaigns ({campaignsData?.total ?? 0})</CardTitle>
           </CardHeader>
           <CardBody>
-            {isLoadingCampaigns ? (
-              <div className="campaigns-loading">
-                <div className="spinner" />
-              </div>
-            ) : campaignsData && campaignsData.campaigns.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="table">
-                  <thead className="table-header">
-                    <tr>
-                      <th className="table-header-cell">Recipient</th>
-                      <th className="table-header-cell">Channel</th>
-                      <th className="table-header-cell">Subject/Message</th>
-                      <th className="table-header-cell">Status</th>
-                      <th className="table-header-cell">Sent</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {campaignsData.campaigns.map((campaign) => (
-                      <tr key={campaign.id} className="table-row">
-                        <td className="table-cell">
-                          <div>
-                            <p className="font-medium">
-                              {campaign.business_name || campaign.recipient_name || 'Unknown'}
-                            </p>
-                            <p className="text-xs text-text-secondary">
-                              {campaign.recipient_email || campaign.recipient_phone || '—'}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="table-cell">
-                          <Badge variant="info">
-                            {campaign.channel === 'sms' ? '💬 SMS' : '📧 Email'}
-                          </Badge>
-                        </td>
-                        <td className="table-cell" style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {campaign.channel === 'sms'
-                            ? campaign.sms_body || 'SMS Campaign'
-                            : campaign.subject_line || '—'}
-                        </td>
-                        <td className="table-cell">{getStatusBadge(campaign.status)}</td>
-                        <td className="table-cell text-text-secondary">
-                          {campaign.sent_at
-                            ? new Date(campaign.sent_at).toLocaleDateString()
-                            : 'Not sent'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="campaigns-empty">
-                <div className="campaigns-empty__icon">📭</div>
-                <h4 className="campaigns-empty__title">No Campaigns Yet</h4>
-                <p className="campaigns-empty__description">
-                  Create your first campaign by selecting businesses above
-                </p>
-              </div>
-            )}
+            <RecentCampaignsTable
+              campaigns={campaignsData?.campaigns ?? []}
+              isLoading={isLoadingCampaigns}
+              onSendCampaign={handleSendCampaign}
+              sendingCampaignId={sendingCampaignId}
+            />
           </CardBody>
         </Card>
       </div>

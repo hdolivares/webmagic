@@ -431,3 +431,46 @@
   font-size: 0.875rem;
   color: var(--color-text-secondary);
 }
+
+/* ============================================
+   RECENT CAMPAIGNS TABLE
+   ============================================ */
+
+.campaigns-table {
+  width: 100%;
+}
+
+.campaigns-table__actions-header,
+.campaigns-table__actions-cell {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.campaigns-table__actions-cell {
+  vertical-align: middle;
+}
+
+/* Small button variant for table actions (semantic, reusable) */
+.campaigns-button--small {
+  padding: var(--campaigns-spacing-xs) var(--campaigns-spacing-sm);
+  font-size: 0.8125rem;
+}
+
+.campaigns-table__spinner {
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: campaigns-spin 0.7s linear infinite;
+  margin-right: var(--campaigns-spacing-xs);
+  vertical-align: -0.125em;
+}
+
+@keyframes campaigns-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
