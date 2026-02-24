@@ -11,6 +11,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, and_, or_, func
 
+from core.outreach_enums import OutreachChannel
 from models.business import Business
 from tasks.generation_sync import generate_site_for_business  # Use SYNC version for Celery
 
@@ -93,6 +94,17 @@ class WebsiteGenerationQueueService:
                 'status': 'has_valid_website',
                 'website_url': business.website_url,
                 'message': 'Business already has a valid website - generation not needed'
+            }
+
+        # **GUARD: Do not queue call-later businesses (no SMS, no email)**
+        if OutreachChannel.is_call_later(business.outreach_channel):
+            logger.info(
+                f"Business {business_id} is in call_later bucket (no valid SMS, no email). "
+                "Skipping generation until calling flow exists."
+            )
+            return {
+                'status': 'call_later',
+                'message': 'Business has no valid SMS or email; in call-later queue for future outreach'
             }
         
         # Check if already queued or in progress
@@ -436,6 +448,14 @@ class WebsiteGenerationQueueService:
                         Business.website_url.is_(None),
                         Business.website_validation_status == 'invalid'
                     ),
+                    # Eligible for outreach (exclude call_later)
+                    or_(
+                        Business.outreach_channel.is_(None),
+                        Business.outreach_channel.in_([
+                            OutreachChannel.SMS.value,
+                            OutreachChannel.EMAIL.value,
+                        ]),
+                    ),
                     # Not already processed
                     Business.website_status.in_(['none', 'pending']),
                     # Not in queue
@@ -486,6 +506,14 @@ class WebsiteGenerationQueueService:
                     or_(
                         Business.website_url.is_(None),
                         Business.website_url == ""
+                    ),
+                    # Eligible for outreach (exclude call_later)
+                    or_(
+                        Business.outreach_channel.is_(None),
+                        Business.outreach_channel.in_([
+                            OutreachChannel.SMS.value,
+                            OutreachChannel.EMAIL.value,
+                        ]),
                     ),
                     Business.website_status.in_(['none', 'pending']),
                     Business.generation_queued_at.is_(None),

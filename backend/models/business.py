@@ -131,7 +131,12 @@ class Business(BaseModel):
     phone_line_type = Column(String(20), nullable=True, index=True)
     # Values: mobile | landline | voip | toll_free | premium_rate | unknown
     phone_lookup_at = Column(DateTime, nullable=True)
-    
+
+    # Outreach channel (set by phone validation job after triple-validation)
+    outreach_channel = Column(String(20), nullable=True, index=True)
+    # Values: sms | email | call_later (see core.outreach_enums.OutreachChannel)
+    phone_validated_at = Column(DateTime, nullable=True)
+
     # Relationships
     # coverage_grid = relationship("CoverageGrid", back_populates="businesses")
     generated_sites = relationship("GeneratedSite", back_populates="business", lazy="select")

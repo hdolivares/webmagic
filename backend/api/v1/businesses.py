@@ -250,6 +250,8 @@ async def get_businesses_needing_generation(
         # Minimum rating — good-review businesses only
         MIN_RATING = 4.0
 
+        from core.outreach_enums import OutreachChannel
+
         query = select(Business).outerjoin(
             GeneratedSite,
             Business.id == GeneratedSite.business_id
@@ -260,6 +262,14 @@ async def get_businesses_needing_generation(
                 or_(
                     Business.website_validation_status == 'triple_verified',
                     Business.website_validation_status == 'confirmed_no_website',
+                ),
+                # Eligible for outreach (exclude call_later — no SMS, no email)
+                or_(
+                    Business.outreach_channel.is_(None),
+                    Business.outreach_channel.in_([
+                        OutreachChannel.SMS.value,
+                        OutreachChannel.EMAIL.value,
+                    ]),
                 ),
                 # Only good-rated businesses (rating exists AND meets threshold,
                 # OR rating is null — new scrapes may not have it yet)

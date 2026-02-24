@@ -44,6 +44,7 @@ celery_app.autodiscover_tasks([
     "tasks.validation_tasks",  # Playwright website validation (old system)
     "tasks.validation_tasks_enhanced",  # Enhanced V2 validation with metadata
     "tasks.discovery_tasks",  # Website discovery pipeline (ScrapingDog)
+    "tasks.phone_validation_tasks",  # Pre-generation phone validation (outreach_channel)
     "tasks.ticket_tasks",  # Support ticket AI processing
     "tasks.abandoned_cart_tasks",  # Abandoned cart recovery (15min window, 24h coupon)
 ])
@@ -56,6 +57,13 @@ celery_app.conf.beat_schedule = {
     "scrape-territories": {
         "task": "tasks.scraping.scrape_pending_territories",
         "schedule": crontab(minute=0, hour="*/6"),
+    },
+
+    # ── Pre-generation: Phone validation (outreach_channel) every hour ────────
+    # Sets sms | email | call_later for triple-validated businesses so generation queue excludes call_later
+    "run-phone-validation-job": {
+        "task": "tasks.phone_validation_tasks.run_phone_validation_job",
+        "schedule": crontab(minute=15),  # :15 past so outreach_channel is set before next generate-sites
     },
 
     # ── Stage 2: Generate sites for qualified leads every hour ───────────────
@@ -127,6 +135,7 @@ celery_app.conf.task_routes = {
     
     # Queue 3: Website discovery (I/O bound, ScrapingDog + LLM)
     "tasks.discovery_tasks.*": {"queue": "discovery", "priority": 6},
+    "tasks.phone_validation_tasks.*": {"queue": "generation", "priority": 4},  # Pre-generation, run before site gen
     
     # Other queues (unchanged)
     "tasks.generation.*": {"queue": "generation"},
