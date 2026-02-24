@@ -130,12 +130,11 @@ async def _process_abandoned_carts() -> Dict[str, int]:
 
         for session in abandoned_sessions:
             try:
-                discount_code, recurrente_coupon_id = await create_abandoned_cart_coupon(
-                    session, db, validity_hours
-                )
-
                 business_name = await _get_business_name_for_site(
                     db, session.site_slug, session.site_id
+                )
+                discount_code, recurrente_coupon_id = await create_abandoned_cart_coupon(
+                    session, db, validity_hours, business_name=business_name
                 )
 
                 await email_service.send_abandoned_cart_email(

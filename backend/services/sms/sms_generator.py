@@ -12,6 +12,7 @@ import logging
 from anthropic import AsyncAnthropic
 
 from core.config import get_settings
+from core.text_utils import title_case
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -264,7 +265,7 @@ Return ONLY the SMS message text — no quotes, no labels, no explanation."""
         - Naming the gap (no website) creates a cognitive hook without being pushy
         - Soft question at the end boosts reply rates from 24% to 28%
         """
-        business_name = business_data.get("name") or "Your business"
+        business_name = title_case((business_data.get("name") or "Your business").strip()) or "Your business"
         rating = business_data.get("rating", 0)
         review_count = business_data.get("review_count", 0)
         url_display = site_url or "[link]"

@@ -301,7 +301,10 @@ class EmailService:
         """
         try:
             site_preview_url = f"{settings.FRONTEND_URL}/site-preview/{site_slug}"
-            discounted_amount = purchase_amount * 0.9  # 10% off
+            # Abandoned cart: $49.70 off the first (setup) payment = 10% of total first bill ($400 + $97)
+            discount_amount = 49.70
+            total_first_bill = purchase_amount + monthly_amount  # e.g. 400 + 97 = 497
+            first_payment_after_discount = round(purchase_amount - discount_amount, 2)  # e.g. 350.30
             # Subject: use business name (title-cased) instead of slug when available
             display_name = (business_name or site_slug).strip()
             subject_display = title_case(display_name) if display_name else "Your Website"
@@ -342,9 +345,10 @@ class EmailService:
                                         
                                         <!-- Special Offer Box -->
                                         <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 20px; margin: 30px 0; border-radius: 8px;">
-                                            <h2 style="margin: 0 0 15px; font-size: 24px; color: #065f46;">🎁 Special 10% Discount - Just for You!</h2>
+                                            <h2 style="margin: 0 0 15px; font-size: 24px; color: #065f46;">🎁 10% Off Your Total First Bill – Just for You!</h2>
                                             <p style="margin: 0 0 10px; font-size: 16px; color: #065f46;">
-                                                To help you get started, we're offering you <strong>10% off</strong> your first payment.
+                                                Use the code below at checkout for <strong>${discount_amount:.2f} off</strong> your first payment. 
+                                                That's 10% off your total first bill (setup + first month). You'll pay <strong>${first_payment_after_discount:.2f}</strong> today, then ${monthly_amount:.2f}/month — one code, one click.
                                             </p>
                                             <div style="background: white; padding: 15px; border-radius: 6px; margin-top: 15px;">
                                                 <p style="margin: 0 0 5px; font-size: 14px; color: #6b7280;">Your discount code:</p>
@@ -356,15 +360,22 @@ class EmailService:
                                         <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin: 25px 0;">
                                             <table width="100%" cellpadding="8" cellspacing="0">
                                                 <tr>
-                                                    <td style="font-size: 15px; color: #6b7280;">Original Price:</td>
-                                                    <td align="right" style="font-size: 15px; color: #9ca3af; text-decoration: line-through;">${purchase_amount:.2f}</td>
+                                                    <td style="font-size: 15px; color: #6b7280;">Total first bill (setup + first month):</td>
+                                                    <td align="right" style="font-size: 15px; color: #9ca3af; text-decoration: line-through;">${total_first_bill:.2f}</td>
                                                 </tr>
                                                 <tr>
-                                                    <td style="font-size: 18px; color: #111827; font-weight: 600;">Your Price Today:</td>
-                                                    <td align="right" style="font-size: 22px; color: #10b981; font-weight: 700;">${discounted_amount:.2f}</td>
+                                                    <td style="font-size: 15px; color: #6b7280;">Your discount (10% off):</td>
+                                                    <td align="right" style="font-size: 15px; color: #10b981;">−${discount_amount:.2f}</td>
                                                 </tr>
                                                 <tr>
-                                                    <td style="font-size: 14px; color: #6b7280; padding-top: 10px; border-top: 1px solid #e5e7eb;">Then Monthly:</td>
+                                                    <td style="font-size: 18px; color: #111827; font-weight: 600;">Your total payment today:</td>
+                                                    <td align="right" style="font-size: 22px; color: #10b981; font-weight: 700;">${(total_first_bill - discount_amount):.2f}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td colspan="2" style="font-size: 13px; color: #6b7280; padding-top: 6px; padding-bottom: 4px;">Breakdown: initial payment ${first_payment_after_discount:.2f} + first month ${monthly_amount:.2f} = ${(total_first_bill - discount_amount):.2f}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="font-size: 14px; color: #6b7280; padding-top: 10px; border-top: 1px solid #e5e7eb;">Then monthly:</td>
                                                     <td align="right" style="font-size: 14px; color: #374151; padding-top: 10px; border-top: 1px solid #e5e7eb;">${monthly_amount:.2f}/month</td>
                                                 </tr>
                                             </table>
