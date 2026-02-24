@@ -14,6 +14,7 @@ import logging
 import asyncio
 
 from core.database import get_db_session_sync, AsyncSessionLocal
+from core.outreach_enums import OutreachChannel
 from models.business import Business
 from models.site import GeneratedSite
 from services.creative.orchestrator import CreativeOrchestrator
@@ -118,6 +119,19 @@ def generate_site_for_business(self, business_id: str):
                         "status": "skipped",
                         "reason": "has_valid_website",
                         "website_url": business.website_url
+                    }
+
+                # **SKIP call_later businesses** (no valid SMS, no email)
+                if OutreachChannel.is_call_later(business.outreach_channel):
+                    logger.info(
+                        f"Business {business_id} is call_later (no SMS, no email). Skipping generation."
+                    )
+                    business.generation_queued_at = None
+                    await db.commit()
+                    return {
+                        "status": "skipped",
+                        "reason": "call_later",
+                        "message": "No valid SMS or email; in call-later queue"
                     }
                 
                 # ── Phone line-type check ─────────────────────────────────────
