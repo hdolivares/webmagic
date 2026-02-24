@@ -418,8 +418,14 @@ class RecurrenteClient:
             payload["coupon"]["currency"] = currency
         if amount_off_in_cents is not None:
             payload["coupon"]["amount_off_in_cents"] = amount_off_in_cents
-        response = await self._request("POST", "/api/coupons", data=payload)
-        return RecurrenteCouponResponse(**response)
+        # Base URL is already .../api, so endpoint must be /coupons (not /api/coupons)
+        response = await self._request("POST", "/coupons", data=payload)
+        # API may return percent_off as string "10.0"; coerce for our model
+        if isinstance(response.get("percent_off"), (str, float)):
+            response = {**response, "percent_off": int(float(response["percent_off"]))}
+        coupon = RecurrenteCouponResponse(**response)
+        logger.info(f"Recurrente coupon created: id={coupon.id} name={coupon.name} status={coupon.status}")
+        return coupon
 
     # Subscriptions
 
