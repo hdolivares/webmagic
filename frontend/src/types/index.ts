@@ -257,6 +257,10 @@ export interface ReadyBusiness {
   site_created_at: string
   available_channels: string[]
   recommended_channel: string
+  /** null = not yet validated, 'sms' | 'call_later' | 'email' */
+  outreach_channel?: string | null
+  /** e.g. 'mobile' | 'landline' | 'voip' | 'fixed_voip' | 'unknown' */
+  phone_line_type?: string | null
   // Campaign history (null if never contacted)
   last_campaign_status?: string | null
   last_campaign_at?: string | null
@@ -270,6 +274,7 @@ export interface ReadyBusinessesResponse {
   with_phone: number
   sms_only: number
   email_only: number
+  call_later: number
   already_contacted: number
 }
 
