@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: Optional[str] = None
     TELNYX_API_KEY: Optional[str] = None
     TELNYX_PUBLIC_KEY: Optional[str] = None
+
+    # LabsMobile SMS
+    LABSMOBILE_USERNAME: Optional[str] = None
+    LABSMOBILE_TOKEN: Optional[str] = None
+    LABSMOBILE_PHONE_NUMBER: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
     BREVO_API_KEY: Optional[str] = None
     SCRAPINGDOG_API_KEY: Optional[str] = None  # For Google search verification
@@ -80,7 +85,7 @@ class Settings(BaseSettings):
     TELNYX_PHONE_NUMBER: Optional[str] = None
     
     # SMS Configuration
-    SMS_PROVIDER: str = "telnyx"
+    SMS_PROVIDER: str = "labsmobile"
     SMS_DAILY_BUDGET: str = "10.00"
     SMS_MAX_COST_PER_MESSAGE: str = "0.05"
     SMS_ENABLE_COST_ALERTS: str = "true"

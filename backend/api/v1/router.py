@@ -31,7 +31,8 @@ from api.v1 import (
     shortener,  # URL Shortener admin API
 )
 from api.v1.endpoints import scrapes  # Phase 2: Async scraping with SSE progress
-from api.v1 import webhooks_telnyx as telnyx  # Phase 7: SMS webhooks (Telnyx)
+from api.v1 import webhooks_telnyx as telnyx  # Phase 7: SMS webhooks (Telnyx, kept for rollback)
+from api.v1 import webhooks_labsmobile as labsmobile  # Phase 7: SMS webhooks (LabsMobile)
 from api.v1 import messages  # Phase 7: SMS Messages inbox
 
 api_router = APIRouter()
@@ -47,8 +48,9 @@ api_router.include_router(domains.router)  # Custom domains (Phase 5)
 api_router.include_router(tickets.router)  # Support tickets customer-facing (Phase 6)
 api_router.include_router(admin_tickets.router)  # Support tickets admin (Phase 6)
 api_router.include_router(webhooks.router)  # Webhooks (Phase 2)
-api_router.include_router(telnyx.router)  # SMS webhooks - Telnyx (Phase 7)
-api_router.include_router(messages.router)  # SMS Messages inbox (Phase 7)
+api_router.include_router(telnyx.router)       # SMS webhooks - Telnyx (Phase 7, kept for rollback)
+api_router.include_router(labsmobile.router)   # SMS webhooks - LabsMobile (Phase 7)
+api_router.include_router(messages.router)     # SMS Messages inbox (Phase 7)
 api_router.include_router(businesses.router)
 api_router.include_router(business_categories.router)  # Business categories
 api_router.include_router(coverage.router)

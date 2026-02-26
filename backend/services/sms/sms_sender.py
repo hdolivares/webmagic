@@ -1,12 +1,12 @@
 """
-SMS Sender Service - Telnyx SMS Provider.
+SMS Sender Service.
 
-Uses Telnyx API for SMS sending with raw requests (no SDK dependency).
-Provides retry logic and comprehensive error handling.
+Provider-agnostic SMS sending with retry logic and comprehensive error handling.
+Supported providers: telnyx, labsmobile.
 
 Author: WebMagic Team
 Date: January 21, 2026
-Updated: February 2026 - Migrated from Twilio to Telnyx
+Updated: February 2026 - Added LabsMobile provider
 """
 from typing import Optional, Dict, Any
 from abc import ABC, abstractmethod
@@ -20,13 +20,23 @@ from core.exceptions import ExternalAPIException
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# Telnyx API configuration
+# Telnyx API configuration (kept for backward compatibility / rollback)
 TELNYX_API_URL = "https://api.telnyx.com/v2/messages"
 
 
 class SMSProvider(ABC):
-    """Abstract base class for SMS providers."""
-    
+    """
+    Abstract base class for SMS providers.
+
+    Each provider must implement send_sms() and declare webhook_status_path
+    so the campaign helper can build the correct delivery callback URL
+    without hard-coding provider names outside this module.
+    """
+
+    # Path on our own API that this provider will call for status callbacks.
+    # Override in each concrete provider.
+    webhook_status_path: str = ""
+
     @abstractmethod
     async def send_sms(
         self,
@@ -52,7 +62,9 @@ class SMSProvider(ABC):
 
 class TelnyxSMSProvider(SMSProvider):
     """Telnyx SMS provider implementation using raw requests."""
-    
+
+    webhook_status_path: str = "/api/v1/webhooks/telnyx/status"
+
     def __init__(self):
         """Initialize Telnyx client with API key."""
         self.api_key = settings.TELNYX_API_KEY
@@ -207,14 +219,10 @@ class TelnyxSMSProvider(SMSProvider):
 class SMSSender:
     """
     SMS sender that auto-selects configured provider.
-    
-    Currently supports:
-    - Telnyx (primary)
-    
-    Future providers:
-    - MessageBird
-    - AWS SNS
-    - Vonage (Nexmo)
+
+    Supported providers:
+    - labsmobile (primary)
+    - telnyx     (kept for rollback / testing)
     """
     
     def __init__(self, provider: Optional[str] = None):
@@ -237,20 +245,26 @@ class SMSSender:
         Raises:
             ValueError: If provider is not configured or invalid
         """
-        if self.provider_name.lower() == "telnyx":
+        name = self.provider_name.lower()
+
+        if name == "labsmobile":
+            from services.sms.labsmobile_provider import LabsMobileSMSProvider
+            try:
+                return LabsMobileSMSProvider()
+            except Exception as e:
+                logger.error(f"Failed to initialize LabsMobile: {e}")
+                raise ValueError(f"LabsMobile initialization failed: {e}")
+
+        if name == "telnyx":
             try:
                 return TelnyxSMSProvider()
             except Exception as e:
                 logger.error(f"Failed to initialize Telnyx: {e}")
                 raise ValueError(f"Telnyx initialization failed: {e}")
-        
-        # Future providers can be added here
-        # elif self.provider_name.lower() == "messagebird":
-        #     return MessageBirdSMSProvider()
-        
+
         raise ValueError(
             f"Invalid SMS provider: {self.provider_name}. "
-            "Supported providers: telnyx"
+            "Supported providers: labsmobile, telnyx"
         )
     
     async def send(

@@ -80,9 +80,10 @@ class SMSCampaignHelper:
                 await db.commit()
                 raise ValidationException(error_msg)
             
-            # Build status callback URL for delivery tracking (Telnyx)
+            # Build status callback URL — path comes from the provider so we
+            # never hard-code a provider name here.
             callback_url = (
-                f"{settings.API_URL}/api/v1/webhooks/telnyx/status"
+                f"{settings.API_URL}{sms_sender.provider.webhook_status_path}"
                 if settings.API_URL
                 else None
             )
@@ -126,10 +127,10 @@ class SMSCampaignHelper:
             )
 
             # Store outbound message in sms_messages table
-            from_phone = result.get("from") or settings.TELNYX_PHONE_NUMBER
+            from_phone = result.get("from") or ""
             outbound_message = SMSMessage.create_outbound(
                 to_phone=campaign.recipient_phone,
-                from_phone=from_phone if from_phone else "",
+                from_phone=from_phone,
                 body=campaign.sms_body,
                 campaign_id=campaign.id,
                 business_id=campaign.business_id,
@@ -154,7 +155,7 @@ class SMSCampaignHelper:
                     await db.commit()
                     logger.info(
                         f"Updated business {campaign.business_id}: "
-                        f"contact_status=sms_sent (SMS queued at Telnyx)"
+                        f"contact_status=sms_sent (SMS queued)"
                     )
                 except Exception as e:
                     logger.error(
