@@ -22,7 +22,7 @@ interface ReadyBusinessesPanelProps {
   alreadyContactedCount: number
 }
 
-type FilterType = 'all' | 'sms_only' | 'email_only' | 'both'
+type FilterType = 'all' | 'sms_only' | 'email_only' | 'both' | 'call_later'
 
 const CAMPAIGN_STATUS_COLORS: Record<string, string> = {
   delivered: '#16a34a',
@@ -56,11 +56,13 @@ export const ReadyBusinessesPanel: React.FC<ReadyBusinessesPanelProps> = ({
   const filteredBusinesses = useMemo(() => {
     switch (filter) {
       case 'sms_only':
-        return businesses.filter(b => b.phone && !b.email)
+        return businesses.filter(b => b.phone && !b.email && b.outreach_channel !== 'call_later')
       case 'email_only':
         return businesses.filter(b => b.email && !b.phone)
       case 'both':
         return businesses.filter(b => b.email && b.phone)
+      case 'call_later':
+        return businesses.filter(b => b.outreach_channel === 'call_later')
       default:
         return businesses
     }
@@ -68,11 +70,12 @@ export const ReadyBusinessesPanel: React.FC<ReadyBusinessesPanelProps> = ({
 
   // Calculate stats for filters
   const stats = useMemo(() => {
-    const smsOnly = businesses.filter(b => b.phone && !b.email).length
+    const smsOnly = businesses.filter(b => b.phone && !b.email && b.outreach_channel !== 'call_later').length
     const emailOnly = businesses.filter(b => b.email && !b.phone).length
     const both = businesses.filter(b => b.email && b.phone).length
+    const callLater = businesses.filter(b => b.outreach_channel === 'call_later').length
 
-    return { smsOnly, emailOnly, both, total: businesses.length }
+    return { smsOnly, emailOnly, both, callLater, total: businesses.length }
   }, [businesses])
 
   // Toggle business selection
@@ -236,6 +239,17 @@ export const ReadyBusinessesPanel: React.FC<ReadyBusinessesPanelProps> = ({
         >
           Both
         </FilterButton>
+        {stats.callLater > 0 && (
+          <FilterButton
+            active={filter === 'call_later'}
+            onClick={() => setFilter('call_later')}
+            count={stats.callLater}
+            icon="📞"
+            variant="warning"
+          >
+            Call Later
+          </FilterButton>
+        )}
       </div>
 
       {/* Business List */}
@@ -282,43 +296,51 @@ interface FilterButtonProps {
   onClick: () => void
   count: number
   icon?: string
+  variant?: 'default' | 'warning'
   children: React.ReactNode
 }
 
-const FilterButton: React.FC<FilterButtonProps> = ({ active, onClick, count, icon, children }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    style={{
-      padding: '0.375rem 0.75rem',
-      borderRadius: 'var(--campaigns-radius-md)',
-      border: '1px solid var(--color-border-primary)',
-      background: active ? 'var(--campaigns-selected-bg)' : 'transparent',
-      color: active ? 'var(--campaigns-selected-border)' : 'var(--color-text-secondary)',
-      fontWeight: active ? 'var(--campaigns-font-weight-medium)' : 'var(--campaigns-font-weight-normal)',
-      fontSize: '0.875rem',
-      cursor: 'pointer',
-      transition: 'all 0.2s ease',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.375rem',
-    }}
-  >
-    {icon && <span>{icon}</span>}
-    <span>{children}</span>
-    <span
+const FilterButton: React.FC<FilterButtonProps> = ({ active, onClick, count, icon, variant = 'default', children }) => {
+  const isWarning = variant === 'warning'
+  const activeColor = isWarning ? '#d97706' : 'var(--campaigns-selected-border)'
+  const activeBg = isWarning ? '#fef3c7' : 'var(--campaigns-selected-bg)'
+  const activeBadgeBg = isWarning ? '#d97706' : 'var(--campaigns-selected-border)'
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
       style={{
-        fontSize: '0.75rem',
-        padding: '0.125rem 0.375rem',
-        borderRadius: 'var(--campaigns-radius-full)',
-        background: active ? 'var(--campaigns-selected-border)' : 'var(--color-bg-secondary)',
-        color: active ? 'white' : 'var(--color-text-secondary)',
+        padding: '0.375rem 0.75rem',
+        borderRadius: 'var(--campaigns-radius-md)',
+        border: `1px solid ${active && isWarning ? '#d97706' : 'var(--color-border-primary)'}`,
+        background: active ? activeBg : 'transparent',
+        color: active ? activeColor : 'var(--color-text-secondary)',
+        fontWeight: active ? 'var(--campaigns-font-weight-medium)' : 'var(--campaigns-font-weight-normal)',
+        fontSize: '0.875rem',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.375rem',
       }}
     >
-      {count}
-    </span>
-  </button>
-)
+      {icon && <span>{icon}</span>}
+      <span>{children}</span>
+      <span
+        style={{
+          fontSize: '0.75rem',
+          padding: '0.125rem 0.375rem',
+          borderRadius: 'var(--campaigns-radius-full)',
+          background: active ? activeBadgeBg : 'var(--color-bg-secondary)',
+          color: active ? 'white' : 'var(--color-text-secondary)',
+        }}
+      >
+        {count}
+      </span>
+    </button>
+  )
+}
 
 /**
  * BusinessItem - Individual business row component
@@ -334,12 +356,12 @@ interface BusinessItemProps {
 const BusinessItem: React.FC<BusinessItemProps> = ({ business, isSelected, isPreviewing, onToggle, onClick }) => {
   const campaignStatus = business.last_campaign_status
   const statusColor = campaignStatus ? (CAMPAIGN_STATUS_COLORS[campaignStatus] ?? '#6b7280') : null
+  const isCallLater = business.outreach_channel === 'call_later'
+
   const handleClick = (e: React.MouseEvent) => {
-    // If clicking the checkbox area, toggle selection
     if ((e.target as HTMLElement).closest('.business-item__checkbox')) {
       onToggle()
     } else {
-      // Otherwise trigger the preview
       onClick()
     }
   }
@@ -356,6 +378,7 @@ const BusinessItem: React.FC<BusinessItemProps> = ({ business, isSelected, isPre
           onToggle()
         }
       }}
+      style={isCallLater ? { opacity: 0.75 } : undefined}
     >
       {/* Checkbox */}
       <div className="business-item__checkbox">
@@ -379,9 +402,25 @@ const BusinessItem: React.FC<BusinessItemProps> = ({ business, isSelected, isPre
           )}
 
           {/* Channel badges */}
-          {business.phone && (
+          {business.phone && !isCallLater && (
             <span className="business-item__badge business-item__badge--sms">
               💬 SMS
+            </span>
+          )}
+          {isCallLater && (
+            <span
+              title={`Landline number — cannot receive SMS (${business.phone_line_type ?? 'landline'})`}
+              style={{
+                fontSize: '0.65rem',
+                padding: '0.1rem 0.4rem',
+                borderRadius: '9999px',
+                background: '#fef3c718',
+                color: '#92400e',
+                border: '1px solid #d9780640',
+                fontWeight: 600,
+              }}
+            >
+              📞 Landline
             </span>
           )}
           {business.email && (

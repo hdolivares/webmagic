@@ -268,6 +268,7 @@ async def get_ready_businesses(
     with_phone = 0
     sms_only = 0
     email_only = 0
+    call_later = 0
     already_contacted_count = 0
 
     for business, site in businesses_with_sites:
@@ -275,18 +276,28 @@ async def get_ready_businesses(
         has_phone = bool(business.phone)
         if not has_email and not has_phone:
             continue
+
+        outreach_channel = getattr(business, "outreach_channel", None)
+        phone_line_type = getattr(business, "phone_line_type", None)
+        is_call_later = outreach_channel == "call_later"
+
         available_channels = []
         if has_email:
             available_channels.append("email")
             with_email += 1
         if has_phone:
-            available_channels.append("sms")
+            if not is_call_later:
+                available_channels.append("sms")
             with_phone += 1
+
         if has_email and not has_phone:
             email_only += 1
-        elif has_phone and not has_email:
+        elif has_phone and not has_email and not is_call_later:
             sms_only += 1
-        recommended_channel = "email" if has_email else "sms"
+        if is_call_later:
+            call_later += 1
+
+        recommended_channel = "email" if has_email else ("call_later" if is_call_later else "sms")
         site_url = f"https://sites.lavish.solutions/{site.subdomain}"
 
         campaign_info = last_campaign.get(str(business.id))
@@ -311,11 +322,13 @@ async def get_ready_businesses(
             "site_created_at": site.created_at.isoformat() if site.created_at else None,
             "available_channels": available_channels,
             "recommended_channel": recommended_channel,
+            "outreach_channel": outreach_channel,
+            "phone_line_type": phone_line_type,
             "last_campaign_status": campaign_info["status"] if campaign_info else None,
             "last_campaign_at": campaign_info["sent_at"] if campaign_info else None,
             "last_campaign_channel": campaign_info["channel"] if campaign_info else None,
         })
-    
+
     return JSONResponse(content={
         "businesses": ready_businesses,
         "total": len(ready_businesses),
@@ -323,6 +336,7 @@ async def get_ready_businesses(
         "with_phone": with_phone,
         "sms_only": sms_only,
         "email_only": email_only,
+        "call_later": call_later,
         "already_contacted": already_contacted_count,
     })
 
