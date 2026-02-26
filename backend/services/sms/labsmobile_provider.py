@@ -35,6 +35,28 @@ LABSMOBILE_BALANCE_URL = "https://api.labsmobile.com/json/balance"
 # Path on our own API that LabsMobile will call for delivery status GET callbacks
 WEBHOOK_STATUS_PATH = "/api/v1/webhooks/labsmobile/status"
 
+# LabsMobile API error code → human-readable explanation.
+# Source: https://www.labsmobile.com/en/sms-api/api-versions/http-rest-post-json
+# and https://www.labsmobile.com/en/sms-api/api-versions/webservice (shared code table).
+LABSMOBILE_ERROR_DESCRIPTIONS: dict[str, str] = {
+    "10": "Missing JSON data in request — the request body is empty or not JSON.",
+    "11": "Badly formed JSON in request — the payload could not be parsed.",
+    "20": "The 'message' element must be present in the request.",
+    "21": "The 'message' element cannot be empty.",
+    "23": "There are no recipients — the 'recipient' array is missing or empty.",
+    "24": "Too many recipients — the batch limit is 10,000 recipients per request.",
+    "27": "Message contains one or more invalid characters. "
+          "Standard SMS only accepts GSM 03.38 7-bit characters; "
+          "use the 'ucs2' parameter for Unicode/emoji content.",
+    "28": "Subid exceeds the maximum length of 20 characters.",
+    "30": "General error while sending the message — network or operator-level failure. "
+          "Retry after a short delay.",
+    "35": "Insufficient account credit — the account balance is too low to send this message. "
+          "Add credits at https://websms.labsmobile.com/SY0204/renew",
+    "39": "Invalid 'scheduled' field — datetime must be in YYYY-MM-DD HH:MM:SS format (UTC).",
+    "41": "Scheduled messages cannot be sent in test mode (test=1).",
+}
+
 
 class LabsMobileSMSProvider:
     """
@@ -197,18 +219,37 @@ class LabsMobileSMSProvider:
         payload errors. Auth failures are HTTP 401. We also check the
         JSON "code" field because the API returns code "0" (string) on
         success and a non-zero string on failure — normalise with str().
+
+        Error messages are enriched with actionable descriptions from the
+        LABSMOBILE_ERROR_DESCRIPTIONS lookup table so logs and alerts
+        read as specifically as Telnyx errors do.
         """
         if http_status == 401:
-            raise ExternalAPIException("LabsMobile authentication failed (check credentials)")
+            raise ExternalAPIException(
+                "LabsMobile Error 401: Authentication failed — "
+                "verify LABSMOBILE_USERNAME and LABSMOBILE_TOKEN in .env"
+            )
+
+        if http_status == 400:
+            api_message = data.get("message", "Bad request")
+            raise ExternalAPIException(
+                f"LabsMobile Error 400: Malformed request — {api_message}"
+            )
 
         code = str(data.get("code", ""))
         api_message = data.get("message", "Unknown error")
 
         if code != "0":
+            description = LABSMOBILE_ERROR_DESCRIPTIONS.get(code)
+            if description:
+                human_readable = description
+            else:
+                human_readable = api_message
+
             logger.error(
-                "LabsMobile API error code=%s msg=%s to=%s",
-                code, api_message, to_phone,
+                "LabsMobile Error %s to %s: %s (raw: %s)",
+                code, to_phone, human_readable, api_message,
             )
             raise ExternalAPIException(
-                f"LabsMobile error {code}: {api_message}"
+                f"LabsMobile Error {code}: {human_readable}"
             )

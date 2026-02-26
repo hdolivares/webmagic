@@ -46,17 +46,45 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks/labsmobile", tags=["LabsMobile Webhooks"])
 
-# LabsMobile desc values → internal campaign status
-# acklevel: operator | handset | error
-# desc: DELIVRD | REJECTD | UNDELIV | EXPIRED | BLOCKED | UNKNOWN
+# LabsMobile desc → internal campaign status
+# acklevel values: "operator" (intermediate), "handset" (final), "error"
+# desc values come from the carrier's DLR (Delivery Receipt) codes.
 _STATUS_MAP: dict[str, str] = {
     "DELIVRD": "delivered",
+    "READ":    "delivered",
     "REJECTD": "failed",
     "UNDELIV": "failed",
     "EXPIRED": "failed",
     "BLOCKED": "failed",
     "UNKNOWN": "failed",
-    "READ":    "delivered",
+}
+
+# Human-readable explanation for each delivery failure desc code.
+# Surfaced in campaign.error_message so operators know exactly why a send failed.
+_DELIVERY_FAILURE_REASONS: dict[str, str] = {
+    "REJECTD": (
+        "Message rejected by the carrier or operator — "
+        "the destination number may be on a DNC list, "
+        "the sender ID may not be allowed, or content was flagged."
+    ),
+    "UNDELIV": (
+        "Message undeliverable — the destination number may be "
+        "disconnected, out of coverage, the handset is full, "
+        "or the number does not exist."
+    ),
+    "EXPIRED": (
+        "Message expired before delivery — the handset was unreachable "
+        "for longer than the carrier TTL (usually 24–72 hours)."
+    ),
+    "BLOCKED": (
+        "Message blocked — the destination number is on a "
+        "Do-Not-Disturb or spam filter list, or the account has been "
+        "flagged for content policy violations."
+    ),
+    "UNKNOWN": (
+        "Delivery status unknown — the carrier did not return a final "
+        "delivery receipt. The message may or may not have been received."
+    ),
 }
 
 
@@ -120,9 +148,14 @@ async def handle_sms_status_callback(
             update_values["delivered_at"] = datetime.utcnow()
 
         if acklevel == "error" or new_status == "failed":
-            update_values["error_message"] = (
-                f"LabsMobile delivery failed: {desc or acklevel or 'unknown'}"
-            )
+            reason = _DELIVERY_FAILURE_REASONS.get(desc_upper)
+            if reason:
+                error_msg = f"LabsMobile Error ({desc_upper}): {reason}"
+            elif desc:
+                error_msg = f"LabsMobile delivery failed: desc={desc} acklevel={acklevel}"
+            else:
+                error_msg = f"LabsMobile delivery failed: acklevel={acklevel or 'error'}"
+            update_values["error_message"] = error_msg
 
         await db.execute(
             update(Campaign).where(Campaign.id == campaign.id).values(**update_values)
