@@ -1,17 +1,8 @@
-/**
- * Coverage Campaign Management Page
- * 
- * Displays campaign progress, location/category coverage,
- * and controls for starting/scheduling automated discovery.
- */
 import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui'
 import { api } from '@/services/api'
 import { IntelligentCampaignPanel } from '@/components/coverage/IntelligentCampaignPanel'
-// TEMP: Disabled until draft campaigns endpoint is fixed
-// import { DraftCampaignsPanel } from '@/components/coverage/DraftCampaignsPanel'
 import '@/components/coverage/IntelligentCampaignPanel.css'
-// import '@/components/coverage/DraftCampaignsPanel.css'
 
 interface CampaignStats {
   total_grids: number
@@ -59,6 +50,7 @@ export function CoveragePage() {
   // Scheduling settings
   const [scheduledSearches, setScheduledSearches] = useState(100)
   const [scheduleEnabled, setScheduleEnabled] = useState(false)
+  const [batchMessage, setBatchMessage] = useState<string | null>(null)
 
   useEffect(() => {
     loadCampaignData()
@@ -84,8 +76,6 @@ export function CoveragePage() {
 
 
   const startBatchScrape = async (priorityMin: number, limit: number) => {
-    if (!confirm(`Start scraping ${limit} high-priority grids?`)) return
-    
     try {
       const response = await fetch(
         `/api/v1/coverage/campaigns/start-batch?priority_min=${priorityMin}&limit=${limit}`,
@@ -98,16 +88,18 @@ export function CoveragePage() {
         }
       )
       const data = await response.json()
-      alert(`Success! Queued ${data.queued_tasks} scraping tasks`)
+      setBatchMessage(`Queued ${data.queued_tasks ?? 0} scraping tasks`)
       loadCampaignData()
     } catch (error) {
-      alert('Failed to start batch scrape: ' + error)
+      setBatchMessage('Failed to start batch scrape')
     }
   }
 
   if (loading) {
     return <div className="loading-screen">Loading campaign data...</div>
   }
+
+  const completionPct = stats?.completion_percentage || 0
 
   return (
     <div className="page-container">
@@ -116,26 +108,18 @@ export function CoveragePage() {
         <div>
           <h1 className="page-title">Discovery Campaign</h1>
           <p className="page-description">
-            Systematic business discovery across 346 US cities
+            Systematic business discovery across {stats?.total_locations || 0} cities and {stats?.total_categories || 0} categories
           </p>
         </div>
-        
-        {/* Quick Actions */}
-        <div className="btn-group">
-          <button
-            onClick={() => startBatchScrape(9, 50)}
-            className="btn btn-primary"
-          >
-            Start 50 High-Priority
-          </button>
-          <button
-            onClick={() => startBatchScrape(7, 100)}
-            className="btn btn-secondary"
-          >
-            Start 100 Medium-Priority
-          </button>
-        </div>
       </div>
+
+      {/* Batch message toast */}
+      {batchMessage && (
+        <div className="coverage-toast" onClick={() => setBatchMessage(null)}>
+          {batchMessage}
+          <span className="coverage-toast-close">×</span>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="stats-grid">
@@ -149,9 +133,9 @@ export function CoveragePage() {
 
         <Card>
           <div className="stat-label">Completion</div>
-          <div className="stat-value">{stats?.completion_percentage?.toFixed(1) || '0'}%</div>
+          <div className="stat-value">{completionPct.toFixed(1)}%</div>
           <div className="stat-meta">
-            {stats?.completed_grids} of {stats?.total_grids} complete
+            {stats?.completed_grids || 0} of {stats?.total_grids || 0} complete
           </div>
         </Card>
 
@@ -166,7 +150,7 @@ export function CoveragePage() {
         </Card>
 
         <Card>
-          <div className="stat-label">Cost</div>
+          <div className="stat-label">Actual Cost</div>
           <div className="stat-value">${stats?.actual_cost?.toFixed(2) || '0.00'}</div>
           <div className="stat-meta">
             of ${stats?.estimated_cost?.toFixed(2) || '0.00'} estimated
@@ -174,84 +158,34 @@ export function CoveragePage() {
         </Card>
       </div>
 
-      {/* Intelligent Campaign Panel - Claude-powered with Draft Mode */}
-      <IntelligentCampaignPanel onCampaignUpdate={loadCampaignData} />
-
-      {/* Draft Campaigns Panel - Review and Approve */}
-      {/* TEMP: Disabled until draft campaigns endpoint is fixed */}
-      {/* <DraftCampaignsPanel onCampaignUpdate={loadCampaignData} /> */}
-
-      {/* Progress Bar */}
+      {/* Overall Progress Bar */}
       <Card>
         <div className="card-header">
           <h2 className="card-title">Overall Progress</h2>
+          <div className="coverage-status-pills">
+            <span className="status-pill status-pill--success">{stats?.completed_grids || 0} Completed</span>
+            {(stats?.in_progress_grids || 0) > 0 && (
+              <span className="status-pill status-pill--info">{stats?.in_progress_grids} In Progress</span>
+            )}
+            <span className="status-pill status-pill--secondary">{stats?.pending_grids || 0} Pending</span>
+            {(stats?.failed_grids || 0) > 0 && (
+              <span className="status-pill status-pill--error">{stats?.failed_grids} Failed</span>
+            )}
+          </div>
         </div>
         <div className="progress-bar-wrapper">
           <div
             className="progress-bar"
-            style={{ width: `${stats?.completion_percentage || 0}%` }}
-          >
-            {stats?.completion_percentage?.toFixed(1) || '0'}%
-          </div>
+            style={{ width: `${completionPct}%` }}
+          />
         </div>
-        <div className="progress-labels">
-          <span className="text-success">{stats?.completed_grids || 0} Completed</span>
-          <span className="text-info">{stats?.in_progress_grids || 0} In Progress</span>
-          <span className="text-secondary">{stats?.pending_grids || 0} Pending</span>
-          <span className="text-error">{stats?.failed_grids || 0} Failed</span>
+        <div className="progress-bar-label">
+          {completionPct.toFixed(1)}% complete
         </div>
       </Card>
 
-      {/* Automated Scheduling */}
-      <Card>
-        <div className="card-header">
-          <h2 className="card-title">Automated Scheduling</h2>
-        </div>
-        <div className="form-section">
-          <div className="form-row">
-            <div>
-              <div className="form-label">Enable Automated Discovery</div>
-              <div className="form-hint">
-                Automatically queue searches daily based on priority
-              </div>
-            </div>
-            <label className="toggle-switch">
-              <input
-                type="checkbox"
-                checked={scheduleEnabled}
-                onChange={(e) => setScheduleEnabled(e.target.checked)}
-              />
-              <span className="toggle-slider"></span>
-            </label>
-          </div>
-          
-          {scheduleEnabled && (
-            <div className="form-section-nested">
-              <div className="form-group">
-                <label className="form-label">
-                  Searches Per Day
-                </label>
-                <input
-                  type="number"
-                  value={scheduledSearches}
-                  onChange={(e) => setScheduledSearches(parseInt(e.target.value))}
-                  min="10"
-                  max="1000"
-                  step="10"
-                  className="input input-number"
-                />
-                <div className="form-hint">
-                  Est. cost: ${(scheduledSearches * 0.50).toFixed(2)}/day
-                </div>
-              </div>
-
-              <button className="btn btn-primary">
-                Save Schedule Settings
-              </button>
-            </div>
-          )}
-        </div>
-      </Card>
+      {/* Intelligent Campaign Panel - Claude-powered with Draft Mode */}
+      <IntelligentCampaignPanel onCampaignUpdate={loadCampaignData} />
 
       {/* Tabs */}
       <div className="tabs-container">
@@ -374,6 +308,57 @@ export function CoveragePage() {
           </div>
         </Card>
       )}
+
+      {/* Automated Scheduling */}
+      <Card>
+        <div className="card-header">
+          <h2 className="card-title">Automated Scheduling</h2>
+        </div>
+        <div className="form-section">
+          <div className="form-row">
+            <div>
+              <div className="form-label">Enable Automated Discovery</div>
+              <div className="form-hint">
+                Automatically queue searches daily based on priority
+              </div>
+            </div>
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                checked={scheduleEnabled}
+                onChange={(e) => setScheduleEnabled(e.target.checked)}
+              />
+              <span className="toggle-slider"></span>
+            </label>
+          </div>
+          
+          {scheduleEnabled && (
+            <div className="form-section-nested">
+              <div className="form-group">
+                <label className="form-label">
+                  Searches Per Day
+                </label>
+                <input
+                  type="number"
+                  value={scheduledSearches}
+                  onChange={(e) => setScheduledSearches(parseInt(e.target.value))}
+                  min="10"
+                  max="1000"
+                  step="10"
+                  className="input input-number"
+                />
+                <div className="form-hint">
+                  Est. cost: ${(scheduledSearches * 0.50).toFixed(2)}/day
+                </div>
+              </div>
+
+              <button className="btn btn-primary">
+                Save Schedule Settings
+              </button>
+            </div>
+          )}
+        </div>
+      </Card>
     </div>
   )
 }
