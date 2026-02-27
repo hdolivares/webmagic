@@ -759,8 +759,8 @@ async def get_filter_stats(
 
 @router.post("/queue-for-generation")
 async def queue_businesses_for_generation(
-    business_ids: Optional[List[str]] = None,
-    queue_all: bool = False,
+    business_ids: Optional[List[str]] = Query(None),
+    queue_all: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_user)
 ):
