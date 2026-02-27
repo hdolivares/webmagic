@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card } from '@/components/ui'
 import { api } from '@/services/api'
+import { US_CITIES_BY_STATE } from '@/data/cities'
 import { IntelligentCampaignPanel } from '@/components/coverage/IntelligentCampaignPanel'
 import '@/components/coverage/IntelligentCampaignPanel.css'
 
@@ -24,6 +25,7 @@ interface CampaignStats {
   zones_completion_pct: number
   strategy_cities: number
   strategy_categories: number
+  available_categories: number
 }
 
 interface LocationCoverage {
@@ -107,16 +109,24 @@ export function CoveragePage() {
     return <div className="loading-screen">Loading campaign data...</div>
   }
 
-  // Prefer strategy-level completion (zones done vs zones planned) when strategies exist,
-  // because it reflects the true scope. Fall back to grid-level if no strategies yet.
+  // Full discoverable universe from the dropdown data (computed client-side)
+  const totalAvailableCities = useMemo(
+    () => Object.values(US_CITIES_BY_STATE).flat().length,
+    []
+  )
+  const totalAvailableStates = useMemo(
+    () => Object.keys(US_CITIES_BY_STATE).length,
+    []
+  )
+  const availableCategories = stats?.available_categories || 0
+
+  // Strategy-level progress (zones done vs zones planned)
   const hasStrategyData = (stats?.total_zones || 0) > 0
   const completionPct = hasStrategyData
     ? (stats?.zones_completion_pct || 0)
     : (stats?.completion_percentage || 0)
   const zonesCompleted = stats?.zones_completed || 0
   const totalZones = stats?.total_zones || 0
-  const scopeCities = hasStrategyData ? (stats?.strategy_cities || 0) : (stats?.total_locations || 0)
-  const scopeCategories = hasStrategyData ? (stats?.strategy_categories || 0) : (stats?.total_categories || 0)
 
   return (
     <div className="page-container">
@@ -125,7 +135,7 @@ export function CoveragePage() {
         <div>
           <h1 className="page-title">Discovery Campaign</h1>
           <p className="page-description">
-            Systematic business discovery across {scopeCities} {scopeCities === 1 ? 'city' : 'cities'} and {scopeCategories} {scopeCategories === 1 ? 'category' : 'categories'}
+            {totalAvailableCities.toLocaleString()} cities across {totalAvailableStates} states · {availableCategories} business categories available
           </p>
         </div>
       </div>
@@ -138,24 +148,35 @@ export function CoveragePage() {
         </div>
       )}
 
-      {/* Stats Cards */}
+      {/* Stats Cards — three levels: universe → started → done */}
       <div className="stats-grid">
+
+        {/* Level 1 — full discoverable universe */}
+        <Card>
+          <div className="stat-label">Available Universe</div>
+          <div className="stat-value">{totalAvailableCities.toLocaleString()}</div>
+          <div className="stat-meta">{totalAvailableStates} states · {totalAvailableCities.toLocaleString()} cities</div>
+          <div className="stat-meta">{availableCategories} business categories</div>
+        </Card>
+
+        {/* Level 2 — how much has been started (active strategies) */}
         <Card>
           <div className="stat-label">Active Strategies</div>
           <div className="stat-value">{stats?.total_strategies?.toLocaleString() || '0'}</div>
           <div className="stat-meta">
-            {scopeCities} {scopeCities === 1 ? 'city' : 'cities'} × {scopeCategories} categories
+            {stats?.strategy_cities || 0} {stats?.strategy_cities === 1 ? 'city' : 'cities'} × {stats?.strategy_categories || 0} categories
           </div>
+          <div className="stat-meta">{totalZones.toLocaleString()} zones planned</div>
         </Card>
 
+        {/* Level 3 — how much work is done */}
         <Card>
           <div className="stat-label">Zone Completion</div>
           <div className="stat-value">{completionPct.toFixed(1)}%</div>
           <div className="stat-meta">
-            {hasStrategyData
-              ? `${zonesCompleted.toLocaleString()} of ${totalZones.toLocaleString()} zones`
-              : `${stats?.completed_grids || 0} of ${stats?.total_grids || 0} grids`}
+            {zonesCompleted.toLocaleString()} of {totalZones.toLocaleString()} zones done
           </div>
+          <div className="stat-meta">{(totalZones - zonesCompleted).toLocaleString()} remaining</div>
         </Card>
 
         <Card>
@@ -164,17 +185,11 @@ export function CoveragePage() {
             {stats?.total_businesses_found?.toLocaleString() || '0'}
           </div>
           <div className="stat-meta">
-            {(totalZones - zonesCompleted).toLocaleString()} zones remaining
+            Actual cost: ${stats?.actual_cost?.toFixed(2) || '0.00'}
           </div>
+          <div className="stat-meta">of ${stats?.estimated_cost?.toFixed(2) || '0.00'} estimated</div>
         </Card>
 
-        <Card>
-          <div className="stat-label">Actual Cost</div>
-          <div className="stat-value">${stats?.actual_cost?.toFixed(2) || '0.00'}</div>
-          <div className="stat-meta">
-            of ${stats?.estimated_cost?.toFixed(2) || '0.00'} estimated
-          </div>
-        </Card>
       </div>
 
       {/* Overall Progress Bar */}
@@ -182,24 +197,9 @@ export function CoveragePage() {
         <div className="card-header">
           <h2 className="card-title">Overall Progress</h2>
           <div className="coverage-status-pills">
-            {hasStrategyData ? (
-              <>
-                <span className="status-pill status-pill--success">{zonesCompleted.toLocaleString()} zones done</span>
-                <span className="status-pill status-pill--secondary">{(totalZones - zonesCompleted).toLocaleString()} remaining</span>
-                <span className="status-pill status-pill--info">{stats?.total_strategies || 0} strategies</span>
-              </>
-            ) : (
-              <>
-                <span className="status-pill status-pill--success">{stats?.completed_grids || 0} Completed</span>
-                {(stats?.in_progress_grids || 0) > 0 && (
-                  <span className="status-pill status-pill--info">{stats?.in_progress_grids} In Progress</span>
-                )}
-                <span className="status-pill status-pill--secondary">{stats?.pending_grids || 0} Pending</span>
-                {(stats?.failed_grids || 0) > 0 && (
-                  <span className="status-pill status-pill--error">{stats?.failed_grids} Failed</span>
-                )}
-              </>
-            )}
+            <span className="status-pill status-pill--success">{zonesCompleted.toLocaleString()} zones done</span>
+            <span className="status-pill status-pill--secondary">{(totalZones - zonesCompleted).toLocaleString()} remaining</span>
+            <span className="status-pill status-pill--info">{stats?.total_strategies || 0} strategies · {stats?.strategy_cities || 0} {stats?.strategy_cities === 1 ? 'city' : 'cities'} · {stats?.strategy_categories || 0} categories</span>
           </div>
         </div>
         <div className="progress-bar-wrapper">
@@ -209,10 +209,8 @@ export function CoveragePage() {
           />
         </div>
         <div className="progress-bar-label">
-          {completionPct.toFixed(1)}% complete
-          {hasStrategyData && (
-            <span className="progress-bar-label-sub"> · {zonesCompleted} of {totalZones.toLocaleString()} zones scraped</span>
-          )}
+          {completionPct.toFixed(1)}% of active strategies complete
+          <span className="progress-bar-label-sub"> · {zonesCompleted.toLocaleString()} of {totalZones.toLocaleString()} zones scraped</span>
         </div>
       </Card>
 
