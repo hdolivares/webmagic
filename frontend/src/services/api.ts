@@ -438,6 +438,11 @@ class ApiClient {
     return response.data
   }
 
+  async regenerateSiteImages(siteId: string): Promise<{ success: boolean; message: string; saved: number; total: number; failed_slots: string[] }> {
+    const response = await this.client.post(`/sites/${siteId}/regenerate-images`)
+    return response.data
+  }
+
   // ============================================
   // PROMPT SETTINGS METHODS
   // ============================================

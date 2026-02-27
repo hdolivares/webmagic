@@ -432,6 +432,84 @@ async def mark_site_unreachable(
     return {"success": True, "message": "Site marked as superseded (business unreachable)"}
 
 
+@router.post("/{site_id}/regenerate-images")
+async def regenerate_site_images(
+    site_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Regenerate the 3 AI images (hero, about, services) for an existing generated site.
+
+    Uses the brand DNA and reviews already stored on the site/business to produce
+    contextually correct images without regenerating the entire site HTML.
+
+    Overwrites img/hero.jpg, img/about.jpg, img/services.jpg in-place — the HTML
+    references these filenames so no HTML edits are needed.
+    """
+    from sqlalchemy import select
+    from models.site import GeneratedSite
+    from models.business import Business
+    from services.creative.image_service import ImageGenerationService
+
+    result = await db.execute(select(GeneratedSite).where(GeneratedSite.id == site_id))
+    site = result.scalar_one_or_none()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    if not site.subdomain:
+        raise HTTPException(status_code=400, detail="Site has no subdomain — cannot save images")
+
+    business = None
+    if site.business_id:
+        biz_result = await db.execute(select(Business).where(Business.id == site.business_id))
+        business = biz_result.scalar_one_or_none()
+
+    # Derive inputs for image generation
+    business_name = business.name if business else "Business"
+    category = (business.category or business.subcategory or "") if business else ""
+
+    # creative_dna is stored as brand_concept on the site record
+    creative_dna = site.brand_concept or {}
+
+    # Brand colors come from design_brief if available
+    brand_colors: dict = {}
+    if site.design_brief and isinstance(site.design_brief, dict):
+        palette = site.design_brief.get("color_palette") or site.design_brief.get("colors") or {}
+        brand_colors = {
+            "primary": palette.get("primary", ""),
+            "secondary": palette.get("secondary", ""),
+        }
+
+    image_service = ImageGenerationService()
+    if not image_service.api_key:
+        raise HTTPException(status_code=503, detail="Gemini API key not configured")
+
+    try:
+        image_results = await image_service.generate_images_for_site(
+            business_name=business_name,
+            category=category,
+            subdomain=site.subdomain,
+            brand_colors=brand_colors or None,
+            creative_dna=creative_dna or None,
+        )
+    except Exception as e:
+        logger.error(f"Image regeneration failed for site {site_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Image generation failed: {str(e)}")
+
+    saved = [r for r in image_results if r.get("saved")]
+    failed = [r["slot"] for r in image_results if not r.get("saved")]
+
+    return {
+        "success": len(saved) > 0,
+        "saved": len(saved),
+        "total": len(image_results),
+        "slots": {r["slot"]: r.get("filename") for r in image_results if r.get("saved")},
+        "failed_slots": failed,
+        "message": f"Regenerated {len(saved)}/{len(image_results)} images for {business_name}",
+    }
+
+
 @router.post("/test-image-generation", response_model=ImageGenerationResponse)
 async def test_image_generation(
     request: ImageGenerationRequest,
