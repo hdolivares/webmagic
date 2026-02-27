@@ -24,14 +24,17 @@ from services.sms.phone_validator import PhoneValidator
 logger = logging.getLogger(__name__)
 
 
-# Minimum HTML size (bytes) — anything below this is almost certainly truncated
-_MIN_HTML_BYTES = 20_000
+# Minimum HTML size (bytes) — based on observed floor of 40 real generations (~22.4 KB min).
+# Sites below this are almost certainly truncated.
+_MIN_HTML_BYTES = 22_000
 
-# Keywords expected near the top of <body> for a valid full-page generation
-_HERO_KEYWORDS = ["hero", 'class="hero', "id=\"hero", "class='hero", "id='hero"]
+# Keywords expected near the top of <body> for a valid full-page generation.
+# Both hero AND nav must be present — having only nav can still indicate a truncated page
+# (e.g. the header rendered but generation was cut off before the hero section).
+_HERO_KEYWORDS = ["hero", 'class="hero', 'id="hero', "class='hero", "id='hero"]
 _NAV_KEYWORDS  = [
     "nav-link", "nav-logo", "nav-brand", "nav-content", "nav-menu",
-    "<a href", "logo", "hamburger", "menu-toggle",
+    "hamburger", "menu-toggle",
 ]
 
 
@@ -40,9 +43,10 @@ def _is_html_complete(html: str | None) -> bool:
     Return True only if the HTML looks like a full-page generation.
 
     Checks:
-    1. Minimum byte size (_MIN_HTML_BYTES)
+    1. Minimum byte size (_MIN_HTML_BYTES) — derived from observed floor across 40 real sites
     2. Presence of a <body> tag
-    3. Hero or nav content in the first 2000 chars of <body>
+    3. BOTH hero AND nav content in the first 2000 chars of <body>
+       (requiring both prevents falsely passing pages where only nav rendered before truncation)
     """
     if not html or len(html) < _MIN_HTML_BYTES:
         return False
@@ -55,7 +59,7 @@ def _is_html_complete(html: str | None) -> bool:
     body_start = lower[body_pos: body_pos + 2_000]
     has_hero = any(kw in body_start for kw in _HERO_KEYWORDS)
     has_nav  = any(kw in body_start for kw in _NAV_KEYWORDS)
-    return has_hero or has_nav
+    return has_hero and has_nav
 
 
 def run_async(coro):
