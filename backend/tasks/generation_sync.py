@@ -336,7 +336,18 @@ def generate_site_for_business(self, business_id: str):
                 site.js_content = js_content
                 site.brand_analysis = result.get("analysis")
                 site.brand_concept = result.get("concepts", {}).get("creative_dna")
-                site.design_brief = result.get("design_brief")
+
+                # Persist the exact Gemini prompts used for each image slot so we can
+                # review and improve them without having to regenerate the whole site.
+                design_brief = result.get("design_brief") or {}
+                generated_images = result.get("website", {}).get("generated_images", [])
+                if generated_images:
+                    design_brief["image_prompts"] = {
+                        img["slot"]: img.get("full_prompt")
+                        for img in generated_images
+                        if isinstance(img, dict) and img.get("slot")
+                    }
+                site.design_brief = design_brief
                 site.status = "completed"
                 site.generation_completed_at = datetime.utcnow()
                 

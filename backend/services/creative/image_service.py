@@ -97,9 +97,15 @@ _CATEGORY_PROMPTS: Dict[str, List[Dict[str, str]]] = {
             "slot": "about",
             "aspect": "4:3",
             "desc": (
-                "A skilled female massage therapist performing a relaxing back massage "
-                "on a client draped in white linen on a massage table. Soft warm "
-                "lighting, spa interior with candles and natural elements, tranquil mood."
+                "A skilled female massage therapist in white attire STANDING BESIDE a "
+                "professional massage table, both feet firmly planted on the floor, "
+                "gently applying pressure to the upper back of a client lying face-down "
+                "and draped in soft white linen. Side-angle or 3/4 view that shows the "
+                "full height of both therapist and client. The therapist is NOT sitting "
+                "or kneeling on the table — she is standing upright next to it, leaning "
+                "slightly forward from the waist. Soft warm candlelit spa interior with "
+                "natural elements, serene and tranquil atmosphere. Correct human anatomy, "
+                "realistic body proportions, both legs of the therapist fully visible."
             ),
         },
         {
@@ -371,7 +377,7 @@ class ImageGenerationService:
         for spec, res in zip(prompt_specs, results):
             if isinstance(res, Exception):
                 logger.error(f"[ImageGen] Failed {spec['slot']}: {res}")
-                output.append({"slot": spec["slot"], "filename": None, "saved": False})
+                output.append({"slot": spec["slot"], "filename": None, "saved": False, "full_prompt": None})
             else:
                 output.append(res)
 
@@ -403,7 +409,7 @@ class ImageGenerationService:
 
         png_bytes = await self._call_gemini(full_prompt, aspect)
         if not png_bytes:
-            return {"slot": slot, "filename": None, "saved": False}
+            return {"slot": slot, "filename": None, "saved": False, "full_prompt": full_prompt}
 
         jpeg_bytes = self._compress_to_jpeg(png_bytes)
         filename = f"img/{slot}.jpg"
@@ -411,7 +417,7 @@ class ImageGenerationService:
 
         size_kb = len(jpeg_bytes) / 1024
         logger.info(f"[ImageGen] {slot}: {size_kb:.0f} KB saved → {filename}")
-        return {"slot": slot, "filename": filename, "saved": True}
+        return {"slot": slot, "filename": filename, "saved": True, "full_prompt": full_prompt}
 
     async def _call_gemini(self, prompt: str, aspect_ratio: str) -> Optional[bytes]:
         url = f"{self.BASE_URL}/models/{self.MODEL}:generateContent"
