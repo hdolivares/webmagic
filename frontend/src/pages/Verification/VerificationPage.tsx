@@ -27,8 +27,15 @@ import {
   ClipboardCheck,
   Wand2,
   CheckCircle,
+  CreditCard,
 } from 'lucide-react'
 import { api } from '@/services/api'
+
+/** Returns true if a raw error string signals Anthropic credits exhaustion. */
+function isCreditsError(msg: string) {
+  const lower = msg.toLowerCase()
+  return lower.includes('credit balance is too low') || (lower.includes('credits') && lower.includes('too low'))
+}
 import type { VerificationQueueItem, VerificationDecisionRequest } from '@/services/api'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -492,7 +499,11 @@ export function VerificationPage() {
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.detail ?? err?.message ?? 'Something went wrong'
-      showToast(msg, 'error')
+      if (isCreditsError(msg)) {
+        showToast('Anthropic API credits exhausted — add credits at console.anthropic.com/settings/billing', 'error')
+      } else {
+        showToast(msg, 'error')
+      }
     },
     onSettled: () => setProcessingId(null),
   })
@@ -570,12 +581,33 @@ export function VerificationPage() {
         </div>
       )}
 
-      {isError && (
-        <div className="flex items-center gap-sm p-lg rounded-xl border border-error/30 bg-error/5 text-error">
-          <AlertTriangle className="w-5 h-5 shrink-0" />
-          Failed to load verification queue. Please refresh.
-        </div>
-      )}
+      {isError && (() => {
+        const errMsg = (isError as any)?.message ?? ''
+        return isCreditsError(errMsg) ? (
+          <div className="flex items-start gap-3 p-lg rounded-xl border border-red-300 bg-red-50">
+            <CreditCard className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-red-800 text-sm">Anthropic API Credits Exhausted</p>
+              <p className="text-red-700 text-xs mt-0.5">
+                The LLM validation pipeline requires active Anthropic credits.{' '}
+                <a
+                  href="https://console.anthropic.com/settings/billing"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline font-medium"
+                >
+                  Add credits →
+                </a>
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-sm p-lg rounded-xl border border-error/30 bg-error/5 text-error">
+            <AlertTriangle className="w-5 h-5 shrink-0" />
+            Failed to load verification queue. Please refresh.
+          </div>
+        )
+      })()}
 
       {!isLoading && !isError && data?.items.length === 0 && (
         <div className="flex flex-col items-center justify-center py-2xl text-center">

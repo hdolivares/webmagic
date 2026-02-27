@@ -11,6 +11,7 @@ import logging
 from core.database import get_db_session_sync
 from core.config import get_settings
 from services.validation.validation_orchestrator import ValidationOrchestrator
+from utils.error_classifier import classify_error
 
 logger = logging.getLogger(__name__)
 
@@ -125,14 +126,17 @@ def validate_business_website(self, business_id: str):
             logger.error(f"Max retries exceeded for business {business_id}")
             
             # Mark as failed in database
+            err_category, err_message = classify_error(e)
             with get_db_session_sync() as db:
                 from models.business import Business
                 business = db.query(Business).filter(Business.id == business_id).first()
                 if business:
                     business.website_validation_status = "error"
                     business.website_validation_result = {
-                        "error": str(e),
-                        "verdict": "error"
+                        "error": err_message,
+                        "error_category": err_category,
+                        "verdict": "error",
+                        "timestamp": datetime.utcnow().isoformat(),
                     }
                     business.website_validated_at = datetime.utcnow()
                     # db.commit() is handled by context manager
@@ -358,14 +362,17 @@ def discover_missing_websites(self, business_id: str):
             logger.error(f"Max retries exceeded for discovery {business_id}")
             
             # Mark as error in database
+            err_category, err_message = classify_error(e)
             with get_db_session_sync() as db:
                 from models.business import Business
                 business = db.query(Business).filter(Business.id == business_id).first()
                 if business:
                     business.website_validation_status = "error"
                     business.website_validation_result = {
-                        "error": f"Discovery failed: {str(e)}",
-                        "verdict": "error"
+                        "error": err_message,
+                        "error_category": err_category,
+                        "verdict": "error",
+                        "timestamp": datetime.utcnow().isoformat(),
                     }
                     business.website_validated_at = datetime.utcnow()
             

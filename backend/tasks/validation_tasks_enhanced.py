@@ -19,6 +19,7 @@ from core.database import get_db_session_sync
 from models.business import Business
 from services.validation.validation_orchestrator import ValidationOrchestrator
 from services.validation.validation_metadata_service import ValidationMetadataService
+from utils.error_classifier import classify_error
 from core.validation_enums import (
     ValidationState,
     ValidationRecommendation,
@@ -696,13 +697,15 @@ def _handle_validation_error(business_id: str, error: Exception) -> Dict[str, An
     """
     logger.error(f"Max retries exceeded for {business_id}")
     
+    err_category, err_message = classify_error(error)
     try:
         with get_db_session_sync() as db:
             business = db.query(Business).filter(Business.id == business_id).first()
             if business:
                 business.website_validation_status = ValidationState.ERROR.value
                 business.website_validation_result = {
-                    "error": str(error),
+                    "error": err_message,
+                    "error_category": err_category,
                     "verdict": "error",
                     "timestamp": datetime.utcnow().isoformat()
                 }
@@ -714,7 +717,8 @@ def _handle_validation_error(business_id: str, error: Exception) -> Dict[str, An
     return {
         "business_id": business_id,
         "status": "error",
-        "error": str(error)
+        "error": err_message,
+        "error_category": err_category,
     }
 
 
