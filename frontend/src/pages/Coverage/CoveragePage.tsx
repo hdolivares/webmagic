@@ -117,17 +117,23 @@ export function CoveragePage() {
   )
   const availableCategories = stats?.available_categories || 0
 
-  // Strategy-level progress (zones done vs zones planned)
-  const hasStrategyData = (stats?.total_zones || 0) > 0
-
   if (loading) {
     return <div className="loading-screen">Loading campaign data...</div>
   }
-  const completionPct = hasStrategyData
-    ? (stats?.zones_completion_pct || 0)
-    : (stats?.completion_percentage || 0)
+
+  // Grid-level (all cities, all scrapes)
+  const totalGrids       = stats?.total_grids || 0
+  const completedGrids   = stats?.completed_grids || 0
+  const pendingGrids     = stats?.pending_grids || 0
+  const inProgressGrids  = stats?.in_progress_grids || 0
+  const gridCompletionPct = totalGrids > 0 ? (completedGrids / totalGrids) * 100 : 0
+  const citiesScraped    = stats?.total_locations || 0
+  const categoriesScraped = stats?.total_categories || 0
+
+  // Strategy-level (intelligent zone system — LA only for now)
+  const totalZones     = stats?.total_zones || 0
   const zonesCompleted = stats?.zones_completed || 0
-  const totalZones = stats?.total_zones || 0
+  const hasStrategyData = totalZones > 0
 
   return (
     <div className="page-container">
@@ -149,10 +155,10 @@ export function CoveragePage() {
         </div>
       )}
 
-      {/* Stats Cards — three levels: universe → started → done */}
+      {/* Stats Cards */}
       <div className="stats-grid">
 
-        {/* Level 1 — full discoverable universe */}
+        {/* Universe — what's possible */}
         <Card>
           <div className="stat-label">Available Universe</div>
           <div className="stat-value">{(totalAvailableCities * availableCategories).toLocaleString()}</div>
@@ -160,34 +166,32 @@ export function CoveragePage() {
           <div className="stat-meta">{totalAvailableStates} states</div>
         </Card>
 
-        {/* Level 2 — how much has been started (active strategies) */}
+        {/* Coverage — all cities & categories touched so far */}
         <Card>
-          <div className="stat-label">Active Strategies</div>
-          <div className="stat-value">{stats?.total_strategies?.toLocaleString() || '0'}</div>
-          <div className="stat-meta">
-            {stats?.strategy_cities || 0} {stats?.strategy_cities === 1 ? 'city' : 'cities'} × {stats?.strategy_categories || 0} categories
-          </div>
-          <div className="stat-meta">{totalZones.toLocaleString()} zones planned</div>
+          <div className="stat-label">Cities Covered</div>
+          <div className="stat-value">{citiesScraped}</div>
+          <div className="stat-meta">{categoriesScraped} categories scraped</div>
+          <div className="stat-meta">{totalGrids} total grids queued</div>
         </Card>
 
-        {/* Level 3 — how much work is done */}
+        {/* Grid completion — across ALL cities */}
         <Card>
-          <div className="stat-label">Zone Completion</div>
-          <div className="stat-value">{completionPct.toFixed(1)}%</div>
+          <div className="stat-label">Grids Completed</div>
+          <div className="stat-value">{gridCompletionPct.toFixed(1)}%</div>
+          <div className="stat-meta">{completedGrids} of {totalGrids} grids done</div>
           <div className="stat-meta">
-            {zonesCompleted.toLocaleString()} of {totalZones.toLocaleString()} zones done
+            {pendingGrids} pending
+            {inProgressGrids > 0 ? ` · ${inProgressGrids} in progress` : ''}
           </div>
-          <div className="stat-meta">{(totalZones - zonesCompleted).toLocaleString()} remaining</div>
         </Card>
 
+        {/* Businesses */}
         <Card>
           <div className="stat-label">Businesses Found</div>
           <div className="stat-value text-success">
             {stats?.total_businesses_found?.toLocaleString() || '0'}
           </div>
-          <div className="stat-meta">
-            Actual cost: ${stats?.actual_cost?.toFixed(2) || '0.00'}
-          </div>
+          <div className="stat-meta">Actual cost: ${stats?.actual_cost?.toFixed(2) || '0.00'}</div>
           <div className="stat-meta">of ${stats?.estimated_cost?.toFixed(2) || '0.00'} estimated</div>
         </Card>
 
@@ -198,20 +202,25 @@ export function CoveragePage() {
         <div className="card-header">
           <h2 className="card-title">Overall Progress</h2>
           <div className="coverage-status-pills">
-            <span className="status-pill status-pill--success">{zonesCompleted.toLocaleString()} zones done</span>
-            <span className="status-pill status-pill--secondary">{(totalZones - zonesCompleted).toLocaleString()} remaining</span>
-            <span className="status-pill status-pill--info">{stats?.total_strategies || 0} strategies · {stats?.strategy_cities || 0} {stats?.strategy_cities === 1 ? 'city' : 'cities'} · {stats?.strategy_categories || 0} categories</span>
+            <span className="status-pill status-pill--success">{completedGrids} grids done</span>
+            <span className="status-pill status-pill--secondary">{pendingGrids} pending</span>
+            <span className="status-pill status-pill--info">{citiesScraped} {citiesScraped === 1 ? 'city' : 'cities'} · {categoriesScraped} categories</span>
+            {hasStrategyData && (
+              <span className="status-pill status-pill--info">
+                {zonesCompleted} / {totalZones} intelligent zones (LA)
+              </span>
+            )}
           </div>
         </div>
         <div className="progress-bar-wrapper">
           <div
             className="progress-bar"
-            style={{ width: `${completionPct}%` }}
+            style={{ width: `${gridCompletionPct}%` }}
           />
         </div>
         <div className="progress-bar-label">
-          {completionPct.toFixed(1)}% of active strategies complete
-          <span className="progress-bar-label-sub"> · {zonesCompleted.toLocaleString()} of {totalZones.toLocaleString()} zones scraped</span>
+          {gridCompletionPct.toFixed(1)}% of queued grids complete
+          <span className="progress-bar-label-sub"> · {completedGrids} of {totalGrids} grids across {citiesScraped} cities</span>
         </div>
       </Card>
 
