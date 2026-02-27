@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     
     # JWT / Auth
     SECRET_KEY: str
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 hours
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
     # API Versioning

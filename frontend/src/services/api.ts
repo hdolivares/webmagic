@@ -144,13 +144,14 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       (error: AxiosError) => {
-        // Only redirect on 401 for authenticated requests, not login attempts
         if (error.response?.status === 401) {
           const isLoginEndpoint = error.config?.url?.includes('/auth/login') || 
                                   error.config?.url?.includes('/auth/unified-login')
-          
-          // Don't redirect if this is a login attempt (let the login page handle the error)
-          if (!isLoginEndpoint) {
+          // Callers can pass { suppressAuthRedirect: true } in axios config
+          // to handle 401 themselves (e.g. background polling) without forcing logout
+          const suppress = (error.config as any)?.suppressAuthRedirect === true
+
+          if (!isLoginEndpoint && !suppress) {
             this.clearAuth()
             window.location.href = '/login'
           }
@@ -973,6 +974,15 @@ class ApiClient {
 
   async getIntelligentStrategy(strategyId: string): Promise<any> {
     const response = await this.client.get(`/intelligent-campaigns/strategies/${strategyId}`)
+    return response.data
+  }
+
+  // Silent variant for background polling — a 401 won't trigger global logout
+  async getIntelligentStrategyQuiet(strategyId: string): Promise<any> {
+    const response = await this.client.get(
+      `/intelligent-campaigns/strategies/${strategyId}`,
+      { suppressAuthRedirect: true } as any
+    )
     return response.data
   }
 
