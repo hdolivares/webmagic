@@ -104,14 +104,14 @@ class ScrapeZoneRequest(BaseModel):
     strategy_id: str = Field(..., description="Strategy UUID")
     zone_id: Optional[str] = Field(None, description="Specific zone to scrape (if None, scrapes next zone)")
     force_rescrape: bool = Field(default=False, description="If True, allows re-scraping already-scraped zones")
-    limit_per_zone: int = Field(default=50, description="Maximum businesses per zone")
+    limit_per_zone: int = Field(default=200, description="Maximum businesses per zone")
     draft_mode: bool = Field(default=False, description="If True, save businesses for review without sending messages")
 
 
 class BatchScrapeRequest(BaseModel):
     """Request to scrape multiple zones in a strategy."""
     strategy_id: str = Field(..., description="Strategy UUID")
-    limit_per_zone: int = Field(default=50, description="Maximum businesses per zone")
+    limit_per_zone: int = Field(default=200, description="Maximum businesses per zone")
     max_zones: Optional[int] = Field(None, description="Maximum zones to scrape (None = all remaining)")
     draft_mode: bool = Field(default=False, description="If True, save businesses for review without sending messages")
 

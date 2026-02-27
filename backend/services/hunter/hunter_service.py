@@ -74,7 +74,7 @@ class HunterService:
         state: str,
         category: str,
         country: str = "US",
-        limit_per_zone: int = 50,
+        limit_per_zone: int = 200,
         population: Optional[int] = None,
         center_lat: Optional[float] = None,
         center_lon: Optional[float] = None,
@@ -611,7 +611,7 @@ class HunterService:
     async def scrape_all_zones_for_strategy(
         self,
         strategy_id: str,
-        limit_per_zone: int = 50,
+        limit_per_zone: int = 200,
         max_zones: Optional[int] = None
     ) -> Dict[str, Any]:
         """

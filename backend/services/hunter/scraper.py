@@ -35,7 +35,7 @@ class OutscraperClient:
         city: str,
         state: str,
         country: str = "US",
-        limit: int = 50,
+        limit: int = 200,
         language: str = "en",
         zone_lat: Optional[float] = None,  # DEPRECATED: Outscraper ignores coordinates
         zone_lon: Optional[float] = None,  # DEPRECATED: Outscraper ignores coordinates
