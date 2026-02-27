@@ -241,11 +241,12 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
 
     pollIntervalRef.current = setInterval(async () => {
       try {
-        const updated = await api.getIntelligentStrategy(strategyId)
+        // Use the quiet variant — a 401 (e.g. token expiry) stops polling
+        // gracefully instead of triggering a full logout
+        const updated = await api.getIntelligentStrategyQuiet(strategyId)
         setStrategy(updated)
 
         if (updated.zones_completed === updated.total_zones) {
-          // All zones done
           stopBatchPolling()
           setIsBatchRunning(false)
           if (onCampaignUpdate) onCampaignUpdate()
@@ -264,8 +265,15 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
           noChangeCountRef.current = 0
           lastZonesCompleted = updated.zones_completed
         }
-      } catch (err) {
-        console.error('Polling error:', err)
+      } catch (err: any) {
+        if (err?.response?.status === 401) {
+          // Token expired mid-poll — stop polling silently, don't logout
+          console.warn('Polling stopped: session expired. Please refresh the page.')
+          stopBatchPolling()
+          setIsBatchRunning(false)
+        } else {
+          console.error('Polling error:', err)
+        }
       }
     }, 10_000) // poll every 10 seconds
   }, [stopBatchPolling, onCampaignUpdate])
@@ -284,7 +292,7 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
     try {
       await api.batchScrapeIntelligentStrategy({
         strategy_id: strategy.strategy_id,
-        limit_per_zone: 50,
+        limit_per_zone: 200,
         max_zones: batchTargetZones,
         draft_mode: draftMode
       })
