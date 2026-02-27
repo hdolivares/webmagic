@@ -510,25 +510,43 @@ async def regenerate_site_images(
     saved = [r for r in image_results if r.get("saved")]
     failed = [r["slot"] for r in image_results if not r.get("saved")]
 
-    # ── Cache-bust the img src attributes in the stored HTML ────────────────
-    # Nginx caches .jpg responses for 30 days (expires 30d in nginx config).
-    # Adding ?v=<timestamp> to each src forces the browser to fetch the new
-    # file without touching any other HTML content.
-    # Pattern: src="img/hero.jpg" or src="img/hero.jpg?v=oldvalue"
-    if saved and site.html_content:
-        version = int(time.time())
-        updated_html = re.sub(
-            r'(src="img/(hero|about|services)\.jpg)(?:\?v=\d+)?(")',
-            lambda m: f'{m.group(1)}?v={version}{m.group(3)}',
-            site.html_content,
-        )
-        if updated_html != site.html_content:
-            site.html_content = updated_html
-            await db.commit()
+    # ── Save prompts + cache-bust HTML ──────────────────────────────────────
+    if saved:
+        # 1. Persist the exact prompts used so they can be reviewed/improved.
+        new_prompts = {
+            r["slot"]: r.get("full_prompt")
+            for r in image_results
+            if isinstance(r, dict) and r.get("slot") and r.get("full_prompt")
+        }
+        if new_prompts and site.design_brief is not None:
+            updated_brief = dict(site.design_brief)
+            updated_brief["image_prompts"] = {
+                **(updated_brief.get("image_prompts") or {}),
+                **new_prompts,
+            }
+            site.design_brief = updated_brief
             logger.info(
-                f"[RegenImages] Updated img src cache-busters to v={version} "
-                f"for site {site_id} ({site.subdomain})"
+                f"[RegenImages] Saved prompts for slots {list(new_prompts.keys())} "
+                f"into design_brief for site {site_id}"
             )
+
+        # 2. Append ?v=<timestamp> cache-busters to img src attributes in the
+        #    stored HTML so browsers bypass Nginx's 30-day .jpg cache.
+        if site.html_content:
+            version = int(time.time())
+            updated_html = re.sub(
+                r'(src="img/(hero|about|services)\.jpg)(?:\?v=\d+)?(")',
+                lambda m: f'{m.group(1)}?v={version}{m.group(3)}',
+                site.html_content,
+            )
+            if updated_html != site.html_content:
+                site.html_content = updated_html
+                logger.info(
+                    f"[RegenImages] Updated img src cache-busters to v={version} "
+                    f"for site {site_id} ({site.subdomain})"
+                )
+
+        await db.commit()
 
     return {
         "success": len(saved) > 0,
