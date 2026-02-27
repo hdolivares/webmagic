@@ -16,6 +16,7 @@ from models.business import Business
 from models.geo_strategy import GeoStrategy
 from models.user import AdminUser
 from pydantic import BaseModel
+from scripts.business_categories import BUSINESS_CATEGORIES
 
 router = APIRouter(prefix="/coverage/campaigns", tags=["coverage-campaigns"])
 
@@ -45,6 +46,8 @@ class CampaignStats(BaseModel):
     zones_completion_pct: float
     strategy_cities: int
     strategy_categories: int
+    # Full available universe (from dropdown data)
+    available_categories: int
 
 
 class LocationCoverage(BaseModel):
@@ -174,6 +177,7 @@ async def get_campaign_stats(
         zones_completion_pct=zones_completion_pct,
         strategy_cities=strategy_cities,
         strategy_categories=strategy_categories,
+        available_categories=len(BUSINESS_CATEGORIES),
     )
 
 
