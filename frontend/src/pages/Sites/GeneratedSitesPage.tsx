@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
 import { Card, CardHeader, CardBody, CardTitle, Badge, Button } from '@/components/ui'
-import { Wand2, Search, ExternalLink, Eye, Calendar, TrendingUp, ChevronDown, ChevronUp, ExternalLink as LinkIcon, Play, AlertCircle, RefreshCw, ShieldCheck, Globe, PhoneOff } from 'lucide-react'
+import { Wand2, Search, ExternalLink, Eye, Calendar, TrendingUp, ChevronDown, ChevronUp, ExternalLink as LinkIcon, Play, AlertCircle, RefreshCw, ShieldCheck, Globe, PhoneOff, ImagePlus } from 'lucide-react'
 
 // Statuses that mean the business passed the full triple-check validation (no website found)
 const TRIPLE_VERIFIED_STATUSES = new Set(['triple_verified', 'confirmed_no_website'])
@@ -86,6 +86,18 @@ export const GeneratedSitesPage = () => {
     },
     onError: (error: any) => {
       alert(`❌ Failed to mark: ${error.message}`)
+    },
+  })
+
+  // Regenerate just the 3 AI images for an existing site (keeps HTML intact)
+  const regenImagesMutation = useMutation({
+    mutationFn: (siteId: string) => api.regenerateSiteImages(siteId),
+    onSuccess: (data) => {
+      alert(`✅ ${data.message}${data.failed_slots?.length ? `\n⚠️ Failed slots: ${data.failed_slots.join(', ')}` : ''}`)
+      queryClient.invalidateQueries({ queryKey: ['generated-sites'] })
+    },
+    onError: (error: any) => {
+      alert(`❌ Image regeneration failed: ${error.message}`)
     },
   })
   
@@ -618,6 +630,23 @@ export const GeneratedSitesPage = () => {
                           Unreachable
                         </button>
                       </div>
+                    )}
+
+                    {/* Regen images — available for any completed/published site */}
+                    {(site.status === 'completed' || site.status === 'published') && (
+                      <button
+                        className="w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 hover:bg-purple-100 transition-colors disabled:opacity-50"
+                        onClick={() => {
+                          if (confirm('Regenerate the 3 AI images (hero, about, services) for this site? The existing HTML is kept — only the image files are overwritten.')) {
+                            regenImagesMutation.mutate(site.id)
+                          }
+                        }}
+                        disabled={regenImagesMutation.isPending}
+                        title="Regenerate hero, about, and services images with correct brand context"
+                      >
+                        <ImagePlus className="w-3 h-3" />
+                        {regenImagesMutation.isPending ? 'Generating…' : 'Regen Images'}
+                      </button>
                     )}
                     
                     {/* Show short link if available */}
