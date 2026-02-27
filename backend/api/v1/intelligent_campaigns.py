@@ -13,7 +13,7 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID
 import logging
 
-from core.database import get_db
+from core.database import get_db, AsyncSessionLocal
 from models.user import AdminUser
 from api.v1.auth import get_current_user
 from services.hunter.hunter_service import HunterService
@@ -318,16 +318,23 @@ async def batch_scrape_strategy(
             f"max_zones={request.max_zones or 'all'}"
         )
         
-        # Run in background
+        # Run in background — must use a fresh session, not the request-scoped one
+        strategy_id = request.strategy_id
+        limit_per_zone = request.limit_per_zone
+        max_zones = request.max_zones
+
         async def execute_batch():
-            async with get_db() as db_session:
-                hunter_service = HunterService(db_session)
-                await hunter_service.scrape_all_zones_for_strategy(
-                    strategy_id=request.strategy_id,
-                    limit_per_zone=request.limit_per_zone,
-                    max_zones=request.max_zones
-                )
-        
+            async with AsyncSessionLocal() as db_session:
+                try:
+                    hunter_service = HunterService(db_session)
+                    await hunter_service.scrape_all_zones_for_strategy(
+                        strategy_id=strategy_id,
+                        limit_per_zone=limit_per_zone,
+                        max_zones=max_zones
+                    )
+                except Exception as exc:
+                    logger.error(f"Batch scrape background task failed: {exc}", exc_info=True)
+
         background_tasks.add_task(execute_batch)
         
         return {
