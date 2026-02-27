@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card } from '@/components/ui'
+import { CreditCard, Database, Zap, Clock, AlertTriangle, ExternalLink } from 'lucide-react'
 import { api } from '@/services/api'
 import { US_STATES } from '@/data/states'
 import { getCitiesForState } from '@/data/cities'
@@ -75,6 +76,63 @@ interface ScrapeResult {
 
 interface IntelligentCampaignPanelProps {
   onCampaignUpdate?: () => void
+}
+
+/** Detect error category from a raw error string (mirrors backend classify_error logic). */
+function detectErrorCategory(msg: string): 'credits_exhausted' | 'data_error' | 'api_error' | 'timeout' | 'unknown' {
+  const lower = msg.toLowerCase()
+  if (lower.includes('credit balance is too low') || (lower.includes('credits') && lower.includes('too low')))
+    return 'credits_exhausted'
+  if (lower.includes('timeout') || lower.includes('timed out')) return 'timeout'
+  if (lower.includes('api') || lower.includes('claude') || lower.includes('anthropic')) return 'api_error'
+  if (lower.includes('nonetype') || lower.includes('typeerror') || lower.includes('valueerror')) return 'data_error'
+  return 'unknown'
+}
+
+/** Renders a contextual error banner based on the error message. */
+function ErrorBanner({ message }: { message: string }) {
+  const category = detectErrorCategory(message)
+
+  if (category === 'credits_exhausted') {
+    return (
+      <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-300 rounded-lg mt-3">
+        <CreditCard className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-red-800 text-sm">Anthropic API Credits Exhausted</p>
+          <p className="text-red-700 text-xs mt-0.5">
+            Strategy generation uses Claude and requires an active credit balance.
+            Add credits to resume.
+          </p>
+          <a
+            href="https://console.anthropic.com/settings/billing"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs font-medium text-red-700 underline mt-1"
+          >
+            <ExternalLink className="w-3 h-3" /> Add Credits →
+          </a>
+        </div>
+      </div>
+    )
+  }
+
+  const config = {
+    timeout:  { Icon: Clock,         label: 'Request Timed Out',    bg: 'bg-blue-50',   border: 'border-blue-300',  text: 'text-blue-800',  sub: 'text-blue-700'  },
+    api_error:{ Icon: Zap,           label: 'API Error',            bg: 'bg-yellow-50', border: 'border-yellow-300',text: 'text-yellow-800',sub: 'text-yellow-700'},
+    data_error:{ Icon: Database,     label: 'Data Error',           bg: 'bg-orange-50', border: 'border-orange-300',text: 'text-orange-800',sub: 'text-orange-700'},
+    unknown:  { Icon: AlertTriangle, label: 'Error',                bg: 'bg-red-50',    border: 'border-red-200',   text: 'text-red-800',   sub: 'text-red-700'   },
+  }[category]
+
+  const { Icon, label, bg, border, text, sub } = config
+  return (
+    <div className={`flex items-start gap-3 p-4 ${bg} border ${border} rounded-lg mt-3`}>
+      <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${text}`} />
+      <div>
+        <p className={`font-semibold text-sm ${text}`}>{label}</p>
+        <p className={`text-xs mt-0.5 ${sub}`}>{message}</p>
+      </div>
+    </div>
+  )
 }
 
 export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampaignPanelProps) {
@@ -420,11 +478,7 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
         </div>
 
         {/* Error Display */}
-        {error && (
-          <div className="error-message">
-            ⚠️ {error}
-          </div>
-        )}
+        {error && <ErrorBanner message={error} />}
 
         {/* Strategy Display */}
         {strategy && (
