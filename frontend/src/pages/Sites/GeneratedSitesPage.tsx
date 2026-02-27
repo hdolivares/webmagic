@@ -2,18 +2,24 @@
  * Generated Sites Inventory - Shows AI-generated sites from generated_sites table
  * These are sites created by the system but not yet purchased by customers
  */
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
 import { Card, CardHeader, CardBody, CardTitle, Badge, Button } from '@/components/ui'
-import { Wand2, Search, ExternalLink, Eye, Calendar, TrendingUp, ChevronDown, ChevronUp, ExternalLink as LinkIcon, Play, AlertCircle, RefreshCw } from 'lucide-react'
+import { Wand2, Search, ExternalLink, Eye, Calendar, TrendingUp, ChevronDown, ChevronUp, ExternalLink as LinkIcon, Play, AlertCircle, RefreshCw, ShieldCheck } from 'lucide-react'
+
+// Statuses that mean the business passed the full triple-check validation
+const TRIPLE_VERIFIED_STATUSES = new Set(['triple_verified', 'confirmed_no_website'])
+
+type VerificationFilter = 'all' | 'verified' | 'not_verified'
 
 export const GeneratedSitesPage = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [verificationFilter, setVerificationFilter] = useState<VerificationFilter>('all')
   const [expandedSites, setExpandedSites] = useState<Set<string>>(new Set())
   const [showNeedingGeneration, setShowNeedingGeneration] = useState(false)
   
@@ -59,16 +65,30 @@ export const GeneratedSitesPage = () => {
   })
   
   // Sort sites by created_at descending (most recent first) and filter
-  const filteredAndSortedSites = [...(data?.sites || [])]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .filter((site: any) => {
-      const search = searchTerm.toLowerCase()
-      return (
-        site.subdomain?.toLowerCase().includes(search) ||
-        site.business?.name?.toLowerCase().includes(search) ||
-        site.id?.toLowerCase().includes(search)
-      )
-    })
+  const filteredAndSortedSites = useMemo(() => {
+    return [...(data?.sites || [])]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .filter((site: any) => {
+        // Text search
+        const search = searchTerm.toLowerCase()
+        const matchesSearch = (
+          site.subdomain?.toLowerCase().includes(search) ||
+          site.business?.name?.toLowerCase().includes(search) ||
+          site.id?.toLowerCase().includes(search)
+        )
+        if (!matchesSearch) return false
+
+        // Verification filter
+        const validationStatus = site.business?.website_validation_status
+        if (verificationFilter === 'verified') {
+          return TRIPLE_VERIFIED_STATUSES.has(validationStatus)
+        }
+        if (verificationFilter === 'not_verified') {
+          return !TRIPLE_VERIFIED_STATUSES.has(validationStatus)
+        }
+        return true
+      })
+  }, [data?.sites, searchTerm, verificationFilter])
   
   const toggleExpanded = (siteId: string) => {
     setExpandedSites(prev => {
@@ -94,6 +114,43 @@ export const GeneratedSitesPage = () => {
     return <Badge variant={variant}>{label}</Badge>
   }
 
+  const getValidationBadge = (validationStatus: string | undefined) => {
+    if (!validationStatus) return null
+    if (TRIPLE_VERIFIED_STATUSES.has(validationStatus)) {
+      const label = validationStatus === 'triple_verified' ? '✅ Triple Verified' : '✅ Confirmed No Site'
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-success-100 text-success-700 border border-success-200">
+          {label}
+        </span>
+      )
+    }
+    const pendingStates: Record<string, string> = {
+      pending: '⏳ Pending',
+      needs_discovery: '🔍 Needs Discovery',
+      discovery_queued: '🔍 Queued',
+      discovery_in_progress: '🔍 In Progress',
+      invalid_technical: '❌ Invalid',
+      invalid_type: '❌ Invalid Type',
+      invalid_mismatch: '❌ Mismatch',
+      valid_outscraper: '🌐 Has Website',
+      valid_scrapingdog: '🌐 Has Website',
+      valid_manual: '🌐 Has Website',
+      geo_mismatch: '🌍 Geo Mismatch',
+      error: '⚠️ Error',
+    }
+    const label = pendingStates[validationStatus] ?? `⚠️ ${validationStatus}`
+    const isHasWebsite = validationStatus.startsWith('valid_')
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
+        isHasWebsite
+          ? 'bg-error-50 text-error-700 border-error-200'
+          : 'bg-warning-50 text-warning-700 border-warning-200'
+      }`}>
+        {label}
+      </span>
+    )
+  }
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A'
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -105,13 +162,16 @@ export const GeneratedSitesPage = () => {
   }
 
   // Stats calculations
-  const stats = {
+  const stats = useMemo(() => ({
     total: data?.total || 0,
     generating: data?.sites.filter((s: any) => s.status === 'generating').length || 0,
     completed: data?.sites.filter((s: any) => s.status === 'completed').length || 0,
     published: data?.sites.filter((s: any) => s.status === 'published').length || 0,
     failed: data?.sites.filter((s: any) => s.status === 'failed').length || 0,
-  }
+    tripleVerified: data?.sites.filter((s: any) =>
+      TRIPLE_VERIFIED_STATUSES.has(s.business?.website_validation_status)
+    ).length || 0,
+  }), [data?.sites])
 
   return (
     <div className="p-xl">
@@ -137,11 +197,25 @@ export const GeneratedSitesPage = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-lg">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-lg">
         <Card>
           <CardBody className="p-4">
             <div className="text-sm text-text-secondary mb-1">Total Sites</div>
             <div className="text-2xl font-bold text-text-primary">{stats.total}</div>
+          </CardBody>
+        </Card>
+        
+        <Card
+          className={`cursor-pointer transition-all ${verificationFilter === 'verified' ? 'ring-2 ring-success-500' : 'hover:shadow-md'}`}
+          onClick={() => setVerificationFilter(v => v === 'verified' ? 'all' : 'verified')}
+        >
+          <CardBody className="p-4">
+            <div className="text-sm text-text-secondary mb-1 flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3 text-success-500" />
+              Triple Verified
+            </div>
+            <div className="text-2xl font-bold text-success-600">{stats.tripleVerified}</div>
+            <div className="text-xs text-text-tertiary mt-1">Ready for campaigns</div>
           </CardBody>
         </Card>
         
@@ -241,7 +315,7 @@ export const GeneratedSitesPage = () => {
       )}
       
       {/* Filters */}
-      <div className="flex gap-4 mb-lg">
+      <div className="flex flex-wrap gap-4 mb-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-text-tertiary" />
           <input
@@ -266,9 +340,56 @@ export const GeneratedSitesPage = () => {
         </select>
       </div>
 
-      {searchTerm && (
+      {/* Verification Filter Tabs */}
+      <div className="flex items-center gap-2 mb-lg flex-wrap">
+        <span className="text-sm text-text-secondary font-medium mr-1">Validation:</span>
+        {(
+          [
+            { value: 'all', label: 'All', count: data?.sites.length || 0 },
+            { value: 'verified', label: '✅ Triple Verified', count: stats.tripleVerified },
+            { value: 'not_verified', label: '⚠️ Not Verified', count: (data?.sites.length || 0) - stats.tripleVerified },
+          ] as { value: VerificationFilter; label: string; count: number }[]
+        ).map(({ value, label, count }) => (
+          <button
+            key={value}
+            onClick={() => setVerificationFilter(value)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+              verificationFilter === value
+                ? value === 'verified'
+                  ? 'bg-success-100 border-success-500 text-success-700'
+                  : value === 'not_verified'
+                  ? 'bg-warning-100 border-warning-400 text-warning-700'
+                  : 'bg-primary-100 border-primary-500 text-primary-700'
+                : 'bg-bg-secondary border-border text-text-secondary hover:border-text-secondary'
+            }`}
+          >
+            {label}
+            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+              verificationFilter === value
+                ? value === 'verified'
+                  ? 'bg-success-500 text-white'
+                  : value === 'not_verified'
+                  ? 'bg-warning-500 text-white'
+                  : 'bg-primary-500 text-white'
+                : 'bg-bg-tertiary text-text-tertiary'
+            }`}>
+              {count}
+            </span>
+          </button>
+        ))}
+        {(verificationFilter !== 'all' || statusFilter !== 'all' || searchTerm) && (
+          <button
+            onClick={() => { setVerificationFilter('all'); setStatusFilter('all'); setSearchTerm('') }}
+            className="text-xs text-text-tertiary hover:text-text-secondary underline ml-2"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
+      {(searchTerm || verificationFilter !== 'all' || statusFilter !== 'all') && (
         <p className="text-sm text-text-secondary mb-4">
-          Found {filteredAndSortedSites.length} of {data?.sites.length || 0} sites
+          Showing {filteredAndSortedSites.length} of {data?.sites.length || 0} sites
         </p>
       )}
 
@@ -310,7 +431,7 @@ export const GeneratedSitesPage = () => {
               <Card key={site.id} className="hover:shadow-lg transition-shadow flex flex-col">
                 <CardBody className="p-4 flex flex-col h-full">
                   {/* Header with number and status */}
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 text-primary-700 font-bold text-sm">
                         {index + 1}
@@ -321,6 +442,11 @@ export const GeneratedSitesPage = () => {
                     {site.status === 'generating' && (
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-info-500"></div>
                     )}
+                  </div>
+                  
+                  {/* Validation status badge */}
+                  <div className="mb-3">
+                    {getValidationBadge(business?.website_validation_status)}
                   </div>
                   
                   {/* Site info */}

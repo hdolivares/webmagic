@@ -189,6 +189,7 @@ async def list_sites(
                 "rating": float(s.business.rating) if s.business.rating else None,
                 "review_count": s.business.review_count,
                 "website_url": s.business.website_url,
+                "website_validation_status": s.business.website_validation_status,
                 "gmb_place_id": s.business.gmb_place_id,
             } if s.business else None
         }
