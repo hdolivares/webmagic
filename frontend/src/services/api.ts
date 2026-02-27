@@ -1401,7 +1401,6 @@ class ApiClient {
     const response = await this.client.post(`/admin/tickets/${ticketId}/apply-edit`)
     return response.data
   }
-}
 
   // ============================================
   // VERIFICATION QUEUE
