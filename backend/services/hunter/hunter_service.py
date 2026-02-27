@@ -127,8 +127,12 @@ class HunterService:
             center_lon=center_lon
         )
         
+        # Capture as plain string now — ORM lazy-reload after a rolled-back savepoint
+        # inside the business loop would trigger a greenlet_spawn crash at line ~541.
+        strategy_id = str(strategy.id)
+        
         logger.info(
-            f"Using strategy {strategy.id}: {strategy.total_zones} zones, "
+            f"Using strategy {strategy_id}: {strategy.total_zones} zones, "
             f"{strategy.zones_completed} already completed"
         )
         
@@ -194,7 +198,8 @@ class HunterService:
                 zone_lon=str(zone_lon) if zone_lon is not None else None,
                 zone_radius_km=str(zone_radius) if zone_radius is not None else None
             )
-            logger.info(f"Coverage grid {'created' if created else 'found'}: {coverage.id}")
+            coverage_id = coverage.id  # Capture as plain UUID before the business loop
+            logger.info(f"Coverage grid {'created' if created else 'found'}: {coverage_id}")
             
             # Process and save ALL leads (we're paying for the Outscraper call!)
             total_saved = 0
@@ -224,7 +229,7 @@ class HunterService:
                     if self.progress_publisher:
                         try:
                             self.progress_publisher.publish_business_scraped(
-                                session_id=str(coverage.id),  # Use coverage_id as session identifier
+                                session_id=str(coverage_id),
                                 business_name=business_name,
                                 current=idx + 1,
                                 total=len(raw_businesses)
@@ -404,7 +409,7 @@ class HunterService:
                         business = await self.business_service.create_or_update_business(
                             data=biz_data,
                             source="outscraper_gmaps",
-                            coverage_grid_id=coverage.id,
+                            coverage_grid_id=coverage_id,
                             discovery_city=city,
                             discovery_state=state,
                             discovery_zone_id=zone_id,
@@ -443,7 +448,7 @@ class HunterService:
                             if self.progress_publisher:
                                 try:
                                     self.progress_publisher.publish_validation_progress(
-                                        session_id=str(coverage.id),
+                                        session_id=str(coverage_id),
                                         validated_count=total_saved,
                                         total_count=len(raw_businesses),
                                         business_id=str(business.id),
@@ -509,7 +514,7 @@ class HunterService:
             zone_businesses_query = select(
                 func.avg(Business.qualification_score).label("avg_score"),
                 func.avg(Business.rating).label("avg_rating")
-            ).where(Business.coverage_grid_id == coverage.id)
+            ).where(Business.coverage_grid_id == coverage_id)
             
             result = await self.db.execute(zone_businesses_query)
             averages = result.first()
@@ -518,7 +523,7 @@ class HunterService:
             
             # Update with comprehensive scraping results
             await self.coverage_service.update_coverage(
-                coverage_id=coverage.id,
+                coverage_id=coverage_id,
                 updates={
                     "status": "completed",
                     "lead_count": total_saved,
@@ -538,7 +543,7 @@ class HunterService:
             
             # Mark zone complete in strategy
             await self.geo_strategy_service.mark_zone_complete(
-                strategy_id=str(strategy.id),
+                strategy_id=strategy_id,
                 zone_id=zone_id,
                 businesses_found=total_saved
             )
@@ -554,7 +559,7 @@ class HunterService:
             
             # Prepare enhanced response with Phase 2 metrics
             return {
-                "strategy_id": str(strategy.id),
+                "strategy_id": strategy_id,
                 "status": "active" if strategy.zones_completed < strategy.total_zones else "completed",
                 "city": city,
                 "state": state,
