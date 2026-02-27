@@ -308,9 +308,48 @@ def _handle_url_found(
         Result dictionary
     """
     confidence = discovery_result.get("confidence", 0)
-    
+
+    # ----------------------------------------------------------------
+    # DIRECTORY / AGGREGATOR GUARD
+    # Reject known directory and aggregator domains immediately.
+    # These are never valid business websites — saving them as website_url
+    # would waste Playwright+LLM time and could pollute the DB.
+    # ----------------------------------------------------------------
+    from core.validation_enums import categorize_url_domain, InvalidURLReason, NON_BUSINESS_DOMAINS
+    from urllib.parse import urlparse as _urlparse
+
+    def _is_non_business_domain(url: str) -> bool:
+        try:
+            host = _urlparse(url).netloc.lower().lstrip("www.")
+            return any(host == d or host.endswith("." + d) for d in NON_BUSINESS_DOMAINS)
+        except Exception:
+            return False
+
+    domain_category = categorize_url_domain(found_url)
+    is_non_business = _is_non_business_domain(found_url)
+
+    if domain_category in (
+        InvalidURLReason.DIRECTORY.value,
+        InvalidURLReason.AGGREGATOR.value,
+        InvalidURLReason.SOCIAL_MEDIA.value,
+    ) or is_non_business:
+        logger.warning(
+            f"🚫 ScrapingDog returned a non-business URL for {business.name}: {found_url} "
+            f"(category={domain_category or 'matched NON_BUSINESS_DOMAINS'}) — treating as no URL found"
+        )
+        # Record the rejected URL in raw_data for audit purposes
+        current_raw_data = business.raw_data or {}
+        sd_data = current_raw_data.get("scrapingdog_discovery", {})
+        sd_data["rejected_non_business_url"] = found_url
+        sd_data["rejection_reason"] = domain_category or "non_business_domain"
+        current_raw_data["scrapingdog_discovery"] = sd_data
+        business.raw_data = current_raw_data
+        return _handle_no_url_found(db, business, discovery_result, metadata_service)
+
+    # ----------------------------------------------------------------
+    # LOOP GUARD
     # Check if ScrapingDog returned the SAME URL that was just rejected
-    # This prevents infinite validation loops
+    # ----------------------------------------------------------------
     validation_history = business.website_metadata.get("validation_history", [])
     if validation_history:
         last_validation = validation_history[-1]
@@ -321,7 +360,6 @@ def _handle_url_found(
                 f"⚠️ ScrapingDog returned the SAME rejected URL ({found_url}). "
                 f"Marking as confirmed_no_website to prevent loop."
             )
-            # Treat as "no URL found" - this business truly has no website
             return _handle_no_url_found(db, business, discovery_result, metadata_service)
     
     logger.info(
