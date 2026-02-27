@@ -49,26 +49,27 @@ class BusinessService:
                 business_data.get("state", "")
             )
             
-            business = Business(
-                **business_data,
-                slug=slug,
-                coverage_grid_id=coverage_grid_id,
-                scraped_at=datetime.utcnow()
-            )
-            
-            self.db.add(business)
-            await self.db.flush()
-            await self.db.refresh(business)
+            # Use a savepoint so a constraint violation here only rolls back this
+            # insert — not the entire outer transaction (e.g., the flushed coverage row).
+            async with self.db.begin_nested():
+                business = Business(
+                    **business_data,
+                    slug=slug,
+                    coverage_grid_id=coverage_grid_id,
+                    scraped_at=datetime.utcnow()
+                )
+                
+                self.db.add(business)
+                await self.db.flush()
+                await self.db.refresh(business)
             
             logger.info(f"Created business: {business.name} ({business.id})")
             return business
             
         except IntegrityError as e:
-            await self.db.rollback()
             logger.error(f"Integrity error creating business: {str(e)}")
             raise DatabaseException(f"Business already exists or constraint violated")
         except Exception as e:
-            await self.db.rollback()
             logger.error(f"Error creating business: {str(e)}")
             raise DatabaseException(f"Failed to create business: {str(e)}")
     
@@ -242,18 +243,19 @@ class BusinessService:
         try:
             updates["updated_at"] = datetime.utcnow()
             
-            await self.db.execute(
-                update(Business)
-                .where(Business.id == business_id)
-                .values(**updates)
-            )
-            await self.db.flush()
+            # Use a savepoint so an update failure doesn't corrupt the outer transaction.
+            async with self.db.begin_nested():
+                await self.db.execute(
+                    update(Business)
+                    .where(Business.id == business_id)
+                    .values(**updates)
+                )
+                await self.db.flush()
             
             # Fetch updated business
             return await self.get_business(business_id)
             
         except Exception as e:
-            await self.db.rollback()
             logger.error(f"Error updating business: {str(e)}")
             raise DatabaseException(f"Failed to update business: {str(e)}")
     

@@ -55,24 +55,26 @@ class CoverageService:
             if "zone_radius_km" in kwargs and kwargs["zone_radius_km"] is not None and not isinstance(kwargs["zone_radius_km"], str):
                 logger.warning(f"zone_radius_km should be string, got {type(kwargs['zone_radius_km']).__name__}: {kwargs['zone_radius_km']}")
             
-            coverage = CoverageGrid(
-                state=state,
-                city=city,
-                country=country,
-                industry=industry,
-                priority=priority,
-                **kwargs
-            )
-            
-            self.db.add(coverage)
-            await self.db.flush()
-            await self.db.refresh(coverage)
+            # Use a savepoint so a constraint violation (e.g., duplicate key) only
+            # rolls back this insert — not any enclosing transaction.
+            async with self.db.begin_nested():
+                coverage = CoverageGrid(
+                    state=state,
+                    city=city,
+                    country=country,
+                    industry=industry,
+                    priority=priority,
+                    **kwargs
+                )
+                
+                self.db.add(coverage)
+                await self.db.flush()
+                await self.db.refresh(coverage)
             
             logger.info(f"Created coverage: {coverage.full_key}")
             return coverage
             
         except Exception as e:
-            await self.db.rollback()
             logger.error(f"Error creating coverage: {str(e)}")
             logger.error(f"Coverage params - state={state}, city={city}, industry={industry}, kwargs={kwargs}")
             raise DatabaseException(f"Failed to create coverage: {str(e)}")
