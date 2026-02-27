@@ -441,12 +441,14 @@ async def regenerate_site_images(
     """
     Regenerate the 3 AI images (hero, about, services) for an existing generated site.
 
-    Uses the brand DNA and reviews already stored on the site/business to produce
-    contextually correct images without regenerating the entire site HTML.
-
-    Overwrites img/hero.jpg, img/about.jpg, img/services.jpg in-place — the HTML
-    references these filenames so no HTML edits are needed.
+    After saving new image files, updates the img src attributes in the stored HTML to
+    append a ?v=<timestamp> cache-buster.  Nginx caches .jpg files for 30 days, so
+    without a version parameter the browser would serve the old image from its cache
+    even though the file on disk has been replaced.  Only the 3 src attributes change —
+    no other HTML is touched.
     """
+    import re
+    import time
     from sqlalchemy import select
     from models.site import GeneratedSite
     from models.business import Business
@@ -507,6 +509,26 @@ async def regenerate_site_images(
 
     saved = [r for r in image_results if r.get("saved")]
     failed = [r["slot"] for r in image_results if not r.get("saved")]
+
+    # ── Cache-bust the img src attributes in the stored HTML ────────────────
+    # Nginx caches .jpg responses for 30 days (expires 30d in nginx config).
+    # Adding ?v=<timestamp> to each src forces the browser to fetch the new
+    # file without touching any other HTML content.
+    # Pattern: src="img/hero.jpg" or src="img/hero.jpg?v=oldvalue"
+    if saved and site.html_content:
+        version = int(time.time())
+        updated_html = re.sub(
+            r'(src="img/(hero|about|services)\.jpg)(?:\?v=\d+)?(")',
+            lambda m: f'{m.group(1)}?v={version}{m.group(3)}',
+            site.html_content,
+        )
+        if updated_html != site.html_content:
+            site.html_content = updated_html
+            await db.commit()
+            logger.info(
+                f"[RegenImages] Updated img src cache-busters to v={version} "
+                f"for site {site_id} ({site.subdomain})"
+            )
 
     return {
         "success": len(saved) > 0,
