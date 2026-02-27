@@ -17,7 +17,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import case, desc, func, select
+from sqlalchemy import case, desc, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user
@@ -320,6 +320,25 @@ async def submit_verification_decision(
         business.website_url = final_url
         business.website_validation_status = ValidationState.VALID_MANUAL.value
         business.website_validated_at = datetime.utcnow()
+
+        # Supersede any completed/published generated sites — the business has
+        # its own website so our generated version is no longer needed for campaigns.
+        supersede_result = await db.execute(
+            update(GeneratedSite)
+            .where(
+                GeneratedSite.business_id == business_id,
+                GeneratedSite.status.in_(["completed", "published"]),
+            )
+            .values(status="superseded")
+            .returning(GeneratedSite.id, GeneratedSite.subdomain)
+        )
+        superseded_sites = supersede_result.fetchall()
+        if superseded_sites:
+            logger.info(
+                f"  ↳ Superseded {len(superseded_sites)} generated site(s): "
+                f"{[row.subdomain for row in superseded_sites]}"
+            )
+
         logger.info(
             f"✅ Human review: {business.name!r} confirmed as having website {final_url!r} "
             f"(by {current_user.email})"
