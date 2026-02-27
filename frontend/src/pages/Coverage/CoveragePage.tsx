@@ -5,6 +5,7 @@ import { IntelligentCampaignPanel } from '@/components/coverage/IntelligentCampa
 import '@/components/coverage/IntelligentCampaignPanel.css'
 
 interface CampaignStats {
+  // Grid-level (scraped rows)
   total_grids: number
   pending_grids: number
   in_progress_grids: number
@@ -16,6 +17,13 @@ interface CampaignStats {
   completion_percentage: number
   estimated_cost: number
   actual_cost: number
+  // Strategy (zone-plan) level — full planned scope
+  total_strategies: number
+  total_zones: number
+  zones_completed: number
+  zones_completion_pct: number
+  strategy_cities: number
+  strategy_categories: number
 }
 
 interface LocationCoverage {
@@ -99,7 +107,16 @@ export function CoveragePage() {
     return <div className="loading-screen">Loading campaign data...</div>
   }
 
-  const completionPct = stats?.completion_percentage || 0
+  // Prefer strategy-level completion (zones done vs zones planned) when strategies exist,
+  // because it reflects the true scope. Fall back to grid-level if no strategies yet.
+  const hasStrategyData = (stats?.total_zones || 0) > 0
+  const completionPct = hasStrategyData
+    ? (stats?.zones_completion_pct || 0)
+    : (stats?.completion_percentage || 0)
+  const zonesCompleted = stats?.zones_completed || 0
+  const totalZones = stats?.total_zones || 0
+  const scopeCities = hasStrategyData ? (stats?.strategy_cities || 0) : (stats?.total_locations || 0)
+  const scopeCategories = hasStrategyData ? (stats?.strategy_categories || 0) : (stats?.total_categories || 0)
 
   return (
     <div className="page-container">
@@ -108,7 +125,7 @@ export function CoveragePage() {
         <div>
           <h1 className="page-title">Discovery Campaign</h1>
           <p className="page-description">
-            Systematic business discovery across {stats?.total_locations || 0} cities and {stats?.total_categories || 0} categories
+            Systematic business discovery across {scopeCities} {scopeCities === 1 ? 'city' : 'cities'} and {scopeCategories} {scopeCategories === 1 ? 'category' : 'categories'}
           </p>
         </div>
       </div>
@@ -124,18 +141,20 @@ export function CoveragePage() {
       {/* Stats Cards */}
       <div className="stats-grid">
         <Card>
-          <div className="stat-label">Total Grids</div>
-          <div className="stat-value">{stats?.total_grids?.toLocaleString() || '0'}</div>
+          <div className="stat-label">Active Strategies</div>
+          <div className="stat-value">{stats?.total_strategies?.toLocaleString() || '0'}</div>
           <div className="stat-meta">
-            {stats?.total_locations || 0} cities × {stats?.total_categories || 0} categories
+            {scopeCities} {scopeCities === 1 ? 'city' : 'cities'} × {scopeCategories} categories
           </div>
         </Card>
 
         <Card>
-          <div className="stat-label">Completion</div>
+          <div className="stat-label">Zone Completion</div>
           <div className="stat-value">{completionPct.toFixed(1)}%</div>
           <div className="stat-meta">
-            {stats?.completed_grids || 0} of {stats?.total_grids || 0} complete
+            {hasStrategyData
+              ? `${zonesCompleted.toLocaleString()} of ${totalZones.toLocaleString()} zones`
+              : `${stats?.completed_grids || 0} of ${stats?.total_grids || 0} grids`}
           </div>
         </Card>
 
@@ -145,7 +164,7 @@ export function CoveragePage() {
             {stats?.total_businesses_found?.toLocaleString() || '0'}
           </div>
           <div className="stat-meta">
-            {stats?.pending_grids || 0} searches pending
+            {(totalZones - zonesCompleted).toLocaleString()} zones remaining
           </div>
         </Card>
 
@@ -163,13 +182,23 @@ export function CoveragePage() {
         <div className="card-header">
           <h2 className="card-title">Overall Progress</h2>
           <div className="coverage-status-pills">
-            <span className="status-pill status-pill--success">{stats?.completed_grids || 0} Completed</span>
-            {(stats?.in_progress_grids || 0) > 0 && (
-              <span className="status-pill status-pill--info">{stats?.in_progress_grids} In Progress</span>
-            )}
-            <span className="status-pill status-pill--secondary">{stats?.pending_grids || 0} Pending</span>
-            {(stats?.failed_grids || 0) > 0 && (
-              <span className="status-pill status-pill--error">{stats?.failed_grids} Failed</span>
+            {hasStrategyData ? (
+              <>
+                <span className="status-pill status-pill--success">{zonesCompleted.toLocaleString()} zones done</span>
+                <span className="status-pill status-pill--secondary">{(totalZones - zonesCompleted).toLocaleString()} remaining</span>
+                <span className="status-pill status-pill--info">{stats?.total_strategies || 0} strategies</span>
+              </>
+            ) : (
+              <>
+                <span className="status-pill status-pill--success">{stats?.completed_grids || 0} Completed</span>
+                {(stats?.in_progress_grids || 0) > 0 && (
+                  <span className="status-pill status-pill--info">{stats?.in_progress_grids} In Progress</span>
+                )}
+                <span className="status-pill status-pill--secondary">{stats?.pending_grids || 0} Pending</span>
+                {(stats?.failed_grids || 0) > 0 && (
+                  <span className="status-pill status-pill--error">{stats?.failed_grids} Failed</span>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -181,6 +210,9 @@ export function CoveragePage() {
         </div>
         <div className="progress-bar-label">
           {completionPct.toFixed(1)}% complete
+          {hasStrategyData && (
+            <span className="progress-bar-label-sub"> · {zonesCompleted} of {totalZones.toLocaleString()} zones scraped</span>
+          )}
         </div>
       </Card>
 

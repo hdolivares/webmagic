@@ -564,6 +564,11 @@
   text-align: right;
 }
 
+.progress-bar-label-sub {
+  opacity: 0.75;
+  font-size: 0.78rem;
+}
+
 /* Toast notification for batch actions */
 .coverage-toast {
   display: flex;

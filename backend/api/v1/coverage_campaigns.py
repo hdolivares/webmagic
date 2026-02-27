@@ -13,6 +13,7 @@ from core.database import get_db
 from api.deps import get_current_user
 from models.coverage import CoverageGrid
 from models.business import Business
+from models.geo_strategy import GeoStrategy
 from models.user import AdminUser
 from pydantic import BaseModel
 
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/coverage/campaigns", tags=["coverage-campaigns"])
 
 class CampaignStats(BaseModel):
     """Overall campaign statistics."""
+    # Coverage-grid level (scraped rows)
     total_grids: int
     pending_grids: int
     in_progress_grids: int
@@ -36,6 +38,13 @@ class CampaignStats(BaseModel):
     completion_percentage: float
     estimated_cost: float
     actual_cost: float
+    # Strategy (zone plan) level — more accurate scope picture
+    total_strategies: int
+    total_zones: int
+    zones_completed: int
+    zones_completion_pct: float
+    strategy_cities: int
+    strategy_categories: int
 
 
 class LocationCoverage(BaseModel):
@@ -100,31 +109,53 @@ async def get_campaign_stats(
     # Total grids
     total = sum(status_counts.values())
     
-    # Count unique locations and categories (use concat of city+state as location key)
+    # Count unique locations and categories from coverage_grid
     locations_result = await db.execute(
         select(func.count(func.distinct(func.concat(CoverageGrid.city, ':', CoverageGrid.state))))
     )
     total_locations = locations_result.scalar() or 0
-    
+
+    # Fix: the column is `industry`, not `industry_category`
     categories_result = await db.execute(
-        select(func.count(func.distinct(CoverageGrid.industry_category)))
+        select(func.count(func.distinct(CoverageGrid.industry)))
     )
     total_categories = categories_result.scalar() or 0
-    
+
     # Count total businesses found
     businesses_result = await db.execute(
         select(func.count(Business.id))
     )
     total_businesses = businesses_result.scalar() or 0
-    
-    # Calculate completion percentage
+
+    # Calculate grid-level completion percentage
     completed = status_counts.get("completed", 0)
     completion_pct = (completed / total * 100) if total > 0 else 0.0
-    
+
     # Estimate costs (assuming $0.50 per search)
     estimated_cost = total * 0.50
-    actual_cost = (status_counts.get("completed", 0) + status_counts.get("failed", 0)) * 0.50
-    
+    actual_cost = (completed + status_counts.get("failed", 0)) * 0.50
+
+    # ── Strategy (zone-plan) level stats ──────────────────────────────────────
+    # GeoStrategy rows represent the full planned scope: each strategy covers
+    # total_zones zones for one city × category pair. These numbers give a
+    # much more accurate picture of how much work remains.
+    strategy_agg = await db.execute(
+        select(
+            func.count(GeoStrategy.id).label("total_strategies"),
+            func.sum(GeoStrategy.total_zones).label("total_zones"),
+            func.sum(GeoStrategy.zones_completed).label("zones_completed"),
+            func.count(func.distinct(func.concat(GeoStrategy.city, ':', GeoStrategy.state))).label("cities"),
+            func.count(func.distinct(GeoStrategy.category)).label("categories"),
+        ).where(GeoStrategy.is_active == True)  # noqa: E712
+    )
+    strat_row = strategy_agg.first()
+    total_strategies = strat_row.total_strategies or 0
+    total_zones = int(strat_row.total_zones or 0)
+    zones_done = int(strat_row.zones_completed or 0)
+    strategy_cities = strat_row.cities or 0
+    strategy_categories = strat_row.categories or 0
+    zones_completion_pct = round((zones_done / total_zones * 100) if total_zones > 0 else 0.0, 2)
+
     return CampaignStats(
         total_grids=total,
         pending_grids=status_counts.get("pending", 0),
@@ -136,7 +167,13 @@ async def get_campaign_stats(
         total_categories=total_categories,
         completion_percentage=round(completion_pct, 2),
         estimated_cost=estimated_cost,
-        actual_cost=actual_cost
+        actual_cost=actual_cost,
+        total_strategies=total_strategies,
+        total_zones=total_zones,
+        zones_completed=zones_done,
+        zones_completion_pct=zones_completion_pct,
+        strategy_cities=strategy_cities,
+        strategy_categories=strategy_categories,
     )
 
 
