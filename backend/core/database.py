@@ -6,6 +6,7 @@ Also provides synchronous support for Celery tasks.
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from sqlalchemy.pool import NullPool
 from typing import AsyncGenerator
 from contextlib import contextmanager, asynccontextmanager
 from .config import get_settings
@@ -30,6 +31,28 @@ engine = create_async_engine(
 # Create async session factory
 AsyncSessionLocal = async_sessionmaker(
     engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False,
+)
+
+# Async engine for Celery tasks — uses NullPool so that asyncpg never caches
+# connections across event loops.  Celery's run_async() creates a fresh loop
+# for each task; a pooled engine would have pending futures tied to a previous
+# (closed) loop, causing:
+#   RuntimeError: Task got Future attached to a different loop
+celery_async_engine = create_async_engine(
+    settings.DATABASE_URL,
+    poolclass=NullPool,
+    echo=settings.DEBUG,
+    connect_args={
+        "statement_cache_size": 0,
+    },
+)
+
+CeleryAsyncSessionLocal = async_sessionmaker(
+    celery_async_engine,
     class_=AsyncSession,
     expire_on_commit=False,
     autocommit=False,
