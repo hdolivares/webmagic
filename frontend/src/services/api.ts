@@ -69,6 +69,55 @@ export interface SMSMessageItem {
   business_state: string | null
 }
 
+// ─── Verification Queue types ─────────────────────────────────────────────
+
+export interface VerificationMatchSignals {
+  phone_match: boolean
+  address_match: boolean
+  name_match: boolean
+}
+
+export interface VerificationQueueItem {
+  id: string
+  name: string
+  address: string | null
+  phone: string | null
+  city: string | null
+  state: string | null
+  category: string | null
+  rating: number | null
+  review_count: number
+  outscraper_website: string | null
+  candidate_url: string | null
+  candidate_title: string | null
+  candidate_phones: string[]
+  candidate_emails: string[]
+  candidate_content_preview: string | null
+  candidate_quality_score: number | null
+  llm_reasoning: string | null
+  llm_confidence: number | null
+  invalid_reason: 'wrong_business' | 'no_contact' | string | null
+  match_signals: VerificationMatchSignals | null
+  has_generated_site: boolean
+  generated_site_subdomain: string | null
+  generated_site_url: string | null
+  website_validated_at: string | null
+}
+
+export interface VerificationQueueResponse {
+  items: VerificationQueueItem[]
+  total: number
+  page: number
+  page_size: number
+  pages: number
+}
+
+export interface VerificationDecisionRequest {
+  decision: 'valid_website' | 'no_website' | 're_run'
+  website_url?: string
+  notes?: string
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1'
@@ -1350,6 +1399,31 @@ class ApiClient {
 
   async applyTicketSiteEdit(ticketId: string): Promise<any> {
     const response = await this.client.post(`/admin/tickets/${ticketId}/apply-edit`)
+    return response.data
+  }
+}
+
+  // ============================================
+  // VERIFICATION QUEUE
+  // ============================================
+
+  async getVerificationQueue(params?: {
+    page?: number
+    page_size?: number
+    has_generated_site?: boolean
+  }): Promise<VerificationQueueResponse> {
+    const response = await this.client.get('/verification/queue', { params })
+    return response.data
+  }
+
+  async submitVerificationDecision(
+    businessId: string,
+    decision: VerificationDecisionRequest
+  ): Promise<{ status: string; decision?: string; business_id: string }> {
+    const response = await this.client.post(
+      `/verification/${businessId}/decide`,
+      decision
+    )
     return response.data
   }
 }
