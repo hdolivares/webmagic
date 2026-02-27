@@ -13,7 +13,7 @@ from datetime import datetime
 import logging
 import asyncio
 
-from core.database import get_db_session_sync, AsyncSessionLocal
+from core.database import get_db_session_sync, CeleryAsyncSessionLocal
 from core.outreach_enums import OutreachChannel
 from models.business import Business
 from models.site import GeneratedSite
@@ -65,31 +65,16 @@ def _is_html_complete(html: str | None) -> bool:
 
 def run_async(coro):
     """
-    Helper to run async code in sync context.
+    Helper to run async code in sync Celery task context.
 
-    Always creates a brand-new event loop so that stale futures from
-    SQLAlchemy's async connection pool (left over from a previous task
-    that ran in the same Celery fork-pool worker) never bleed into the
-    new coroutine.  The old `asyncio.get_event_loop()` approach returned
-    the worker's existing loop which still had pending futures attached,
-    causing:
+    Uses asyncio.run() which always creates a brand-new event loop and
+    closes it cleanly when done.  Combined with CeleryAsyncSessionLocal
+    (NullPool), this prevents:
         RuntimeError: Task got Future attached to a different loop
+    which occurred because the old pooled asyncpg connections held futures
+    tied to a previous event loop that had already been replaced.
     """
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        try:
-            # Cancel and drain any tasks that the coroutine left running
-            pending = asyncio.all_tasks(loop)
-            if pending:
-                loop.run_until_complete(
-                    asyncio.gather(*pending, return_exceptions=True)
-                )
-        finally:
-            loop.close()
-            asyncio.set_event_loop(None)
+    return asyncio.run(coro)
 
 
 @celery_app.task(
@@ -113,7 +98,7 @@ def generate_site_for_business(self, business_id: str):
     
     async def _generate():
         """Inner async function with actual generation logic."""
-        async with AsyncSessionLocal() as db:
+        async with CeleryAsyncSessionLocal() as db:
             try:
                 # Get business
                 result = await db.execute(
@@ -422,7 +407,7 @@ def generate_pending_sites(self):
     logger.info("[Celery Task] Starting generate_pending_sites")
     
     async def _generate_pending():
-        async with AsyncSessionLocal() as db:
+        async with CeleryAsyncSessionLocal() as db:
             # Find businesses that need websites
             result = await db.execute(
                 select(Business)
@@ -461,7 +446,7 @@ def publish_completed_sites(self):
     logger.info("[Celery Task] Starting publish_completed_sites")
     
     async def _publish():
-        async with AsyncSessionLocal() as db:
+        async with CeleryAsyncSessionLocal() as db:
             # Find completed sites
             result = await db.execute(
                 select(GeneratedSite)
@@ -501,7 +486,7 @@ def retry_failed_generations(self):
     logger.info("[Celery Task] Starting retry_failed_generations")
     
     async def _retry():
-        async with AsyncSessionLocal() as db:
+        async with CeleryAsyncSessionLocal() as db:
             # Find failed sites
             result = await db.execute(
                 select(GeneratedSite)
