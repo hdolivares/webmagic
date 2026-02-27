@@ -19,8 +19,10 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 from celery import shared_task
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from core.database import get_db_session_sync, get_db
+from core.database import get_db_session_sync
+from core.config import get_settings
 from models.scrape_session import ScrapeSession
 from models.geo_strategy import GeoStrategy
 from services.hunter.hunter_service import HunterService
@@ -263,26 +265,46 @@ def _run_scraping(
     """
     
     async def _async_scrape():
-        """Inner async function for scraping."""
+        """
+        Inner async function for scraping.
+
+        IMPORTANT: This runs in a *new* event loop created by the Celery worker,
+        completely separate from the FastAPI server's event loop.  We must NOT
+        borrow connections from the shared AsyncSessionLocal pool (which is bound
+        to the server loop) — doing so causes "Future attached to a different loop".
+
+        Instead, we create a fresh AsyncEngine + session factory that lives entirely
+        within this task's event loop, and dispose it when done.
+        """
+        settings = get_settings()
+        # Strip +asyncpg suffix if present so we can add it cleanly
+        db_url = settings.DATABASE_URL
+        if not db_url.startswith("postgresql+asyncpg://"):
+            db_url = db_url.replace("postgresql://", "postgresql+asyncpg://")
+
+        task_engine = create_async_engine(
+            db_url,
+            pool_size=2,
+            max_overflow=0,
+            pool_pre_ping=True,
+        )
+        task_session_factory = async_sessionmaker(
+            task_engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )
+
         try:
-            # Create async database session using proper context manager
-            # FIXED: Use async context manager instead of async for loop
-            db_generator = get_db()
-            db = await db_generator.__anext__()
-            
-            try:
-                # Initialize HunterService with progress publisher
-                hunter = HunterService(
-                    db=db,
-                    progress_publisher=publisher  # Pass progress publisher for real-time updates
-                )
-                
+            async with task_session_factory() as db:
+                hunter = HunterService(db=db, progress_publisher=publisher)
+
                 logger.info(
-                    f"🔍 Calling HunterService.scrape_with_intelligent_strategy: "
+                    f"Calling HunterService.scrape_with_intelligent_strategy: "
                     f"city={city}, state={state}, category={category}"
                 )
-                
-                # Run intelligent scraping with real-time progress updates
+
                 result = await hunter.scrape_with_intelligent_strategy(
                     city=city,
                     state=state,
@@ -290,38 +312,32 @@ def _run_scraping(
                     country=country,
                     limit_per_zone=limit_per_zone,
                     zone_id=zone_id,
-                    force_new_strategy=False
+                    force_new_strategy=False,
                 )
-                
+
                 logger.info(
-                    f"✅ HunterService completed: "
+                    f"HunterService completed: "
                     f"{result.get('businesses_found', 0)} businesses found"
                 )
-                
                 return result
-                
-            finally:
-                # Properly close the database session
-                await db_generator.aclose()
-                
+
         except Exception as e:
-            logger.error(f"❌ Async scraping failed: {e}", exc_info=True)
+            logger.error(f"Async scraping failed: {e}", exc_info=True)
             raise
-    
-    # Run async function in event loop
+        finally:
+            await task_engine.dispose()
+
+    # Run in a fresh event loop owned entirely by this Celery task
     try:
-        # Create new event loop for this task
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        
         try:
             result = loop.run_until_complete(_async_scrape())
             return result
         finally:
             loop.close()
-            
     except Exception as e:
-        logger.error(f"❌ Event loop execution failed: {e}", exc_info=True)
+        logger.error(f"Event loop execution failed: {e}", exc_info=True)
         raise
 
 
