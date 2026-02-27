@@ -469,17 +469,25 @@ async def regenerate_site_images(
     business_name = business.name if business else "Business"
     category = (business.category or business.subcategory or "") if business else ""
 
-    # creative_dna is stored as brand_concept on the site record
-    creative_dna = site.brand_concept or {}
+    # Extract brand context from design_brief (the only creative data persisted to DB).
+    # brand_concept / brand_analysis were set as transient Python attrs in generation_sync
+    # but are not mapped DB columns — design_brief is the real storage.
+    brief = site.design_brief or {}
+    colors = brief.get("colors") or {}
+    brand_colors: dict = {
+        "primary": colors.get("primary", ""),
+        "secondary": colors.get("secondary", ""),
+    }
 
-    # Brand colors come from design_brief if available
-    brand_colors: dict = {}
-    if site.design_brief and isinstance(site.design_brief, dict):
-        palette = site.design_brief.get("color_palette") or site.design_brief.get("colors") or {}
-        brand_colors = {
-            "primary": palette.get("primary", ""),
-            "secondary": palette.get("secondary", ""),
-        }
+    # Build a minimal creative_dna-style dict from what we have in design_brief
+    # so ImageGenerationService can still apply some brand direction.
+    vibe = brief.get("vibe", "")
+    industry_persona = brief.get("industry_persona", "")
+    creative_dna: dict = {}
+    if vibe:
+        creative_dna["visual_identity"] = vibe
+    if industry_persona:
+        creative_dna["value_proposition"] = industry_persona
 
     image_service = ImageGenerationService()
     if not image_service.api_key:
