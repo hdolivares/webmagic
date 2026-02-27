@@ -63,6 +63,45 @@ def _is_html_complete(html: str | None) -> bool:
     return has_hero and has_nav
 
 
+def _classify_error(exc: Exception) -> tuple[str, str]:
+    """
+    Return (error_category, human_readable_message) for a generation exception.
+
+    Categories
+    ----------
+    credits_exhausted  Anthropic API returned "credit balance is too low"
+    data_error         Business data has missing/invalid fields (e.g. None rating)
+    api_error          External API failure that is not credits-related
+    timeout            Operation timed out
+    unknown            Anything else
+    """
+    msg = str(exc)
+    lower = msg.lower()
+
+    if "credit balance is too low" in lower or "credits" in lower and "too low" in lower:
+        return "credits_exhausted", (
+            "Anthropic API credits exhausted. Add credits at "
+            "console.anthropic.com/settings/billing to resume generation."
+        )
+    if any(phrase in lower for phrase in [
+        "not supported between instances of 'nonetype'",
+        "nonetype",
+        "attributeerror",
+        "keyerror",
+        "typeerror",
+        "valueerror",
+    ]):
+        return "data_error", f"Business data issue: {msg[:300]}"
+    if any(phrase in lower for phrase in ["timeout", "timed out", "read timeout"]):
+        return "timeout", f"Generation timed out: {msg[:300]}"
+    if any(phrase in lower for phrase in [
+        "api failed", "claude api", "gemini", "openai", "external api",
+        "http", "connection", "status code",
+    ]):
+        return "api_error", f"External API error: {msg[:300]}"
+    return "unknown", msg[:400]
+
+
 def run_async(coro):
     """
     Helper to run async code in sync Celery task context.
@@ -232,6 +271,7 @@ def generate_site_for_business(self, business_id: str):
                         )
                         existing_site.status = "failed"
                         existing_site.error_message = "HTML validation failed: missing hero or nav content"
+                        existing_site.error_category = "data_error"
                         await db.flush()
                 
                 # Create or update site record
@@ -372,14 +412,19 @@ def generate_site_for_business(self, business_id: str):
                 
                 # Mark site as failed and reset business status so it can be re-queued
                 try:
+                    err_category, err_message = _classify_error(e)
                     if 'site' in locals() and site and site.id:
                         site.status = "failed"
-                        site.error_message = str(e)[:500]
+                        site.error_message = err_message
+                        site.error_category = err_category
                     if 'business' in locals() and business:
                         # Reset to queued so retry_failed_generations can pick it up
                         business.website_status = 'queued'
                         business.generation_started_at = None
                     await db.commit()
+                    logger.warning(
+                        f"[{err_category}] Generation failed for {business_id}: {err_message[:120]}"
+                    )
                 except Exception as db_err:
                     logger.error(f"Failed to persist failure state: {db_err}")
                 

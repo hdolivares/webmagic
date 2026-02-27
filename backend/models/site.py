@@ -49,6 +49,11 @@ class GeneratedSite(BaseModel):
     screenshot_mobile_url = Column(Text, nullable=True)
     assets_urls = Column(JSONB, default=[], nullable=True)
     
+    # Generation error tracking
+    error_message = Column(Text, nullable=True)
+    # Structured category: credits_exhausted | data_error | api_error | timeout | unknown
+    error_category = Column(String(30), nullable=True)
+
     # Performance metrics
     lighthouse_score = Column(Integer, nullable=True)
     load_time_ms = Column(Integer, nullable=True)

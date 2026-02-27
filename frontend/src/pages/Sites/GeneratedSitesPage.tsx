@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
 import { Card, CardHeader, CardBody, CardTitle, Badge, Button } from '@/components/ui'
-import { Wand2, Search, ExternalLink, Eye, Calendar, TrendingUp, ChevronDown, ChevronUp, ExternalLink as LinkIcon, Play, AlertCircle, RefreshCw, ShieldCheck, Globe, PhoneOff, ImagePlus } from 'lucide-react'
+import { Wand2, Search, ExternalLink, Eye, Calendar, TrendingUp, ChevronDown, ChevronUp, ExternalLink as LinkIcon, Play, AlertCircle, RefreshCw, ShieldCheck, Globe, PhoneOff, ImagePlus, CreditCard, Database, Clock, Zap, HelpCircle, XCircle } from 'lucide-react'
 
 // Statuses that mean the business passed the full triple-check validation (no website found)
 const TRIPLE_VERIFIED_STATUSES = new Set(['triple_verified', 'confirmed_no_website'])
@@ -215,7 +215,71 @@ export const GeneratedSitesPage = () => {
     hasWebsite: data?.sites.filter((s: any) =>
       HAS_WEBSITE_STATUSES.has(s.business?.website_validation_status)
     ).length || 0,
+    creditsExhausted: data?.sites.filter((s: any) =>
+      s.error_category === 'credits_exhausted'
+    ).length || 0,
   }), [data?.sites])
+
+  /**
+   * Returns display config for a given error_category value.
+   * Used to render consistent, actionable error indicators on site cards.
+   */
+  const getErrorInfo = (category: string | null | undefined, message: string | null | undefined) => {
+    switch (category) {
+      case 'credits_exhausted':
+        return {
+          Icon: CreditCard,
+          label: 'API Credits Exhausted',
+          detail: 'Add Anthropic credits to resume.',
+          link: 'https://console.anthropic.com/settings/billing',
+          linkLabel: 'Top up →',
+          bg: 'bg-red-50',
+          border: 'border-red-300',
+          text: 'text-red-700',
+          iconColor: 'text-red-500',
+        }
+      case 'data_error':
+        return {
+          Icon: Database,
+          label: 'Business Data Issue',
+          detail: message || 'Missing or invalid field in business data.',
+          bg: 'bg-orange-50',
+          border: 'border-orange-300',
+          text: 'text-orange-700',
+          iconColor: 'text-orange-500',
+        }
+      case 'api_error':
+        return {
+          Icon: Zap,
+          label: 'External API Error',
+          detail: message || 'A third-party API call failed.',
+          bg: 'bg-yellow-50',
+          border: 'border-yellow-300',
+          text: 'text-yellow-700',
+          iconColor: 'text-yellow-600',
+        }
+      case 'timeout':
+        return {
+          Icon: Clock,
+          label: 'Generation Timed Out',
+          detail: message || 'The generation took too long and was stopped.',
+          bg: 'bg-blue-50',
+          border: 'border-blue-300',
+          text: 'text-blue-700',
+          iconColor: 'text-blue-500',
+        }
+      default:
+        return {
+          Icon: message ? XCircle : HelpCircle,
+          label: 'Generation Failed',
+          detail: message || 'An unexpected error occurred.',
+          bg: 'bg-error-50',
+          border: 'border-error-200',
+          text: 'text-error-700',
+          iconColor: 'text-error-500',
+        }
+    }
+  }
 
   return (
     <div className="p-xl">
@@ -308,6 +372,42 @@ export const GeneratedSitesPage = () => {
           </CardBody>
         </Card>
       </div>
+
+      {/* Anthropic Credits Exhausted Banner */}
+      {stats.creditsExhausted > 0 && (
+        <Card className="mb-lg border-l-4 border-l-red-500 bg-red-50">
+          <CardBody className="p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <CreditCard className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-base font-semibold text-red-900 mb-1">
+                    Anthropic API Credits Exhausted
+                  </h3>
+                  <p className="text-sm text-red-700 mb-2">
+                    {stats.creditsExhausted} site{stats.creditsExhausted !== 1 ? 's are' : ' is'} stuck because
+                    the Anthropic Claude API account has run out of credits. Generation will resume
+                    automatically once credits are added.
+                  </p>
+                  <p className="text-xs text-red-600">
+                    Affected sites show a <strong>Credits Exhausted</strong> badge below. Once you top up,
+                    click <strong>Retry Generation</strong> on each card or wait for the next scheduled run.
+                  </p>
+                </div>
+              </div>
+              <a
+                href="https://console.anthropic.com/settings/billing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Add Credits
+              </a>
+            </div>
+          </CardBody>
+        </Card>
+      )}
 
       {/* Businesses Needing Generation Alert */}
       {needingGeneration && needingGeneration.total > 0 && (
@@ -548,11 +648,30 @@ export const GeneratedSitesPage = () => {
                       {formatDate(site.created_at)}
                     </div>
                     
-                    {site.error_message && (
-                      <div className="mb-3 p-2 bg-error-50 border border-error-200 rounded text-xs text-error-700 line-clamp-2">
-                        Error: {site.error_message}
-                      </div>
-                    )}
+                    {(site.error_message || site.error_category) && (() => {
+                      const err = getErrorInfo(site.error_category, site.error_message)
+                      return (
+                        <div className={`mb-3 p-2 ${err.bg} border ${err.border} rounded-lg`}>
+                          <div className={`flex items-center gap-1.5 ${err.text} font-semibold text-xs mb-1`}>
+                            <err.Icon className={`w-3.5 h-3.5 flex-shrink-0 ${err.iconColor}`} />
+                            {err.label}
+                          </div>
+                          <p className={`text-xs ${err.text} opacity-80 line-clamp-2`}>
+                            {err.detail}
+                          </p>
+                          {err.link && (
+                            <a
+                              href={err.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`text-xs font-medium ${err.text} underline mt-1 inline-block`}
+                            >
+                              {err.linkLabel}
+                            </a>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                   
                   {/* Actions */}

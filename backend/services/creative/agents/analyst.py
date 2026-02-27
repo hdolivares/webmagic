@@ -174,7 +174,7 @@ class AnalystAgent(BaseAgent):
         """Create basic analysis when AI fails."""
         category = business_data.get("category", "business")
         name = business_data.get("name", "this business")
-        rating = business_data.get("rating", 0)
+        rating = business_data.get("rating") or 0
         
         return {
             "review_highlight": f"Customers highly recommend {name} for quality {category} services.",
