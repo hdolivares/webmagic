@@ -135,10 +135,15 @@ def scrape_zone_async(
                 logger.error(f"❌ Session {session_id} not found for update!")
                 return {"error": "Session not found", "status": "failed"}
             
+            # The result has a nested "results" dict with per-zone counts
+            result_counts = scrape_result.get("results", {})
+            total_saved = result_counts.get("total_saved", 0)
+            with_websites = result_counts.get("with_valid_websites", 0)
+            
             # Update metrics from scrape result
-            session.total_businesses = scrape_result.get("businesses_found", 0)
-            session.scraped_businesses = scrape_result.get("businesses_found", 0)
-            session.validated_businesses = scrape_result.get("businesses_with_websites", 0)
+            session.total_businesses = total_saved
+            session.scraped_businesses = total_saved
+            session.validated_businesses = with_websites
             session.status = "completed"
             session.completed_at = datetime.utcnow()
             
@@ -150,14 +155,15 @@ def scrape_zone_async(
                 f"{session.validated_businesses} with websites"
             )
         
-        # Publish completion event
+        # Publish completion event (uses the nested "results" dict for counts)
+        result_counts = scrape_result.get("results", {})
         publisher.publish_scrape_complete(
             session_id=session_id,
             summary={
-                "total": scrape_result.get("businesses_found", 0),
-                "valid": scrape_result.get("businesses_with_websites", 0),
-                "invalid": scrape_result.get("businesses_needing_websites", 0),
-                "zone_id": scrape_result.get("zone_id", zone_id)
+                "total": result_counts.get("total_saved", 0),
+                "valid": result_counts.get("with_valid_websites", 0),
+                "invalid": result_counts.get("needing_websites", 0),
+                "zone_id": scrape_result.get("zone_scraped", {}).get("zone_id", zone_id or "")
             }
         )
         
@@ -313,6 +319,7 @@ def _run_scraping(
                     limit_per_zone=limit_per_zone,
                     zone_id=zone_id,
                     force_new_strategy=False,
+                    scrape_session_id=session_id,
                 )
 
                 logger.info(

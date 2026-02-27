@@ -79,7 +79,8 @@ class HunterService:
         center_lat: Optional[float] = None,
         center_lon: Optional[float] = None,
         force_new_strategy: bool = False,
-        zone_id: Optional[str] = None
+        zone_id: Optional[str] = None,
+        scrape_session_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Scrape a city using Claude-generated intelligent zone placement strategy.
@@ -199,6 +200,10 @@ class HunterService:
                 zone_radius_km=str(zone_radius) if zone_radius is not None else None
             )
             coverage_id = coverage.id  # Capture as plain UUID before the business loop
+            # Use the scrape session ID for SSE if provided; fall back to coverage_id.
+            # The SSE endpoint subscribes to scrape:progress:{scrape_session_id}, so this
+            # must match the ID the frontend uses when connecting.
+            publish_id = scrape_session_id or str(coverage_id)
             logger.info(f"Coverage grid {'created' if created else 'found'}: {coverage_id}")
             
             # Process and save ALL leads (we're paying for the Outscraper call!)
@@ -229,7 +234,8 @@ class HunterService:
                     if self.progress_publisher:
                         try:
                             self.progress_publisher.publish_business_scraped(
-                                session_id=str(coverage_id),
+                                session_id=publish_id,
+                                business_id=biz_data.get("place_id") or f"idx_{idx}",
                                 business_name=business_name,
                                 current=idx + 1,
                                 total=len(raw_businesses)
@@ -447,12 +453,16 @@ class HunterService:
                             # Publish validation progress event
                             if self.progress_publisher:
                                 try:
-                                    self.progress_publisher.publish_validation_progress(
-                                        session_id=str(coverage_id),
-                                        validated_count=total_saved,
-                                        total_count=len(raw_businesses),
+                                    status = (
+                                        "valid" if business.website_validation_status == "pending"
+                                        else "no_website"
+                                    )
+                                    self.progress_publisher.publish_validation_complete(
+                                        session_id=publish_id,
                                         business_id=str(business.id),
-                                        has_website=bool(business.website_url)
+                                        status=status,
+                                        validated_count=total_saved,
+                                        total_count=len(raw_businesses)
                                     )
                                 except Exception as e:
                                     logger.warning(f"Failed to publish validation progress: {e}")

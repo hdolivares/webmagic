@@ -110,6 +110,25 @@
   animation: none;
 }
 
+/* Indeterminate bar — slides back and forth while waiting for Outscraper results */
+.scrape-progress__bar-fill--indeterminate {
+  width: 40%;
+  background: var(--color-status-info);
+  background-image: linear-gradient(
+    90deg,
+    var(--color-status-info),
+    color-mix(in srgb, var(--color-status-info) 60%, white),
+    var(--color-status-info)
+  );
+  background-size: 200% 100%;
+  animation: progress-indeterminate 1.6s ease-in-out infinite;
+}
+
+@keyframes progress-indeterminate {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(300%); }
+}
+
 .scrape-progress__percentage {
   min-width: 3rem;
   font-size: var(--font-size-sm);
@@ -189,6 +208,10 @@
 
 .scrape-progress__summary-value--warning {
   color: var(--color-status-warning);
+}
+
+.scrape-progress__summary-value--muted {
+  color: var(--color-text-secondary);
 }
 
 /* =============================================================================

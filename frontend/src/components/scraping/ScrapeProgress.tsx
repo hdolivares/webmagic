@@ -92,22 +92,32 @@ export function ScrapeProgress({
         )}
       </div>
       
-      {/* Progress Bar */}
-      {progress && status !== 'completed' && (
+      {/* Progress Bar — indeterminate while waiting for Outscraper, determinate once businesses flow in */}
+      {status !== 'completed' && status !== 'error' && status !== 'disconnected' && (
         <div className="scrape-progress__bar-container">
           <div className="scrape-progress__bar">
-            <div 
-              className={`scrape-progress__bar-fill scrape-progress__bar-fill--${status}`}
-              style={{ width: `${progress.percentage}%` }}
-              role="progressbar"
-              aria-valuenow={progress.percentage}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            />
+            {progress ? (
+              <div
+                className={`scrape-progress__bar-fill scrape-progress__bar-fill--${status}`}
+                style={{ width: `${progress.percentage}%` }}
+                role="progressbar"
+                aria-valuenow={progress.percentage}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              />
+            ) : (
+              <div
+                className="scrape-progress__bar-fill scrape-progress__bar-fill--indeterminate"
+                role="progressbar"
+                aria-label="Waiting for results…"
+              />
+            )}
           </div>
-          <span className="scrape-progress__percentage">
-            {progress.percentage.toFixed(1)}%
-          </span>
+          {progress && (
+            <span className="scrape-progress__percentage">
+              {progress.percentage.toFixed(1)}%
+            </span>
+          )}
         </div>
       )}
       
@@ -127,18 +137,18 @@ export function ScrapeProgress({
       {status === 'completed' && summary && (
         <div className="scrape-progress__summary">
           <div className="scrape-progress__summary-item">
-            <span className="scrape-progress__summary-label">Total Businesses:</span>
+            <span className="scrape-progress__summary-label">Businesses saved</span>
             <span className="scrape-progress__summary-value">{summary.total}</span>
           </div>
           <div className="scrape-progress__summary-item">
-            <span className="scrape-progress__summary-label">Valid Websites:</span>
-            <span className="scrape-progress__summary-value scrape-progress__summary-value--success">
+            <span className="scrape-progress__summary-label">Have a website</span>
+            <span className="scrape-progress__summary-value scrape-progress__summary-value--muted">
               {summary.valid}
             </span>
           </div>
           <div className="scrape-progress__summary-item">
-            <span className="scrape-progress__summary-label">Need Discovery:</span>
-            <span className="scrape-progress__summary-value scrape-progress__summary-value--warning">
+            <span className="scrape-progress__summary-label">Need a website ✨</span>
+            <span className="scrape-progress__summary-value scrape-progress__summary-value--success">
               {summary.invalid}
             </span>
           </div>
