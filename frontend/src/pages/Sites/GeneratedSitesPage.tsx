@@ -9,10 +9,13 @@ import { api } from '@/services/api'
 import { Card, CardHeader, CardBody, CardTitle, Badge, Button } from '@/components/ui'
 import { Wand2, Search, ExternalLink, Eye, Calendar, TrendingUp, ChevronDown, ChevronUp, ExternalLink as LinkIcon, Play, AlertCircle, RefreshCw, ShieldCheck } from 'lucide-react'
 
-// Statuses that mean the business passed the full triple-check validation
+// Statuses that mean the business passed the full triple-check validation (no website found)
 const TRIPLE_VERIFIED_STATUSES = new Set(['triple_verified', 'confirmed_no_website'])
 
-type VerificationFilter = 'all' | 'verified' | 'not_verified'
+// Statuses that mean the business DOES have a website (should not be in campaigns)
+const HAS_WEBSITE_STATUSES = new Set(['valid_outscraper', 'valid_scrapingdog', 'valid_manual'])
+
+type VerificationFilter = 'all' | 'verified' | 'has_website' | 'not_verified'
 
 export const GeneratedSitesPage = () => {
   const navigate = useNavigate()
@@ -83,8 +86,11 @@ export const GeneratedSitesPage = () => {
         if (verificationFilter === 'verified') {
           return TRIPLE_VERIFIED_STATUSES.has(validationStatus)
         }
+        if (verificationFilter === 'has_website') {
+          return HAS_WEBSITE_STATUSES.has(validationStatus)
+        }
         if (verificationFilter === 'not_verified') {
-          return !TRIPLE_VERIFIED_STATUSES.has(validationStatus)
+          return !TRIPLE_VERIFIED_STATUSES.has(validationStatus) && !HAS_WEBSITE_STATUSES.has(validationStatus)
         }
         return true
       })
@@ -109,6 +115,7 @@ export const GeneratedSitesPage = () => {
       published: { variant: 'primary', label: 'Published' },
       failed: { variant: 'error', label: 'Failed' },
       draft: { variant: 'secondary', label: 'Draft' },
+      superseded: { variant: 'warning', label: 'Has Own Website' },
     }
     const { variant, label } = config[status] || { variant: 'secondary', label: status }
     return <Badge variant={variant}>{label}</Badge>
@@ -168,8 +175,12 @@ export const GeneratedSitesPage = () => {
     completed: data?.sites.filter((s: any) => s.status === 'completed').length || 0,
     published: data?.sites.filter((s: any) => s.status === 'published').length || 0,
     failed: data?.sites.filter((s: any) => s.status === 'failed').length || 0,
+    superseded: data?.sites.filter((s: any) => s.status === 'superseded').length || 0,
     tripleVerified: data?.sites.filter((s: any) =>
       TRIPLE_VERIFIED_STATUSES.has(s.business?.website_validation_status)
+    ).length || 0,
+    hasWebsite: data?.sites.filter((s: any) =>
+      HAS_WEBSITE_STATUSES.has(s.business?.website_validation_status)
     ).length || 0,
   }), [data?.sites])
 
@@ -197,7 +208,7 @@ export const GeneratedSitesPage = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-lg">
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-lg">
         <Card>
           <CardBody className="p-4">
             <div className="text-sm text-text-secondary mb-1">Total Sites</div>
@@ -216,6 +227,20 @@ export const GeneratedSitesPage = () => {
             </div>
             <div className="text-2xl font-bold text-success-600">{stats.tripleVerified}</div>
             <div className="text-xs text-text-tertiary mt-1">Ready for campaigns</div>
+          </CardBody>
+        </Card>
+
+        <Card
+          className={`cursor-pointer transition-all ${verificationFilter === 'has_website' ? 'ring-2 ring-warning-500' : 'hover:shadow-md'}`}
+          onClick={() => setVerificationFilter(v => v === 'has_website' ? 'all' : 'has_website')}
+        >
+          <CardBody className="p-4">
+            <div className="text-sm text-text-secondary mb-1 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3 text-warning-500" />
+              Has Website
+            </div>
+            <div className="text-2xl font-bold text-warning-600">{stats.hasWebsite}</div>
+            <div className="text-xs text-text-tertiary mt-1">Already had one</div>
           </CardBody>
         </Card>
         
@@ -336,6 +361,7 @@ export const GeneratedSitesPage = () => {
           <option value="generating">Generating</option>
           <option value="completed">Ready</option>
           <option value="published">Published</option>
+          <option value="superseded">Has Own Website</option>
           <option value="failed">Failed</option>
         </select>
       </div>
@@ -345,33 +371,24 @@ export const GeneratedSitesPage = () => {
         <span className="text-sm text-text-secondary font-medium mr-1">Validation:</span>
         {(
           [
-            { value: 'all', label: 'All', count: data?.sites.length || 0 },
-            { value: 'verified', label: '✅ Triple Verified', count: stats.tripleVerified },
-            { value: 'not_verified', label: '⚠️ Not Verified', count: (data?.sites.length || 0) - stats.tripleVerified },
-          ] as { value: VerificationFilter; label: string; count: number }[]
-        ).map(({ value, label, count }) => (
+            { value: 'all', label: 'All', count: data?.sites.length || 0, activeClass: 'bg-primary-100 border-primary-500 text-primary-700', activeBadge: 'bg-primary-500 text-white' },
+            { value: 'verified', label: '✅ Triple Verified', count: stats.tripleVerified, activeClass: 'bg-success-100 border-success-500 text-success-700', activeBadge: 'bg-success-500 text-white' },
+            { value: 'has_website', label: '🌐 Has Own Website', count: stats.hasWebsite, activeClass: 'bg-warning-100 border-warning-500 text-warning-700', activeBadge: 'bg-warning-500 text-white' },
+            { value: 'not_verified', label: '⏳ Pending Validation', count: (data?.sites.length || 0) - stats.tripleVerified - stats.hasWebsite, activeClass: 'bg-secondary-100 border-secondary-400 text-secondary-700', activeBadge: 'bg-secondary-500 text-white' },
+          ] as { value: VerificationFilter; label: string; count: number; activeClass: string; activeBadge: string }[]
+        ).map(({ value, label, count, activeClass, activeBadge }) => (
           <button
             key={value}
             onClick={() => setVerificationFilter(value)}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
               verificationFilter === value
-                ? value === 'verified'
-                  ? 'bg-success-100 border-success-500 text-success-700'
-                  : value === 'not_verified'
-                  ? 'bg-warning-100 border-warning-400 text-warning-700'
-                  : 'bg-primary-100 border-primary-500 text-primary-700'
+                ? activeClass
                 : 'bg-bg-secondary border-border text-text-secondary hover:border-text-secondary'
             }`}
           >
             {label}
             <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-              verificationFilter === value
-                ? value === 'verified'
-                  ? 'bg-success-500 text-white'
-                  : value === 'not_verified'
-                  ? 'bg-warning-500 text-white'
-                  : 'bg-primary-500 text-white'
-                : 'bg-bg-tertiary text-text-tertiary'
+              verificationFilter === value ? activeBadge : 'bg-bg-tertiary text-text-tertiary'
             }`}>
               {count}
             </span>
@@ -427,13 +444,15 @@ export const GeneratedSitesPage = () => {
               ? `https://www.google.com/maps/place/?q=place_id:${business.gmb_place_id}`
               : (rawData?.link || rawData?.google_maps_url)
             
+            const isSuperseded = site.status === 'superseded'
+
             return (
-              <Card key={site.id} className="hover:shadow-lg transition-shadow flex flex-col">
+              <Card key={site.id} className={`hover:shadow-lg transition-shadow flex flex-col ${isSuperseded ? 'border-warning-300 border-2' : ''}`}>
                 <CardBody className="p-4 flex flex-col h-full">
                   {/* Header with number and status */}
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 text-primary-700 font-bold text-sm">
+                      <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${isSuperseded ? 'bg-warning-100 text-warning-700' : 'bg-primary-100 text-primary-700'}`}>
                         {index + 1}
                       </div>
                       {getStatusBadge(site.status)}
@@ -443,11 +462,43 @@ export const GeneratedSitesPage = () => {
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-info-500"></div>
                     )}
                   </div>
+
+                  {/* Superseded: show comparison banner */}
+                  {isSuperseded && business?.website_url && (
+                    <div className="mb-3 p-2 bg-warning-50 border border-warning-200 rounded-lg">
+                      <p className="text-xs font-semibold text-warning-800 mb-1.5">Website Comparison</p>
+                      <div className="space-y-1">
+                        <a
+                          href={business.website_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-warning-700 hover:text-warning-900 hover:underline truncate"
+                          title={business.website_url}
+                        >
+                          <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                          <span className="font-medium">Their site:</span>
+                          <span className="truncate">{business.website_url.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                        </a>
+                        <a
+                          href={`https://sites.lavish.solutions/${site.subdomain}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 hover:underline truncate"
+                        >
+                          <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                          <span className="font-medium">Our site:</span>
+                          <span className="truncate">{site.subdomain}</span>
+                        </a>
+                      </div>
+                    </div>
+                  )}
                   
-                  {/* Validation status badge */}
-                  <div className="mb-3">
-                    {getValidationBadge(business?.website_validation_status)}
-                  </div>
+                  {/* Validation status badge (non-superseded only) */}
+                  {!isSuperseded && (
+                    <div className="mb-3">
+                      {getValidationBadge(business?.website_validation_status)}
+                    </div>
+                  )}
                   
                   {/* Site info */}
                   <div className="flex-1">
@@ -473,7 +524,7 @@ export const GeneratedSitesPage = () => {
                   
                   {/* Actions */}
                   <div className="flex flex-col gap-2 mt-3">
-                    {(site.status === 'completed' || site.status === 'published') && site.subdomain && (
+                    {(site.status === 'completed' || site.status === 'published' || isSuperseded) && site.subdomain && (
                       <div className="flex gap-2">
                         {/* View = in-app detail page with iframe + business data */}
                         <Button
@@ -489,14 +540,14 @@ export const GeneratedSitesPage = () => {
 
                         {/* Preview = open live site in a new browser tab */}
                         <Button
-                          variant="primary"
+                          variant={isSuperseded ? 'secondary' : 'primary'}
                           size="sm"
                           className="flex-1 flex items-center justify-center gap-1 text-xs"
                           onClick={() => window.open(site.short_url || `https://sites.lavish.solutions/${site.subdomain}`, '_blank')}
-                          title="Open live site in a new tab"
+                          title="Open our generated site in a new tab"
                         >
                           <ExternalLink className="w-3 h-3" />
-                          Preview
+                          {isSuperseded ? 'Our Site' : 'Preview'}
                         </Button>
                       </div>
                     )}
