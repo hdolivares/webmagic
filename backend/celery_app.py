@@ -66,11 +66,11 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute=15),  # :15 past so outreach_channel is set before next generate-sites
     },
 
-    # ── Stage 2: Generate sites for qualified leads every 30 minutes ─────────
+    # ── Stage 2: Generate sites for qualified leads every 10 minutes ─────────
     # Re-enabled: website detection pipeline is stable (ScrapingDog + LLM country check)
     "generate-sites": {
         "task": "tasks.generation_sync.generate_pending_sites",
-        "schedule": crontab(minute="*/30"),  # Every 30 minutes
+        "schedule": crontab(minute="*/10"),  # Every 10 minutes
     },
 
     # ── Stage 3: Auto-create campaigns for newly published sites ─────────────
