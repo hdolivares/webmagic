@@ -411,12 +411,20 @@ class ApiClient {
     total: number
     message: string
   }> {
-    const response = await this.client.post('/businesses/queue-for-generation', null, {
-      params: {
-        business_ids: params?.business_ids,
-        queue_all: params?.queue_all || false
-      }
-    })
+    // Axios serializes arrays as `key[]=val` by default, but FastAPI expects
+    // `key=val` repeated (no brackets).  Build the query string manually so
+    // FastAPI's List[str] param is populated correctly.
+    const parts: string[] = []
+    if (params?.business_ids?.length) {
+      params.business_ids.forEach(id => parts.push(`business_ids=${encodeURIComponent(id)}`))
+    }
+    parts.push(`queue_all=${params?.queue_all ? 'true' : 'false'}`)
+    const qs = parts.join('&')
+
+    const response = await this.client.post(
+      `/businesses/queue-for-generation?${qs}`,
+      null,
+    )
     return response.data
   }
 
