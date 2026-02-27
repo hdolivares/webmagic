@@ -66,15 +66,30 @@ def _is_html_complete(html: str | None) -> bool:
 def run_async(coro):
     """
     Helper to run async code in sync context.
-    Creates new event loop if needed.
+
+    Always creates a brand-new event loop so that stale futures from
+    SQLAlchemy's async connection pool (left over from a previous task
+    that ran in the same Celery fork-pool worker) never bleed into the
+    new coroutine.  The old `asyncio.get_event_loop()` approach returned
+    the worker's existing loop which still had pending futures attached,
+    causing:
+        RuntimeError: Task got Future attached to a different loop
     """
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    
-    return loop.run_until_complete(coro)
+        return loop.run_until_complete(coro)
+    finally:
+        try:
+            # Cancel and drain any tasks that the coroutine left running
+            pending = asyncio.all_tasks(loop)
+            if pending:
+                loop.run_until_complete(
+                    asyncio.gather(*pending, return_exceptions=True)
+                )
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
 
 
 @celery_app.task(
