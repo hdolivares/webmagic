@@ -97,15 +97,17 @@ _CATEGORY_PROMPTS: Dict[str, List[Dict[str, str]]] = {
             "slot": "about",
             "aspect": "4:3",
             "desc": (
-                "A skilled female massage therapist in white attire STANDING BESIDE a "
-                "professional massage table, both feet firmly planted on the floor, "
-                "gently applying pressure to the upper back of a client lying face-down "
-                "and draped in soft white linen. Side-angle or 3/4 view that shows the "
-                "full height of both therapist and client. The therapist is NOT sitting "
-                "or kneeling on the table — she is standing upright next to it, leaning "
-                "slightly forward from the waist. Soft warm candlelit spa interior with "
-                "natural elements, serene and tranquil atmosphere. Correct human anatomy, "
-                "realistic body proportions, both legs of the therapist fully visible."
+                "A skilled female massage therapist in white attire standing beside the "
+                "HEAD-END of a professional massage table, both feet on the floor on the "
+                "SAME SIDE of the table as the camera. Therapist gently placing hands on "
+                "the upper back and shoulders of a client lying face-down, draped in soft "
+                "white linen. 3/4 front-angle view: the camera is positioned in front of "
+                "and slightly to the side of the therapist so that BOTH her legs appear "
+                "clearly in the FOREGROUND, in front of the white table draping — NOT "
+                "behind or through the linen. Therapist leaning slightly forward from the "
+                "waist, natural relaxed posture. Warm candlelit spa interior with natural "
+                "elements, serene tranquil atmosphere. Correct human anatomy, realistic "
+                "proportions, no depth or occlusion artifacts."
             ),
         },
         {
