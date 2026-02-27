@@ -136,7 +136,7 @@ export function CoveragePage() {
         <div>
           <h1 className="page-title">Discovery Campaign</h1>
           <p className="page-description">
-            {totalAvailableCities.toLocaleString()} cities across {totalAvailableStates} states · {availableCategories} business categories available
+            {totalAvailableCities.toLocaleString()} cities × {availableCategories} categories = {(totalAvailableCities * availableCategories).toLocaleString()} possible scrapes across {totalAvailableStates} states
           </p>
         </div>
       </div>
@@ -155,9 +155,9 @@ export function CoveragePage() {
         {/* Level 1 — full discoverable universe */}
         <Card>
           <div className="stat-label">Available Universe</div>
-          <div className="stat-value">{totalAvailableCities.toLocaleString()}</div>
-          <div className="stat-meta">{totalAvailableStates} states · {totalAvailableCities.toLocaleString()} cities</div>
-          <div className="stat-meta">{availableCategories} business categories</div>
+          <div className="stat-value">{(totalAvailableCities * availableCategories).toLocaleString()}</div>
+          <div className="stat-meta">{totalAvailableCities.toLocaleString()} cities × {availableCategories} categories</div>
+          <div className="stat-meta">{totalAvailableStates} states</div>
         </Card>
 
         {/* Level 2 — how much has been started (active strategies) */}
