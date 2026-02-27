@@ -42,6 +42,26 @@ BUSINESS INFORMATION:
 - Address: {business_address}
 - City: {business_city}, State: {business_state}
 - Country: {business_country}
+- Business Categories (from Google My Business): {gmb_categories}
+- GMB Description: {gmb_description}
+- Known Social Media Pages (confirmed by phone/address match): {known_social_urls}
+- Discovery phone confirmed in search snippet: {discovery_phone_match}
+
+IMPORTANT NOTE ON PHONE MATCHING:
+If "Discovery phone confirmed in search snippet" is True, the URL being validated was
+found specifically because a Google search snippet contained the exact business phone number.
+This is strong evidence the site belongs to this business even if the phone cannot be seen
+in the scraped content (many small business sites render phone numbers via JavaScript
+click-to-call links that appear as "Call Us" in scraped text rather than the number itself).
+In this case, treat a missing phone in the website content as inconclusive, NOT as a mismatch.
+
+IMPORTANT NOTE ON NAME MATCHING:
+Small businesses frequently operate under DIFFERENT names across platforms:
+- Legal/GMB name: "Puget Seattle Plumbers and Drain Cleaning Co."
+- Website/Facebook name: "Puget Sound Plumbing"
+A phone number match or address match is FAR stronger evidence than name similarity.
+If the phone or address matches, accept a name variation as valid — do not reject solely
+because the business name on the site differs from the GMB name.
 
 WEBSITE INFORMATION:
 - URL: {website_url}
@@ -264,6 +284,21 @@ Now analyze the provided business and website information above and return your 
         website_data: Dict[str, Any]
     ) -> str:
         """Format the validation prompt with business and website data."""
+        # Format GMB context fields
+        gmb_categories = business.get("gmb_categories") or "Not available"
+        if isinstance(gmb_categories, list):
+            gmb_categories = ", ".join(str(c) for c in gmb_categories)
+
+        gmb_description = business.get("gmb_description") or "Not available"
+        if len(str(gmb_description)) > 300:
+            gmb_description = str(gmb_description)[:300] + "…"
+
+        known_social = business.get("known_social_urls") or {}
+        known_social_str = (
+            ", ".join(f"{k}: {v}" for k, v in known_social.items())
+            if known_social else "None"
+        )
+
         return self.VALIDATION_PROMPT.format(
             # Business data
             business_name=business.get("name", "Unknown"),
@@ -273,7 +308,12 @@ Now analyze the provided business and website information above and return your 
             business_city=business.get("city", "Unknown"),
             business_state=business.get("state", "Unknown"),
             business_country=business.get("country", "US"),
-            
+            # GMB / discovery context
+            gmb_categories=gmb_categories,
+            gmb_description=gmb_description,
+            known_social_urls=known_social_str,
+            discovery_phone_match=business.get("discovery_phone_match", False),
+
             # Website data
             website_url=website_data.get("url", "Unknown"),
             final_url=website_data.get("final_url", website_data.get("url", "Unknown")),

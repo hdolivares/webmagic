@@ -126,6 +126,23 @@ def generate_site_for_business(self, business_id: str):
                         "website_url": business.website_url
                     }
 
+                # **SKIP businesses with no phone AND no email** — we have no way to
+                # contact them, so generating a site is pointless.
+                if not business.phone and not business.email:
+                    logger.info(
+                        f"Business {business_id} ({business.name}) has no phone and no email. "
+                        "Skipping generation — no contact method available."
+                    )
+                    business.generation_queued_at = None
+                    business.generation_started_at = None
+                    business.website_status = 'ineligible'
+                    await db.commit()
+                    return {
+                        "status": "skipped",
+                        "reason": "no_contact_info",
+                        "message": "No phone number or email address; cannot contact business"
+                    }
+
                 # **SKIP call_later businesses** (no valid SMS, no email)
                 if OutreachChannel.is_call_later(business.outreach_channel):
                     logger.info(

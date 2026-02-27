@@ -57,9 +57,17 @@ class ContentAnalyzer:
             # Get page content
             content_html = await page.content()
             content_text = await self._get_text_content(page)
-            
+
+            # Extract phone numbers from two sources and merge:
+            # 1. Visible text (innerText) — standard regex patterns
+            # 2. tel: href attributes and data-phone/data-tel attributes —
+            #    these are NOT in innerText but are the most reliable source on
+            #    modern small-business sites that use click-to-call links.
+            text_phones = self._extract_phones(content_text)
+            tel_phones = await self._extract_tel_href_phones(page)
+            phones = list(dict.fromkeys(text_phones + tel_phones))  # deduplicate, preserve order
+
             # Extract contact information
-            phones = self._extract_phones(content_text)
             emails = self._extract_emails(content_text)
             has_address = self._detect_address(content_text)
             has_hours = self._detect_hours(content_text)
@@ -152,7 +160,71 @@ class ContentAnalyzer:
             return await page.evaluate('document.body.innerText')
         except Exception:
             return ""
-    
+
+    async def _extract_tel_href_phones(self, page: Page) -> List[str]:
+        """
+        Extract phone numbers from tel: href links and data-* attributes.
+
+        Many small-business sites render click-to-call buttons as:
+            <a href="tel:+12063600078">Call Us</a>
+        or store the number in a data attribute:
+            <div data-phone="(206) 360-0078">
+        These never appear in document.body.innerText, causing our regex
+        extraction to miss them entirely.
+
+        We also check aria-label attributes for patterns like
+        'aria-label="Call (206) 360-0078"'.
+        """
+        try:
+            raw_numbers: List[str] = await page.evaluate("""
+                () => {
+                    const numbers = [];
+
+                    // 1. tel: href links
+                    document.querySelectorAll('a[href^="tel:"]').forEach(el => {
+                        const raw = el.href.replace(/^tel:/i, '').trim();
+                        if (raw) numbers.push(raw);
+                    });
+
+                    // 2. data-phone / data-tel / data-number attributes
+                    const dataAttrs = ['data-phone', 'data-tel', 'data-number', 'data-mobile'];
+                    dataAttrs.forEach(attr => {
+                        document.querySelectorAll('[' + attr + ']').forEach(el => {
+                            const val = el.getAttribute(attr);
+                            if (val) numbers.push(val);
+                        });
+                    });
+
+                    // 3. aria-label containing phone-like strings on links/buttons
+                    document.querySelectorAll('[aria-label]').forEach(el => {
+                        const label = el.getAttribute('aria-label') || '';
+                        if (/\\d{3}[\\s.\\-]?\\d{3}[\\s.\\-]?\\d{4}/.test(label)) {
+                            numbers.push(label);
+                        }
+                    });
+
+                    return numbers;
+                }
+            """)
+        except Exception as e:
+            logger.debug(f"tel: href extraction failed (non-critical): {e}")
+            return []
+
+        # Run the same regex patterns over each raw value to normalize them
+        found: List[str] = []
+        for raw in raw_numbers:
+            cleaned = re.sub(r'[^\d+\-.()\s]', '', raw).strip()
+            if cleaned:
+                # A bare digits-only string from tel: (e.g. "+12063600078") — keep as-is
+                # if it matches a phone length, otherwise run patterns
+                if re.fullmatch(r'\+?1?\d{10}', cleaned.replace('-', '').replace(' ', '').replace('.', '').replace('(', '').replace(')', '')):
+                    found.append(cleaned)
+                else:
+                    extracted = self._extract_phones(cleaned)
+                    found.extend(extracted)
+
+        return list(dict.fromkeys(found))  # deduplicate
+
     def _extract_phones(self, text: str) -> List[str]:
         """Extract phone numbers from text."""
         phones = []

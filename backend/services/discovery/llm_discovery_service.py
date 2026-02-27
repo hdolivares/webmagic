@@ -171,6 +171,17 @@ class LLMDiscoveryService:
                 f"(confidence: {llm_analysis.get('country_confidence', 0)}) "
                 f"signals: {llm_analysis.get('country_signals', [])}"
             )
+
+        # Extract social media page URLs from organic results, validated by
+        # phone/address match in the snippet (NOT name similarity).
+        # These are saved as secondary discovery data — useful even when the
+        # business's primary URL is already found.
+        social_urls = self._extract_social_urls_from_results(
+            organic_results=search_results.get("organic_results", []),
+            phone=phone,
+            address=address,
+            city=city,
+        )
         
         return {
             "url": found_url,
@@ -183,7 +194,8 @@ class LLMDiscoveryService:
             "search_results": search_results,
             "query": self._build_query(business_name, city, state),
             "llm_analysis": llm_analysis,
-            "llm_model": await self._get_llm_model()
+            "llm_model": await self._get_llm_model(),
+            "social_urls": social_urls,  # {platform: url} — matched by phone/address
         }
     
     async def _get_search_results(
@@ -515,6 +527,93 @@ Determine the actual country of this business using these signals (in priority o
 """
         
         return prompt
+
+    # ----------------------------------------------------------------
+    # Social URL domains we look for (platform → canonical root domain)
+    # ----------------------------------------------------------------
+    _SOCIAL_DOMAINS: dict[str, str] = {
+        "facebook.com": "facebook",
+        "fb.com": "facebook",
+        "instagram.com": "instagram",
+        "twitter.com": "twitter",
+        "x.com": "twitter",
+        "linkedin.com": "linkedin",
+        "yelp.com": "yelp",
+    }
+
+    def _extract_social_urls_from_results(
+        self,
+        organic_results: list,
+        phone: Optional[str],
+        address: Optional[str],
+        city: Optional[str],
+    ) -> dict:
+        """
+        Scan organic search results for social media page URLs that can be
+        confirmed as belonging to this business via phone or address in the snippet.
+
+        Key design decision: we validate by PHONE/ADDRESS match in the snippet,
+        NOT by name similarity.  Business names frequently differ across platforms
+        (e.g. "Puget Seattle Plumbers" on GMB vs "Puget Sound Plumbing" on Facebook)
+        but phone numbers are universal.
+
+        Returns a dict like: {"facebook": "https://www.facebook.com/pugetsoundplumbing/"}
+        Only entries with a phone or address match are included.
+        """
+        if not organic_results:
+            return {}
+
+        # Normalise the phone for substring search (strip non-digit chars)
+        phone_digits = "".join(c for c in (phone or "") if c.isdigit())
+        # Use the last 10 digits for matching (strips +1 country code)
+        phone_digits_10 = phone_digits[-10:] if len(phone_digits) >= 10 else phone_digits
+
+        # Normalise address / city for substring search
+        addr_lower = (address or "").lower()
+        city_lower = (city or "").lower()
+
+        found: dict = {}
+
+        for result in organic_results:
+            link = (result.get("link") or "").lower()
+            title = (result.get("title") or "").lower()
+            snippet = (result.get("snippet") or "").lower()
+            combined = f"{title} {snippet}"
+
+            # Check if this result is a social media page
+            matched_platform = None
+            for domain, platform in self._SOCIAL_DOMAINS.items():
+                if domain in link:
+                    matched_platform = platform
+                    break
+            if not matched_platform:
+                continue
+
+            # Only keep if phone or address appears in the snippet/title
+            snippet_digits = "".join(c for c in snippet if c.isdigit())
+            phone_in_snippet = (
+                phone_digits_10
+                and len(phone_digits_10) >= 7
+                and phone_digits_10 in snippet_digits
+            )
+            address_in_snippet = addr_lower and any(
+                word in combined for word in addr_lower.split() if len(word) > 3
+            )
+            city_in_snippet = city_lower and city_lower in combined
+
+            if phone_in_snippet or address_in_snippet or city_in_snippet:
+                if matched_platform not in found:
+                    canonical = result.get("link") or ""
+                    # Prefer page-level URL over post URLs (skip /posts/, /groups/, etc.)
+                    if any(p in canonical for p in ["/posts/", "/groups/", "/photos/", "?fbid=", "story_fbid"]):
+                        continue
+                    found[matched_platform] = canonical
+                    logger.info(
+                        f"📱 Social URL match ({matched_platform}): {canonical} "
+                        f"[phone_match={phone_in_snippet}, addr_match={address_in_snippet}, city_match={city_in_snippet}]"
+                    )
+
+        return found
 
 
 async def test_llm_discovery():
