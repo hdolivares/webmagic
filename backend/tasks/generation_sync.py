@@ -131,7 +131,11 @@ def generate_site_for_business(self, business_id: str):
                     logger.info(
                         f"Business {business_id} is call_later (no SMS, no email). Skipping generation."
                     )
+                    # Reset ALL generation tracking fields so this business is
+                    # not re-dispatched by generate_pending_sites on every cycle.
                     business.generation_queued_at = None
+                    business.generation_started_at = None
+                    business.website_status = 'none'
                     await db.commit()
                     return {
                         "status": "skipped",

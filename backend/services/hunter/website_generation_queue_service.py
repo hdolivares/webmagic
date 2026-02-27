@@ -7,7 +7,7 @@ Integrates with Celery background tasks for async website generation.
 import logging
 from typing import Dict, List, Optional, Any
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, and_, or_, func
 
@@ -107,16 +107,37 @@ class WebsiteGenerationQueueService:
                 'message': 'Business has no valid SMS or email; in call-later queue for future outreach'
             }
         
-        # Check if already queued or in progress
+        # Check if already queued or in progress — but allow re-dispatch for
+        # stuck tasks (queued > 2 h ago, task never even started) or for
+        # businesses whose most-recent GeneratedSite has status 'failed'.
         if business.generation_queued_at and not business.generation_completed_at:
-            logger.info(f"Business {business_id} already queued for generation")
-            return {
-                'status': 'already_queued',
-                'queued_at': business.generation_queued_at,
-                'message': 'Already in generation queue'
-            }
+            # Is the task genuinely running (started < 2 h ago)?
+            stuck_threshold = datetime.utcnow() - timedelta(hours=2)
+            task_started = business.generation_started_at is not None
+            queued_long_ago = business.generation_queued_at < stuck_threshold
+
+            if task_started and not queued_long_ago:
+                # Actively generating — don't duplicate
+                logger.info(f"Business {business_id} is actively generating")
+                return {
+                    'status': 'already_queued',
+                    'queued_at': business.generation_queued_at,
+                    'message': 'Already in generation queue',
+                }
+
+            # Stuck (task never started OR queued > 2h ago): allow re-dispatch
+            logger.warning(
+                f"Business {business_id} appears stuck "
+                f"(queued_at={business.generation_queued_at}, "
+                f"started={business.generation_started_at}). Re-dispatching."
+            )
+            # Reset so the task picks it up cleanly
+            business.generation_queued_at = None
+            business.generation_started_at = None
+            business.website_status = 'none'
+            await self.db.flush()
         
-        # Check if already has generated website
+        # Check if already has a successfully generated website
         if business.website_status in ['generated', 'deployed', 'sold']:
             logger.info(f"Business {business_id} already has generated website (status: {business.website_status})")
             return {
@@ -124,6 +145,28 @@ class WebsiteGenerationQueueService:
                 'website_status': business.website_status,
                 'message': f'Website already {business.website_status}'
             }
+
+        # If the business is 'queued'/'generating' but its latest GeneratedSite
+        # has status 'failed', the previous attempt didn't complete successfully.
+        # Reset state so we can retry cleanly.
+        from models.site import GeneratedSite
+        from sqlalchemy import select as _select
+        site_result = await self.db.execute(
+            _select(GeneratedSite)
+            .where(GeneratedSite.business_id == business_id)
+            .order_by(GeneratedSite.created_at.desc())
+            .limit(1)
+        )
+        latest_site = site_result.scalar_one_or_none()
+        if latest_site and latest_site.status == 'failed':
+            logger.info(
+                f"Business {business_id} has a failed GeneratedSite — resetting for retry."
+            )
+            business.generation_queued_at = None
+            business.generation_started_at = None
+            business.generation_completed_at = None
+            business.website_status = 'none'
+            await self.db.flush()
         
         # Check generation attempts limit
         if business.generation_attempts >= self.MAX_GENERATION_ATTEMPTS:
