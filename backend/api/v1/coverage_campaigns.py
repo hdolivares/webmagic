@@ -149,7 +149,7 @@ async def get_campaign_stats(
             func.sum(GeoStrategy.zones_completed).label("zones_completed"),
             func.count(func.distinct(func.concat(GeoStrategy.city, ':', GeoStrategy.state))).label("cities"),
             func.count(func.distinct(GeoStrategy.category)).label("categories"),
-        ).where(GeoStrategy.is_active == True)  # noqa: E712
+        ).where(GeoStrategy.is_active == "active")
     )
     strat_row = strategy_agg.first()
     total_strategies = strat_row.total_strategies or 0

@@ -105,11 +105,8 @@ export function CoveragePage() {
     }
   }
 
-  if (loading) {
-    return <div className="loading-screen">Loading campaign data...</div>
-  }
-
   // Full discoverable universe from the dropdown data (computed client-side)
+  // These useMemo calls must stay before any early returns (Rules of Hooks)
   const totalAvailableCities = useMemo(
     () => Object.values(US_CITIES_BY_STATE).flat().length,
     []
@@ -122,6 +119,10 @@ export function CoveragePage() {
 
   // Strategy-level progress (zones done vs zones planned)
   const hasStrategyData = (stats?.total_zones || 0) > 0
+
+  if (loading) {
+    return <div className="loading-screen">Loading campaign data...</div>
+  }
   const completionPct = hasStrategyData
     ? (stats?.zones_completion_pct || 0)
     : (stats?.completion_percentage || 0)
