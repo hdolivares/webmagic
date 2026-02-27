@@ -113,7 +113,19 @@ class URLPrescreener:
                 "skip_reason": storage_check["reason"],
                 "recommendation": "skip_playwright"
             }
-        
+
+        # Check 2b: Directory / aggregator / social media domains
+        # These are never valid business websites — skip Playwright entirely
+        # and signal the caller to trigger ScrapingDog discovery instead.
+        directory_check = self._check_non_business_domain(url)
+        if not directory_check["is_valid"]:
+            return {
+                "should_validate": False,
+                "skip_reason": directory_check["reason"],
+                "invalid_reason": directory_check.get("invalid_reason"),
+                "recommendation": "trigger_scrapingdog",
+            }
+
         # Check 3: URL shorteners (warn but don't block)
         shortener_check = self._check_url_shortener(url)
         if not shortener_check["is_valid"]:
@@ -149,6 +161,55 @@ class URLPrescreener:
             "recommendation": "proceed"
         }
     
+    def _check_non_business_domain(self, url: str) -> Dict[str, Any]:
+        """
+        Check if URL belongs to a directory, aggregator, or social media site.
+        These are never valid business websites and should trigger ScrapingDog
+        re-discovery rather than wasting a Playwright session.
+        """
+        try:
+            from core.validation_enums import (
+                DIRECTORY_DOMAINS,
+                AGGREGATOR_DOMAINS,
+                SOCIAL_MEDIA_DOMAINS,
+                SERVICE_PLATFORMS,
+                InvalidURLReason,
+            )
+            from urllib.parse import urlparse
+
+            host = urlparse(url).netloc.lower().lstrip("www.")
+
+            if any(host == d or host.endswith("." + d) for d in DIRECTORY_DOMAINS):
+                return {
+                    "is_valid": False,
+                    "reason": f"Directory site ({host}), not a business website",
+                    "invalid_reason": InvalidURLReason.DIRECTORY.value,
+                }
+            if any(host == d or host.endswith("." + d) for d in AGGREGATOR_DOMAINS):
+                return {
+                    "is_valid": False,
+                    "reason": f"Aggregator/review site ({host}), not a business website",
+                    "invalid_reason": InvalidURLReason.AGGREGATOR.value,
+                }
+            if any(host == d or host.endswith("." + d) for d in SOCIAL_MEDIA_DOMAINS):
+                return {
+                    "is_valid": False,
+                    "reason": f"Social media profile ({host}), not a business website",
+                    "invalid_reason": InvalidURLReason.SOCIAL_MEDIA.value,
+                }
+            if any(host == d or host.endswith("." + d) for d in SERVICE_PLATFORMS):
+                return {
+                    "is_valid": False,
+                    "reason": f"Service marketplace ({host}), not a business website",
+                    "invalid_reason": InvalidURLReason.AGGREGATOR.value,
+                }
+
+            return {"is_valid": True, "reason": None}
+
+        except Exception as e:
+            logger.warning(f"Error in non-business domain check for {url}: {e}")
+            return {"is_valid": True, "reason": None}
+
     def _check_file_extension(self, url: str) -> Dict[str, Any]:
         """Check if URL points to a file document."""
         url_lower = url.lower()

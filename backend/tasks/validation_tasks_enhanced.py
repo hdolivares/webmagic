@@ -463,41 +463,113 @@ def _handle_rejected_url(
     }
 
 
+def _domain_resolves(url: str) -> bool:
+    """
+    Check if a URL's domain resolves via DNS.
+
+    Returns True if the domain has at least one DNS record, False if it's
+    unregistered / NXDOMAIN / unreachable at the DNS level.
+    """
+    import socket
+    from urllib.parse import urlparse as _urlparse
+    try:
+        host = _urlparse(url).netloc.split(":")[0].strip()
+        if not host:
+            return False
+        socket.getaddrinfo(host, 80, proto=socket.IPPROTO_TCP)
+        return True
+    except (socket.gaierror, OSError):
+        return False
+
+
 def _handle_technical_failure(
     db,
     business: Business,
     validation_result: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
-    Handle technical failure - keep URL for retry.
-    
-    Args:
-        db: Database session
-        business: Business instance
-        validation_result: Validation result
-        
-    Returns:
-        Result dictionary
+    Handle technical failure after Playwright/LLM validation fails.
+
+    Two sub-cases:
+      1. Domain doesn't resolve (NXDOMAIN / available) → the URL was wrong.
+         Clear it, reset to needs_discovery, and re-queue ScrapingDog.
+      2. Domain resolves but Playwright failed → bot-detection, flaky page,
+         or temporary outage. Keep as invalid_technical for human review.
     """
     invalid_reason = validation_result.get("invalid_reason", "unknown")
-    
+    url = business.website_url
+
+    # ----------------------------------------------------------------
+    # DNS CHECK — is this domain even registered?
+    # ----------------------------------------------------------------
+    if url and not _domain_resolves(url):
+        logger.warning(
+            f"🚫 Domain does not resolve for {business.name}: {url} "
+            f"— domain is unregistered or dead. Clearing URL and re-queuing ScrapingDog."
+        )
+
+        # Record what happened
+        import copy
+        meta = copy.deepcopy(business.website_metadata or {})
+        history = meta.get("validation_history", [])
+        history.append({
+            "timestamp": datetime.utcnow().isoformat(),
+            "action": "dead_domain_cleared",
+            "url": url,
+            "invalid_reason": "domain_not_found",
+            "notes": "DNS lookup returned NXDOMAIN — domain is unregistered or dead. Re-queuing ScrapingDog.",
+        })
+        meta["validation_history"] = history
+
+        # Reset scrapingdog attempt flag so it can run again
+        attempts = meta.get("discovery_attempts", {})
+        attempts["scrapingdog"] = {}
+        meta["discovery_attempts"] = attempts
+        business.website_metadata = meta
+
+        # Clear the dead URL and reset status
+        business.website_url = None
+        business.website_validation_status = ValidationState.NEEDS_DISCOVERY.value
+        business.website_validation_result = None
+        business.website_validated_at = None
+
+        db.commit()
+
+        # Re-queue ScrapingDog discovery
+        from tasks.discovery_tasks import discover_missing_websites_v2
+        task = discover_missing_websites_v2.delay(str(business.id))
+        logger.info(f"Re-queued ScrapingDog discovery for {business.name} (task: {task.id})")
+
+        return {
+            "business_id": str(business.id),
+            "status": "dead_domain_requeued",
+            "verdict": "invalid",
+            "invalid_reason": "domain_not_found",
+            "cleared_url": url,
+            "discovery_task_id": task.id,
+        }
+
+    # ----------------------------------------------------------------
+    # DOMAIN EXISTS — Playwright failed for other reasons (bot-detection,
+    # slow page, temporary outage). Keep the URL, mark invalid_technical.
+    # ----------------------------------------------------------------
     logger.warning(
-        f"⚠️ Technical failure: {business.website_url} "
-        f"(reason: {invalid_reason}) - keeping URL for retry"
+        f"⚠️ Technical failure for {business.name}: {url} "
+        f"(reason: {invalid_reason}) — domain resolves, keeping URL for human review"
     )
-    
+
     business.website_validation_status = ValidationState.INVALID_TECHNICAL.value
     business.website_validation_result = validation_result
     business.website_validated_at = datetime.utcnow()
-    
+
     db.commit()
-    
+
     return {
         "business_id": str(business.id),
         "status": "technical_failure",
         "verdict": "invalid",
         "invalid_reason": invalid_reason,
-        "url": business.website_url
+        "url": url,
     }
 
 
