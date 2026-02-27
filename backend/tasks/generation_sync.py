@@ -18,6 +18,7 @@ from core.outreach_enums import OutreachChannel
 from models.business import Business
 from models.site import GeneratedSite
 from services.creative.orchestrator import CreativeOrchestrator
+from services.hunter.scraper import OutscraperClient
 from services.sms.number_lookup import NumberLookupService
 from services.sms.phone_validator import PhoneValidator
 
@@ -236,6 +237,42 @@ def generate_site_for_business(self, business_id: str):
                 logger.info(f"Generating site content for {business.name}...")
                 orchestrator = CreativeOrchestrator(db)
                 
+                # Fetch actual review text if not already cached in raw_data.
+                # The standard Outscraper search only stores review COUNT; real text
+                # requires a separate reviews API call.  We cap at 10 to balance
+                # cost vs. context quality and cache the result in raw_data so
+                # retries don't re-fetch.
+                reviews_data: list = []
+                raw = business.raw_data or {}
+                cached_reviews = raw.get("reviews_text")  # set by us after first fetch
+                if cached_reviews and isinstance(cached_reviews, list):
+                    reviews_data = cached_reviews
+                    logger.info(
+                        f"[Gen] Using {len(reviews_data)} cached review texts for {business.name}"
+                    )
+                elif business.gmb_place_id:
+                    try:
+                        outscraper = OutscraperClient()
+                        fetched = await outscraper.fetch_reviews(
+                            place_id=business.gmb_place_id,
+                            limit=10,
+                        )
+                        if fetched:
+                            reviews_data = fetched
+                            # Cache in raw_data to avoid paying for this on retries
+                            updated_raw = dict(raw)
+                            updated_raw["reviews_text"] = fetched
+                            business.raw_data = updated_raw
+                            logger.info(
+                                f"[Gen] Fetched and cached {len(fetched)} reviews for "
+                                f"{business.name} ({business.gmb_place_id})"
+                            )
+                    except Exception as rev_err:
+                        logger.warning(
+                            f"[Gen] Review fetch failed for {business.name} "
+                            f"(non-fatal): {rev_err}"
+                        )
+
                 # Prepare business data for generation
                 business_data = {
                     "id": str(business.id),
@@ -249,6 +286,7 @@ def generate_site_for_business(self, business_id: str):
                     "rating": business.rating,
                     "review_count": business.review_count,
                     "reviews_summary": business.reviews_summary,
+                    "reviews_data": reviews_data,
                 }
                 
                 # Pass subdomain so architect can generate and save images

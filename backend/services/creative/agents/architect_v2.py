@@ -71,6 +71,7 @@ class ArchitectAgentV2(BaseAgent):
                     category=enhanced_data.get("category", ""),
                     subdomain=subdomain,
                     brand_colors=colors if isinstance(colors, dict) else {},
+                    creative_dna=creative_dna,
                 )
             except Exception as img_err:
                 # Image generation is best-effort — never block site creation

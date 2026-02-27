@@ -81,6 +81,37 @@ _CATEGORY_PROMPTS: Dict[str, List[Dict[str, str]]] = {
             ),
         },
     ],
+    # ── Massage / Spa ─────────────────────────────────────────────────────────
+    "massage": [
+        {
+            "slot": "hero",
+            "aspect": "16:9",
+            "desc": (
+                "A serene, elegant spa treatment room with a beautiful woman in a "
+                "plush white towel resting peacefully on a professional massage table. "
+                "Warm dim candlelight, orchids, stone accessories, luxurious atmosphere. "
+                "Cinematic photography, 8K, ultra-realistic, no people working."
+            ),
+        },
+        {
+            "slot": "about",
+            "aspect": "4:3",
+            "desc": (
+                "A skilled female massage therapist performing a relaxing back massage "
+                "on a client draped in white linen on a massage table. Soft warm "
+                "lighting, spa interior with candles and natural elements, tranquil mood."
+            ),
+        },
+        {
+            "slot": "services",
+            "aspect": "4:3",
+            "desc": (
+                "Elegant spa treatment setting — smooth hot stones, aromatic essential "
+                "oil bottles, bamboo accessories, fresh flowers, and soft towels arranged "
+                "on a dark wooden surface. Product photography, warm candlelit tones."
+            ),
+        },
+    ],
     # ── Health / Wellness ─────────────────────────────────────────────────────
     "chiropractor": [
         {
@@ -221,7 +252,10 @@ _CATEGORY_PROMPTS: Dict[str, List[Dict[str, str]]] = {
     ],
 }
 
-# Map common category keywords to our known buckets
+# Map common category keywords to our known buckets.
+# ORDER MATTERS: more-specific keywords must come before substrings that could
+# accidentally match (e.g. "massage therapist" contains "therap" — "massage"
+# must be checked first so it routes to the massage bucket, not counselor).
 _CATEGORY_KEYWORDS: Dict[str, str] = {
     "plumb": "plumber",
     "drain": "plumber",
@@ -231,10 +265,20 @@ _CATEGORY_KEYWORDS: Dict[str, str] = {
     "heating": "hvac",
     "chiropract": "chiropractor",
     "chiro": "chiropractor",
+    # Massage / spa — must come before generic "therap" to avoid mis-routing
+    "massage": "massage",
+    "spa": "massage",
+    "facial": "massage",
+    "estheti": "massage",
+    "reflexolog": "massage",
+    "nail salon": "massage",
+    "waxing": "massage",
+    # Mental health / counseling
     "counsel": "counselor",
     "therap": "counselor",
     "psycholog": "counselor",
     "psychiatr": "counselor",
+    "mental health": "counselor",
     "vet": "veterinarian",
     "animal": "veterinarian",
     "pet": "veterinarian",
@@ -277,6 +321,7 @@ class ImageGenerationService:
         category: str,
         subdomain: str,
         brand_colors: Optional[Dict[str, str]] = None,
+        creative_dna: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Generate 3 images for a site in parallel.
@@ -288,6 +333,12 @@ class ImageGenerationService:
           {"slot": "services", "filename": "img/services.jpg", "saved": True},
         ]
         Files are saved under SITES_BASE_PATH/{subdomain}/img/.
+
+        Args:
+            creative_dna: Optional output from the Concept agent.  When provided,
+                the brand's unique positioning (visual_identity, value_proposition,
+                emotional_core, personality_traits) is injected into every prompt so
+                images reflect the specific brand angle rather than a generic template.
         """
         if not self.api_key:
             logger.warning("[ImageGen] Skipping — no API key")
@@ -296,10 +347,11 @@ class ImageGenerationService:
         bucket = _resolve_category_key(category)
         prompt_specs = _CATEGORY_PROMPTS[bucket]
         color_hint = self._color_hint(brand_colors)
+        brand_hint = self._brand_hint(creative_dna)
 
         logger.info(
             f"[ImageGen] Generating {len(prompt_specs)} images for '{business_name}' "
-            f"(category={category}, bucket={bucket})"
+            f"(category={category}, bucket={bucket}, brand_hint={bool(brand_hint)})"
         )
 
         tasks = [
@@ -307,6 +359,7 @@ class ImageGenerationService:
                 spec=spec,
                 business_name=business_name,
                 color_hint=color_hint,
+                brand_hint=brand_hint,
                 subdomain=subdomain,
             )
             for spec in prompt_specs
@@ -334,6 +387,7 @@ class ImageGenerationService:
         business_name: str,
         color_hint: str,
         subdomain: str,
+        brand_hint: str = "",
     ) -> Dict[str, Any]:
         slot = spec["slot"]
         aspect = spec["aspect"]
@@ -341,6 +395,7 @@ class ImageGenerationService:
         full_prompt = (
             f"{spec['desc']} "
             f"For a business called '{business_name}'. "
+            f"{brand_hint} "
             f"{color_hint} "
             "No text overlays, no logos, no watermarks. "
             "Ultra-realistic, high-fidelity, premium quality."
@@ -443,3 +498,39 @@ class ImageGenerationService:
         if primary or secondary:
             return f"The image should subtly echo the brand palette: {primary}, {secondary}."
         return ""
+
+    @staticmethod
+    def _brand_hint(creative_dna: Optional[Dict[str, Any]]) -> str:
+        """
+        Build a short prompt fragment from the Concept agent's creative DNA so
+        that images reflect the specific brand positioning rather than a generic
+        category template.
+
+        Pulls from (in priority order):
+        - visual_identity  — explicit visual direction from the art director
+        - value_proposition — the brand's unique selling angle
+        - emotional_core   — the feeling the brand wants to evoke
+        - personality_traits — adjectives that describe the brand voice
+        """
+        if not creative_dna:
+            return ""
+
+        fragments: List[str] = []
+
+        visual = creative_dna.get("visual_identity", "")
+        if visual:
+            fragments.append(f"Visual style: {visual}.")
+
+        vp = creative_dna.get("value_proposition", "")
+        if vp:
+            fragments.append(f"Brand positioning: {vp}.")
+
+        ec = creative_dna.get("emotional_core", "")
+        if ec:
+            fragments.append(f"Mood and feeling: {ec}.")
+
+        traits = creative_dna.get("personality_traits", [])
+        if traits:
+            fragments.append(f"Brand character: {', '.join(traits[:4])}.")
+
+        return " ".join(fragments)

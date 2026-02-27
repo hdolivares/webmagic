@@ -377,3 +377,79 @@ class OutscraperClient:
         if results and len(results) > 0:
             return results[0]
         return []
+
+    async def fetch_reviews(
+        self,
+        place_id: str,
+        limit: int = 10,
+        sort: str = "most_relevant",
+        language: str = "en",
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch actual review text for a business via Outscraper's reviews endpoint.
+
+        This is a separate API call from google_maps_search — the standard search
+        only returns the review *count*, not the review text.
+
+        Args:
+            place_id: Google Maps place ID (ChIJ... format) stored in gmb_place_id
+            limit: How many reviews to fetch (default 10; higher = more cost)
+            sort: 'most_relevant' | 'newest' | 'highest_rating' | 'lowest_rating'
+            language: Language code (default 'en')
+
+        Returns:
+            List of dicts with keys: text, rating, date, author
+            Returns [] on any failure to keep generation non-blocking.
+        """
+        try:
+            logger.info(f"[Reviews] Fetching {limit} reviews for place_id={place_id}")
+
+            loop = asyncio.get_event_loop()
+            raw = await loop.run_in_executor(
+                None,
+                self._fetch_reviews_sync,
+                place_id,
+                limit,
+                sort,
+                language,
+            )
+
+            reviews = []
+            for item in (raw or []):
+                text = (item.get("review_text") or "").strip()
+                if not text:
+                    continue
+                reviews.append({
+                    "text": text,
+                    "rating": item.get("review_rating"),
+                    "date": item.get("review_datetime_utc"),
+                    "author": item.get("author_title"),
+                })
+
+            logger.info(f"[Reviews] Got {len(reviews)} reviews with text for {place_id}")
+            return reviews
+
+        except Exception as e:
+            logger.warning(f"[Reviews] Failed to fetch reviews for {place_id}: {e}")
+            return []
+
+    def _fetch_reviews_sync(
+        self,
+        place_id: str,
+        limit: int,
+        sort: str,
+        language: str,
+    ) -> List[Dict[str, Any]]:
+        """Synchronous Outscraper reviews call — runs in thread pool."""
+        results = self.client.google_maps_reviews(
+            queries=[place_id],
+            reviews_limit=limit,
+            sort=sort,
+            language=language,
+        )
+        if not results:
+            return []
+        # Outscraper may return [[{...}]] or [{...}]
+        if isinstance(results[0], list):
+            results = results[0]
+        return results if isinstance(results, list) else []
