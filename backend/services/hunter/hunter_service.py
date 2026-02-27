@@ -484,6 +484,9 @@ class HunterService:
                 if settings.ENABLE_AUTO_VALIDATION:
                     logger.info(f"Queuing {len(businesses_to_validate)} businesses for V2 validation pipeline")
                     try:
+                        # Commit the session first so that Celery workers (separate processes)
+                        # can see the newly saved businesses before the tasks run.
+                        await self.db.commit()
                         from tasks.validation_tasks_enhanced import batch_validate_websites_v2
                         batch_validate_websites_v2.delay(businesses_to_validate)
                     except Exception as e:
@@ -827,6 +830,9 @@ class HunterService:
         if settings.ENABLE_AUTO_VALIDATION and businesses_to_validate:
             logger.info(f"Queuing {len(businesses_to_validate)} businesses for V2 validation pipeline")
             try:
+                # Commit the session first so that Celery workers (separate processes)
+                # can see the newly saved businesses before the tasks run.
+                await self.db.commit()
                 # Import here to avoid circular dependency
                 from tasks.validation_tasks_enhanced import batch_validate_websites_v2
                 

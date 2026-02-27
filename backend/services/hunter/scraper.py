@@ -442,7 +442,7 @@ class OutscraperClient:
     ) -> List[Dict[str, Any]]:
         """Synchronous Outscraper reviews call — runs in thread pool."""
         results = self.client.google_maps_reviews(
-            queries=[place_id],
+            query=[place_id],
             reviews_limit=limit,
             sort=sort,
             language=language,
