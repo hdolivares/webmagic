@@ -48,7 +48,7 @@ def scrape_zone_async(
     state: str,
     category: str,
     country: str = "US",
-    limit_per_zone: int = 50,
+    limit_per_zone: int = 200,
     zone_id: Optional[str] = None,
     strategy_id: Optional[str] = None
 ) -> Dict[str, Any]:
