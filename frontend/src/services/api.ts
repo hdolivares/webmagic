@@ -428,6 +428,16 @@ class ApiClient {
     return response.data
   }
 
+  async markSiteHasWebsite(siteId: string): Promise<{ success: boolean; message: string }> {
+    const response = await this.client.post(`/sites/${siteId}/mark-has-website`)
+    return response.data
+  }
+
+  async markSiteUnreachable(siteId: string): Promise<{ success: boolean; message: string }> {
+    const response = await this.client.post(`/sites/${siteId}/mark-unreachable`)
+    return response.data
+  }
+
   // ============================================
   // PROMPT SETTINGS METHODS
   // ============================================

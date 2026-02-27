@@ -272,7 +272,27 @@ async def _run_website_validation(
     """
     url = business.website_url
     
-    # Prepare business context
+    # Prepare business context, including discovery match signals when available.
+    # The LLM validator can't see JavaScript-rendered phone numbers on a page, so
+    # we pass a hint when ScrapingDog already confirmed a phone match in search snippets.
+    raw = business.raw_data or {}
+    _sd = raw.get("scrapingdog_discovery", {})
+    _sd_match_signals = _sd.get("llm_analysis", {}).get("match_signals", {})
+    _discovery_phone_match = bool(_sd_match_signals.get("phone_match"))
+
+    # Extract useful GMB context from Outscraper raw_data.
+    # Small businesses often operate under a different trading name on their
+    # website vs. the GMB (e.g. "Puget Seattle Plumbers" on GMB but "Puget
+    # Sound Plumbing" on their site). Passing GMB categories, description,
+    # and review excerpts helps the LLM recognise the same business through
+    # contextual clues beyond just the name.
+    _outscraper = raw.get("outscraper", {})
+    _gmb_categories = _outscraper.get("subtypes") or _outscraper.get("type") or ""
+    _gmb_description = _outscraper.get("description") or ""
+    _gmb_rating = _outscraper.get("rating")
+    _gmb_reviews_count = _outscraper.get("reviews")
+    _social_urls = raw.get("social_urls", {})
+
     business_context = {
         "name": business.name,
         "phone": business.phone,
@@ -281,6 +301,14 @@ async def _run_website_validation(
         "city": business.city,
         "state": business.state,
         "country": business.country or "US",
+        # Hint for the orchestrator: discovery confirmed phone match via snippet
+        "discovery_phone_match": _discovery_phone_match,
+        # GMB context: helps LLM match through name variations and aliases
+        "gmb_categories": _gmb_categories,
+        "gmb_description": _gmb_description,
+        "gmb_rating": _gmb_rating,
+        "gmb_reviews_count": _gmb_reviews_count,
+        "known_social_urls": _social_urls,
     }
     
     # Run validation
@@ -366,7 +394,11 @@ def _is_content_mismatch_needing_review(validation_result: Dict[str, Any]) -> bo
     Does NOT route to human review when:
     - The rejection is for a directory/aggregator/social URL (type issue, not content)
     - Playwright failed to load the page at all (technical failure)
-    - The page is a parking/empty page (quality score <= 30)
+    - The page is a parking/empty page (quality score < 20)
+
+    Note on threshold: quality_score=30 is the typical floor for real small-business
+    sites where the phone is JavaScript-rendered (Playwright can't extract it but the
+    page itself is real and loaded fine).  We use >= 20 to catch these cases.
     """
     from core.validation_enums import InvalidURLReason
 
@@ -382,7 +414,9 @@ def _is_content_mismatch_needing_review(validation_result: Dict[str, Any]) -> bo
         return False
 
     quality_score = playwright.get("quality_score", 0) or 0
-    return quality_score > 30
+    # Use >= 20 (previously > 30) — real sites with JS-rendered phone numbers
+    # typically score ~30 because Playwright can't see the contact fields.
+    return quality_score >= 20
 
 
 def _handle_needs_human_review(

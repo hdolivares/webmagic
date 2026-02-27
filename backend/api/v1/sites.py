@@ -356,6 +356,82 @@ class ImageGenerationResponse(BaseModel):
     image_type: str
 
 
+@router.post("/{site_id}/mark-has-website")
+async def mark_site_has_website(
+    site_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Mark a generated site as 'superseded' because the business already has its own website.
+
+    Updates:
+    - generated_sites.status → 'superseded'
+    - business.website_validation_status → 'valid_manual'
+    - business.website_status → cleared (set to 'none') so it doesn't re-enter the queue
+    """
+    from sqlalchemy import select
+    from models.site import GeneratedSite
+    from models.business import Business
+
+    result = await db.execute(select(GeneratedSite).where(GeneratedSite.id == site_id))
+    site = result.scalar_one_or_none()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    site.status = "superseded"
+
+    if site.business_id:
+        biz_result = await db.execute(select(Business).where(Business.id == site.business_id))
+        business = biz_result.scalar_one_or_none()
+        if business:
+            business.website_validation_status = "valid_manual"
+            business.website_status = "none"
+
+    await db.commit()
+    return {"success": True, "message": "Site marked as superseded (business has own website)"}
+
+
+@router.post("/{site_id}/mark-unreachable")
+async def mark_site_unreachable(
+    site_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """
+    Mark a generated site as 'superseded' because the business is unreachable
+    (no phone, no email, or uncontactable).
+
+    Updates:
+    - generated_sites.status → 'superseded'
+    - business.website_status → 'ineligible'
+    - business.outreach_channel → 'call_later' (deprioritised — no SMS/email contact available)
+    """
+    from sqlalchemy import select
+    from models.site import GeneratedSite
+    from models.business import Business
+    from core.outreach_enums import OutreachChannel
+
+    result = await db.execute(select(GeneratedSite).where(GeneratedSite.id == site_id))
+    site = result.scalar_one_or_none()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    site.status = "superseded"
+
+    if site.business_id:
+        biz_result = await db.execute(select(Business).where(Business.id == site.business_id))
+        business = biz_result.scalar_one_or_none()
+        if business:
+            business.website_status = "ineligible"
+            business.outreach_channel = OutreachChannel.CALL_LATER.value
+            business.generation_queued_at = None
+            business.generation_started_at = None
+
+    await db.commit()
+    return {"success": True, "message": "Site marked as superseded (business unreachable)"}
+
+
 @router.post("/test-image-generation", response_model=ImageGenerationResponse)
 async def test_image_generation(
     request: ImageGenerationRequest,

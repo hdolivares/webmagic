@@ -354,6 +354,29 @@ class ValidationOrchestrator:
                     result["invalid_reason"] = InvalidURLReason.NO_CONTACT.value
                 else:
                     result["invalid_reason"] = categorize_url_domain(url)
+
+            # ----------------------------------------------------------------
+            # DISCOVERY PHONE-MATCH RESCUE
+            # When ScrapingDog already confirmed a phone match in search snippets
+            # (meaning the snippet contained the exact business phone), but the
+            # LLM validator says "no_contact" because the phone is JavaScript-
+            # rendered on the actual page, override the recommendation to
+            # TRIGGER_SCRAPINGDOG → RETRY_VALIDATION so we don't clear the URL.
+            # The business will get routed to human review via quality-score check.
+            # ----------------------------------------------------------------
+            if (
+                result.get("invalid_reason") == InvalidURLReason.NO_CONTACT.value
+                and result.get("recommendation") == ValidationRecommendation.TRIGGER_SCRAPINGDOG.value
+                and business.get("discovery_phone_match", False)
+            ):
+                logger.info(
+                    f"📞 Discovery phone-match rescue: discovery confirmed phone match "
+                    f"via snippet for {url}, but Playwright couldn't extract it "
+                    f"(likely JS-rendered). Keeping URL — routing to human review."
+                )
+                result["recommendation"] = ValidationRecommendation.RETRY_VALIDATION.value
+                result["invalid_reason"] = InvalidURLReason.NO_CONTACT.value
+                result["discovery_phone_match_rescue"] = True
             
             # Set is_valid based on verdict
             result["is_valid"] = (llm_result["verdict"] == "valid")

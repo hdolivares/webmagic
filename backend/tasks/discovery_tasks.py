@@ -394,6 +394,8 @@ def _handle_url_found(
     # Save complete ScrapingDog response to raw_data (like Outscraper does)
     # This preserves all search results for debugging and analysis
     current_raw_data = business.raw_data or {}
+    social_urls = discovery_result.get("social_urls", {})
+
     current_raw_data["scrapingdog_discovery"] = {
         "timestamp": datetime.utcnow().isoformat(),
         "query": discovery_result.get("query", ""),
@@ -408,6 +410,16 @@ def _handle_url_found(
         "country_confidence": discovery_result.get("country_confidence", 0.0),
         "country_signals": discovery_result.get("country_signals", []),
     }
+
+    # Save social media URLs found via phone/address match (not name match).
+    # These can be used for further enrichment even when the primary URL differs.
+    if social_urls:
+        current_raw_data["social_urls"] = social_urls
+        logger.info(
+            f"💾 Saved social URLs for {business.name}: "
+            + ", ".join(f"{k}={v}" for k, v in social_urls.items())
+        )
+
     business.raw_data = current_raw_data
     
     db.commit()
@@ -482,6 +494,13 @@ def _handle_no_url_found(
         "country_confidence": discovery_result.get("country_confidence", 0.0),
         "country_signals": discovery_result.get("country_signals", []),
     }
+    social_urls = discovery_result.get("social_urls", {})
+    if social_urls:
+        current_raw_data["social_urls"] = social_urls
+        logger.info(
+            f"💾 Saved social URLs (no-website path) for {business.name}: "
+            + ", ".join(f"{k}={v}" for k, v in social_urls.items())
+        )
     business.raw_data = current_raw_data
 
     # ----------------------------------------------------------------
