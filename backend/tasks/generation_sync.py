@@ -341,7 +341,7 @@ def generate_pending_sites(self):
                     Business.website_status == 'queued',
                     Business.generation_started_at.is_(None)
                 )
-                .limit(5)  # Generate up to 5 sites per run
+                .limit(20)  # Generate up to 20 sites per run
             )
             businesses = result.scalars().all()
             
