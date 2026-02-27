@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card } from '@/components/ui'
 import { api } from '@/services/api'
 import { US_STATES } from '@/data/states'
@@ -99,6 +99,14 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
   // Phase 2: Async scraping with SSE progress
   const [scrapeSessionId, setScrapeSessionId] = useState<string | null>(null)
   const [isScrapingAsync, setIsScrapingAsync] = useState(false)
+
+  // Batch scrape progress tracking
+  const [isBatchRunning, setIsBatchRunning] = useState(false)
+  const [batchStartZones, setBatchStartZones] = useState(0)
+  const [batchTargetZones, setBatchTargetZones] = useState(5)
+  const [batchConfirmMode, setBatchConfirmMode] = useState(false)
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const noChangeCountRef = useRef(0)
 
   // Load business categories on mount
   useEffect(() => {
@@ -220,42 +228,81 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
     setScrapeSessionId(null)
   }
 
-  const handleBatchScrape = async () => {
+  const stopBatchPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+  }, [])
+
+  const startBatchPolling = useCallback((strategyId: string, startingZones: number) => {
+    noChangeCountRef.current = 0
+    let lastZonesCompleted = startingZones
+
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const updated = await api.getIntelligentStrategy(strategyId)
+        setStrategy(updated)
+
+        if (updated.zones_completed === updated.total_zones) {
+          // All zones done
+          stopBatchPolling()
+          setIsBatchRunning(false)
+          if (onCampaignUpdate) onCampaignUpdate()
+          return
+        }
+
+        if (updated.zones_completed === lastZonesCompleted) {
+          noChangeCountRef.current += 1
+          // After ~3 minutes of no change (18 polls × 10s), assume done or stalled
+          if (noChangeCountRef.current >= 18) {
+            stopBatchPolling()
+            setIsBatchRunning(false)
+            if (onCampaignUpdate) onCampaignUpdate()
+          }
+        } else {
+          noChangeCountRef.current = 0
+          lastZonesCompleted = updated.zones_completed
+        }
+      } catch (err) {
+        console.error('Polling error:', err)
+      }
+    }, 10_000) // poll every 10 seconds
+  }, [stopBatchPolling, onCampaignUpdate])
+
+  // Clean up interval on unmount
+  useEffect(() => {
+    return () => stopBatchPolling()
+  }, [stopBatchPolling])
+
+  const handleBatchScrapeConfirm = async () => {
     if (!strategy) return
-    
-    const confirmMessage = draftMode
-      ? 'Start batch scraping 5 zones in DRAFT MODE?\n\nBusinesses will be found and saved for review. No messages will be sent.'
-      : 'Start batch scraping 5 zones in LIVE MODE?\n\nBusinesses will be found and outreach messages will be SENT AUTOMATICALLY.'
-    
-    if (!confirm(confirmMessage)) return
-    
+    setBatchConfirmMode(false)
     setLoading(true)
     setError(null)
-    
+
     try {
       await api.batchScrapeIntelligentStrategy({
         strategy_id: strategy.strategy_id,
         limit_per_zone: 50,
-        max_zones: 5,
+        max_zones: batchTargetZones,
         draft_mode: draftMode
       })
-      
-      const successMessage = draftMode
-        ? 'Batch scraping started in DRAFT MODE! Results will be saved for review.'
-        : 'Batch scraping started in LIVE MODE! Outreach will be sent automatically.'
-      
-      alert(successMessage)
-      
-      // Notify parent if callback provided
-      if (onCampaignUpdate) {
-        onCampaignUpdate()
-      }
+
+      setBatchStartZones(strategy.zones_completed)
+      setIsBatchRunning(true)
+      startBatchPolling(strategy.strategy_id, strategy.zones_completed)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to start batch scrape')
-      console.error('Batch scrape error:', err)
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleBatchScrape = () => {
+    if (!strategy) return
+    setBatchTargetZones(5)
+    setBatchConfirmMode(true)
   }
 
   return (
@@ -494,30 +541,88 @@ export function IntelligentCampaignPanel({ onCampaignUpdate }: IntelligentCampai
                   </div>
                 )}
 
+                {/* Batch Confirm Prompt */}
+                {batchConfirmMode && (
+                  <div className="batch-confirm-box">
+                    <div className="batch-confirm-header">
+                      <span className="batch-confirm-icon">⚡</span>
+                      <span className="batch-confirm-title">Start Batch Scrape?</span>
+                    </div>
+                    <p className="batch-confirm-description">
+                      This will scrape <strong>{batchTargetZones} zones</strong> in{' '}
+                      <strong>{draftMode ? 'Draft Mode' : 'Live Mode'}</strong>.{' '}
+                      {draftMode
+                        ? 'Businesses will be saved for review — no outreach will be sent.'
+                        : 'Outreach will be sent automatically to qualified leads.'}
+                    </p>
+                    <div className="batch-confirm-actions">
+                      <button
+                        onClick={handleBatchScrapeConfirm}
+                        className="scrape-btn primary"
+                      >
+                        Confirm &amp; Start
+                      </button>
+                      <button
+                        onClick={() => setBatchConfirmMode(false)}
+                        className="scrape-btn cancel"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Batch In-Progress Banner */}
+                {isBatchRunning && strategy && (
+                  <div className="batch-progress-banner">
+                    <div className="batch-progress-header">
+                      <span className="batch-spinner" />
+                      <span className="batch-progress-title">
+                        Batch scraping in progress&hellip;
+                      </span>
+                      <span className="batch-progress-count">
+                        {strategy.zones_completed - batchStartZones} / {batchTargetZones} zones done
+                      </span>
+                    </div>
+                    <div className="batch-progress-track">
+                      <div
+                        className="batch-progress-fill"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            ((strategy.zones_completed - batchStartZones) / batchTargetZones) * 100
+                          )}%`
+                        }}
+                      />
+                    </div>
+                    <p className="batch-progress-hint">
+                      The page auto-updates every 10 seconds. You can keep working while zones complete.
+                    </p>
+                  </div>
+                )}
+
                 <div className="action-buttons">
                   <button
                     onClick={handleScrapeNextZone}
-                    disabled={loading || isScrapingAsync || (!selectedZoneId && !strategy.next_zone && !forceRescrape)}
+                    disabled={loading || isScrapingAsync || isBatchRunning || (!selectedZoneId && !strategy.next_zone && !forceRescrape)}
                     className="scrape-btn primary"
                   >
-                    {isScrapingAsync 
-                      ? '⏳ Scraping in progress...' 
-                      : loading
-                      ? '⏳ Starting...'
-                      : forceRescrape 
-                        ? '🔄 Rescrape This Zone' 
-                        : selectedZoneId 
-                          ? '🎯 Scrape Selected Zone'
-                          : '🎯 Start Scraping Next Zone'}
+                    {isScrapingAsync || loading
+                      ? 'Starting…'
+                      : forceRescrape
+                        ? 'Rescrape This Zone'
+                        : selectedZoneId
+                          ? 'Scrape Selected Zone'
+                          : 'Scrape Next Zone'}
                   </button>
                   
                   {strategy.next_zone && (
                     <button
                       onClick={handleBatchScrape}
-                      disabled={loading || isScrapingAsync}
+                      disabled={loading || isScrapingAsync || isBatchRunning || batchConfirmMode}
                       className="scrape-btn secondary"
                     >
-                      {loading ? '⏳ Starting...' : '⚡ Batch Scrape (5 zones)'}
+                      {isBatchRunning ? 'Batch Running…' : 'Batch Scrape (5 zones)'}
                     </button>
                   )}
                 </div>

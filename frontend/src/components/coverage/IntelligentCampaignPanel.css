@@ -517,6 +517,90 @@
   border-top: 3px solid var(--color-primary-200, #bfdbfe);
 }
 
+/* ============================================================
+   Coverage Page Additions
+   ============================================================ */
+
+/* Status pills row in card header */
+.coverage-status-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.status-pill {
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--border-radius-full, 9999px);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.status-pill--success {
+  background: var(--color-success-100, #dcfce7);
+  color: var(--color-success-700, #15803d);
+}
+
+.status-pill--info {
+  background: var(--color-primary-100, #dbeafe);
+  color: var(--color-primary-700, #1d4ed8);
+}
+
+.status-pill--secondary {
+  background: var(--color-secondary-100, #f3f4f6);
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.status-pill--error {
+  background: var(--color-error-100, #fee2e2);
+  color: var(--color-error-700, #b91c1c);
+}
+
+/* Progress bar label under the bar */
+.progress-bar-label {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #6b7280);
+  margin-top: 0.4rem;
+  text-align: right;
+}
+
+/* Toast notification for batch actions */
+.coverage-toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.25rem;
+  background: var(--color-success-600, #16a34a);
+  color: white;
+  border-radius: var(--border-radius-md, 8px);
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 1.5rem;
+  cursor: pointer;
+  animation: fadeInDown 0.3s ease;
+}
+
+.coverage-toast-close {
+  font-size: 1.25rem;
+  opacity: 0.8;
+  line-height: 1;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Card header flex layout */
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .form-row {
@@ -542,6 +626,128 @@
   .website-metrics-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+/* Batch Confirm Box */
+.batch-confirm-box {
+  margin-bottom: 1.25rem;
+  padding: 1.25rem;
+  background: var(--color-warning-50, #fffbeb);
+  border: 2px solid var(--color-warning-300, #fcd34d);
+  border-radius: var(--border-radius-md, 8px);
+}
+
+.batch-confirm-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.batch-confirm-icon {
+  font-size: 1.25rem;
+}
+
+.batch-confirm-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-warning-800, #92400e);
+}
+
+.batch-confirm-description {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary, #6b7280);
+  margin: 0 0 1rem 0;
+  line-height: 1.5;
+}
+
+.batch-confirm-description strong {
+  color: var(--color-text-primary, #111827);
+}
+
+.batch-confirm-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.scrape-btn.cancel {
+  background: var(--color-secondary-200, #e5e7eb);
+  color: var(--color-text-primary, #111827);
+}
+
+.scrape-btn.cancel:hover:not(:disabled) {
+  background: var(--color-secondary-300, #d1d5db);
+}
+
+/* Batch Progress Banner */
+.batch-progress-banner {
+  margin-bottom: 1.25rem;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border: 2px solid var(--color-primary-300, #93c5fd);
+  border-radius: var(--border-radius-md, 8px);
+}
+
+.batch-progress-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.batch-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2.5px solid var(--color-primary-200, #bfdbfe);
+  border-top-color: var(--color-primary-600, #2563eb);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.batch-progress-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-primary-700, #1d4ed8);
+  flex: 1;
+}
+
+.batch-progress-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-primary-600, #2563eb);
+  background: white;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--border-radius-full, 9999px);
+  border: 1px solid var(--color-primary-200, #bfdbfe);
+}
+
+.batch-progress-track {
+  width: 100%;
+  height: 8px;
+  background: var(--color-primary-100, #dbeafe);
+  border-radius: var(--border-radius-full, 9999px);
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.batch-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary-500, #3b82f6), var(--color-primary-600, #2563eb));
+  border-radius: var(--border-radius-full, 9999px);
+  transition: width 0.6s ease;
+}
+
+.batch-progress-hint {
+  font-size: 0.8rem;
+  color: var(--color-primary-600, #2563eb);
+  margin: 0;
+  font-style: italic;
 }
 
 /* Scraping Progress Info */
