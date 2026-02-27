@@ -124,10 +124,9 @@ export const GeneratedSitesPage = () => {
   const getValidationBadge = (validationStatus: string | undefined) => {
     if (!validationStatus) return null
     if (TRIPLE_VERIFIED_STATUSES.has(validationStatus)) {
-      const label = validationStatus === 'triple_verified' ? '✅ Triple Verified' : '✅ Confirmed No Site'
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-success-100 text-success-700 border border-success-200">
-          {label}
+          ✅ No Website Confirmed
         </span>
       )
     }
@@ -223,10 +222,10 @@ export const GeneratedSitesPage = () => {
           <CardBody className="p-4">
             <div className="text-sm text-text-secondary mb-1 flex items-center gap-1">
               <ShieldCheck className="w-3 h-3 text-success-500" />
-              Triple Verified
+              No Website
             </div>
             <div className="text-2xl font-bold text-success-600">{stats.tripleVerified}</div>
-            <div className="text-xs text-text-tertiary mt-1">Ready for campaigns</div>
+            <div className="text-xs text-text-tertiary mt-1">Confirmed &amp; ready</div>
           </CardBody>
         </Card>
 
@@ -372,9 +371,9 @@ export const GeneratedSitesPage = () => {
         {(
           [
             { value: 'all', label: 'All', count: data?.sites.length || 0, activeClass: 'bg-primary-100 border-primary-500 text-primary-700', activeBadge: 'bg-primary-500 text-white' },
-            { value: 'verified', label: '✅ Triple Verified', count: stats.tripleVerified, activeClass: 'bg-success-100 border-success-500 text-success-700', activeBadge: 'bg-success-500 text-white' },
+            { value: 'verified', label: '✅ No Website Confirmed', count: stats.tripleVerified, activeClass: 'bg-success-100 border-success-500 text-success-700', activeBadge: 'bg-success-500 text-white' },
             { value: 'has_website', label: '🌐 Has Own Website', count: stats.hasWebsite, activeClass: 'bg-warning-100 border-warning-500 text-warning-700', activeBadge: 'bg-warning-500 text-white' },
-            { value: 'not_verified', label: '⏳ Pending Validation', count: (data?.sites.length || 0) - stats.tripleVerified - stats.hasWebsite, activeClass: 'bg-secondary-100 border-secondary-400 text-secondary-700', activeBadge: 'bg-secondary-500 text-white' },
+            { value: 'not_verified', label: '⏳ Unconfirmed', count: (data?.sites.length || 0) - stats.tripleVerified - stats.hasWebsite, activeClass: 'bg-secondary-100 border-secondary-400 text-secondary-700', activeBadge: 'bg-secondary-500 text-white' },
           ] as { value: VerificationFilter; label: string; count: number; activeClass: string; activeBadge: string }[]
         ).map(({ value, label, count, activeClass, activeBadge }) => (
           <button
