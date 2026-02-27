@@ -14,6 +14,8 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import re
+
 from services.validation.url_prescreener import URLPrescreener
 from services.validation.playwright_service import PlaywrightValidationService
 from services.validation.llm_validator import LLMWebsiteValidator
@@ -24,6 +26,66 @@ from core.validation_enums import (
     InvalidURLReason,
     categorize_url_domain
 )
+
+_SOCIAL_MEDIA_HOSTS = {
+    "facebook.com", "instagram.com", "twitter.com", "x.com",
+    "linkedin.com", "youtube.com", "tiktok.com", "pinterest.com",
+}
+
+
+def _is_social_media_url(url: str) -> bool:
+    """Return True if the URL is a social media profile page."""
+    try:
+        from urllib.parse import urlparse
+        host = urlparse(url).netloc.lower().lstrip("www.")
+        return any(host == d or host.endswith("." + d) for d in _SOCIAL_MEDIA_HOSTS)
+    except Exception:
+        return False
+
+
+def _extract_website_url_from_content(content_preview: str) -> str | None:
+    """
+    Scan scraped page content for a real business website URL.
+
+    Used when a social media page is scraped — the bio / About section often
+    lists the official website (e.g. "abccpas.com" or "https://example.com").
+    Returns the first URL that is NOT itself a social media domain.
+    """
+    if not content_preview:
+        return None
+
+    # Match both bare domains and full URLs mentioned in content
+    url_pattern = re.compile(
+        r'(?:https?://)?'                # optional scheme
+        r'(?:www\.)?'                    # optional www
+        r'([a-zA-Z0-9-]{2,63}'          # domain
+        r'(?:\.[a-zA-Z]{2,}){1,3})'     # TLD(s)
+        r'(?:/[^\s,;"\')]*)?',           # optional path
+        re.IGNORECASE
+    )
+
+    for m in url_pattern.finditer(content_preview):
+        raw = m.group(0).strip().rstrip(".,;\"')")
+        # Normalize to full URL
+        candidate = raw if raw.startswith("http") else f"https://{raw}"
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(candidate)
+            host = parsed.netloc.lower().lstrip("www.")
+            if not host or "." not in host:
+                continue
+            # Skip social media, aggregators
+            if any(host == d or host.endswith("." + d) for d in _SOCIAL_MEDIA_HOSTS):
+                continue
+            # Must have a real TLD (at least 2 chars)
+            tld = host.rsplit(".", 1)[-1]
+            if len(tld) < 2:
+                continue
+            return candidate
+        except Exception:
+            continue
+
+    return None
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +287,44 @@ class ValidationOrchestrator:
             )
             
             result["stages"]["llm"] = llm_result
-            
+
+            # ----------------------------------------------------------------
+            # SOCIAL MEDIA RESCUE: If we validated a social media URL and the
+            # LLM rejected it, check whether the scraped page content contains
+            # the real business website URL (often listed in the bio/About).
+            # ----------------------------------------------------------------
+            llm_verdict = llm_result.get("verdict", "")
+            if llm_verdict in ("missing", "invalid") and _is_social_media_url(url):
+                content_preview = playwright_result.get("content_preview", "")
+                rescued_url = _extract_website_url_from_content(content_preview)
+                if rescued_url and rescued_url.lower() != url.lower():
+                    logger.info(
+                        f"🔄 Social-media rescue: found '{rescued_url}' in page content "
+                        f"— re-validating instead of marking no-website"
+                    )
+                    # Re-run validation on the rescued URL recursively (one level deep)
+                    rescued_result = await self.validate_business_website(
+                        business=business,
+                        url=rescued_url,
+                        timeout=timeout,
+                        capture_screenshot=capture_screenshot
+                    )
+                    if rescued_result.get("is_valid"):
+                        logger.info(f"✅ Rescued website validated: {rescued_url}")
+                        # Merge rescued result back, noting the rescue path
+                        rescued_result["stages"]["social_media_rescue"] = {
+                            "original_url": url,
+                            "rescued_from": "social_media_content",
+                            "rescued_url": rescued_url
+                        }
+                        rescued_result["rescued_from_social_media"] = True
+                        return self._finalize_result(rescued_result, start_time)
+                    else:
+                        logger.info(
+                            f"Rescued URL '{rescued_url}' also failed validation "
+                            f"— proceeding with original social-media rejection"
+                        )
+
             # LLM verdict is final
             result["verdict"] = llm_result["verdict"]
             result["confidence"] = llm_result["confidence"]

@@ -431,24 +431,30 @@ Analyze ALL results and:
 1. **Phone Number Matching (HIGHEST PRIORITY):**
    - Check if the business phone appears in ANY snippet
    - Phone match = HIGH confidence this is the correct website
-   
+
 2. **Address Matching:**
    - Check if the full address or partial address appears in snippets
    - Exact address match = HIGH confidence
-   
+
 3. **Business Name Matching:**
    - Match the business name (accounting for variations)
    - Name alone is NOT sufficient (many businesses have similar names)
 
-4. **Exclude These:**
-   - Directory sites (Yelp, BBB, YellowPages, etc.)
-   - Franchise aggregator pages (unless phone/address match)
-   - Member directories (Chamber of Commerce listings)
-   - Booking platforms (OpenTable, Resy, etc.)
-   - PDF files
-   - LinkedIn company pages
+4. **NEVER return these as the URL (hard exclusions):**
+   - ANY social media profile: Facebook (facebook.com), Instagram (instagram.com), Twitter/X (twitter.com, x.com), TikTok (tiktok.com), Pinterest (pinterest.com), YouTube channel pages
+   - LinkedIn company or person pages (linkedin.com)
+   - Directory sites: Yelp, BBB, YellowPages, WhitePages, MapQuest, Manta, etc.
+   - Aggregator/review platforms: TripAdvisor, Angi, HomeAdvisor, Thumbtack, Foursquare
+   - Booking platforms: OpenTable, Resy, Mindbody
+   - Lead-gen directories: Bark.com, Thumbtack, LocalRepairsNow, PlumbingServiceHub, etc.
+   - PDF files or file-storage links
 
-5. **Franchise Businesses:**
+5. **Social Media Bio Extraction (CRITICAL):**
+   - If a search result IS a social media page (Facebook, Instagram, etc.) BUT its snippet mentions a real website URL (e.g., "abccpas.com" or "Visit us at example.com"), extract that URL as your answer instead.
+   - Look for patterns like: "example.com", "www.example.com", "Visit our website", website URLs embedded in snippets.
+   - This real website URL from the bio is the correct answer, not the social media page itself.
+
+6. **Franchise Businesses:**
    - If it's a franchise (e.g., "Mr. Rooter of Seattle"), the local franchise page IS valid
    - Verify by checking if phone/address in snippet matches business data
 
@@ -462,7 +468,6 @@ Determine the actual country of this business using these signals (in priority o
    - +1 with other area codes = United States → "US"
    - +61 = Australia → "AU"
    - +52 = Mexico → "MX"
-   - +44 = United Kingdom → "GB"
 
 2. **Postal code format in snippets:**
    - UK: letter-number patterns like "SW1A 1AA", "EC1A 1BB" → "GB"
@@ -484,9 +489,9 @@ Determine the actual country of this business using these signals (in priority o
 
 **DECISION CRITERIA:**
 
-- **Found & High Confidence (0.8-1.0):** Phone or address match in snippet
+- **Found & High Confidence (0.8-1.0):** Phone or address match in snippet, OR website URL found in social media bio
 - **Found & Medium Confidence (0.5-0.7):** Business name + city/state match, no phone/address
-- **Not Found:** No results match, or only directories found
+- **Not Found (null):** No non-social-media, non-directory results match this specific business
 
 **OUTPUT FORMAT (JSON only):**
 

@@ -152,13 +152,43 @@ def validate_business_website_v2(self, business_id: str) -> Dict[str, Any]:
             return _handle_validation_error(business_id, e)
 
 
+_RAW_DATA_WEBSITE_FIELDS = ["website", "site", "url", "domain", "website_url", "business_url", "web", "homepage"]
+_SOCIAL_MEDIA_DOMAINS = {
+    "facebook.com", "instagram.com", "twitter.com", "x.com", "linkedin.com",
+    "youtube.com", "tiktok.com", "pinterest.com"
+}
+
+
+def _extract_website_from_raw_data(raw_data: dict) -> "str | None":
+    """Extract a real business website URL from Outscraper raw_data."""
+    if not raw_data or not isinstance(raw_data, dict):
+        return None
+    for field in _RAW_DATA_WEBSITE_FIELDS:
+        val = raw_data.get(field)
+        if not val or not isinstance(val, str):
+            continue
+        url = val.strip()
+        if len(url) < 7 or url.lower() in ("", "null", "none", "n/a"):
+            continue
+        try:
+            from urllib.parse import urlparse
+            host = urlparse(url).netloc.lower().lstrip("www.")
+            if any(host == d or host.endswith("." + d) for d in _SOCIAL_MEDIA_DOMAINS):
+                logger.info(f"Skipping social media URL from raw_data: {url}")
+                continue
+        except Exception:
+            pass
+        return url
+    return None
+
+
 def _handle_no_url(
     db,
     business: Business,
     metadata_service: ValidationMetadataService
 ) -> Dict[str, Any]:
     """
-    Handle business with no URL - queue for discovery.
+    Handle business with no URL - check raw_data first, then queue for discovery.
     
     Args:
         db: Database session
@@ -168,24 +198,54 @@ def _handle_no_url(
     Returns:
         Result dictionary
     """
-    # Update status
+    # ----------------------------------------------------------------
+    # FIRST: Check if Outscraper already gave us a URL in raw_data.
+    # This happens when old code failed to parse the website field.
+    # ----------------------------------------------------------------
+    raw_data_url = _extract_website_from_raw_data(business.raw_data)
+    if raw_data_url:
+        logger.info(
+            f"✅ Found URL in Outscraper raw_data for {business.name}: {raw_data_url} "
+            f"— queuing for direct validation instead of ScrapingDog"
+        )
+        business.website_url = raw_data_url
+        business.website_metadata = metadata_service.record_discovery_attempt(
+            business.website_metadata,
+            method="outscraper",
+            found_url=True,
+            url_found=raw_data_url,
+            valid=False,
+            notes=f"Recovered URL from Outscraper raw_data: {raw_data_url}"
+        )
+        business.website_validation_status = ValidationState.NEEDS_DISCOVERY.value
+        db.commit()
+
+        # Re-run this task with the URL now set — will go to CASE 4 (validation)
+        from tasks.validation_tasks_enhanced import validate_business_website_v2
+        validation_task = validate_business_website_v2.delay(str(business.id))
+        logger.info(f"Queued validation for raw_data URL (task: {validation_task.id})")
+        return {
+            "business_id": str(business.id),
+            "status": "raw_data_url_found",
+            "url": raw_data_url,
+            "validation_task_id": validation_task.id
+        }
+
+    # No URL anywhere — proceed to ScrapingDog discovery
     business.website_validation_status = ValidationState.NEEDS_DISCOVERY.value
-    
-    # Update metadata
     business.website_metadata = metadata_service.record_discovery_attempt(
         business.website_metadata,
         method="outscraper",
         found_url=False,
-        notes="No URL from Outscraper"
+        notes="No URL from Outscraper raw_data or website_url"
     )
-    
     db.commit()
     
     # Queue ScrapingDog discovery
     from tasks.discovery_tasks import discover_missing_websites_v2
     discovery_task = discover_missing_websites_v2.delay(str(business.id))
     
-    logger.info(f"Queued discovery for {business.id} (task: {discovery_task.id})")
+    logger.info(f"Queued ScrapingDog discovery for {business.id} (task: {discovery_task.id})")
     
     return {
         "business_id": str(business.id),

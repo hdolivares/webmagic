@@ -126,7 +126,41 @@ def discover_missing_websites_v2(self, business_id: str) -> Dict[str, Any]:
                     "reason": "already_has_url",
                     "url": business.website_url
                 }
-            
+
+            # ================================================================
+            # RAW DATA CHECK - Use Outscraper URL before spending ScrapingDog credits
+            # ================================================================
+            # Outscraper saves raw GMB data with a 'website' field. If it's present
+            # we should validate that URL directly instead of running a new search.
+            raw_data_url = _extract_website_from_raw_data(business.raw_data)
+            if raw_data_url:
+                logger.info(
+                    f"✅ Found URL in Outscraper raw_data for {business.name}: {raw_data_url} "
+                    f"— skipping ScrapingDog, queuing for direct validation"
+                )
+                business.website_url = raw_data_url
+                business.website_metadata = metadata_service.record_discovery_attempt(
+                    business.website_metadata,
+                    method="outscraper",
+                    found_url=True,
+                    url_found=raw_data_url,
+                    valid=False,  # Not yet validated by Playwright+LLM
+                    notes=f"Recovered URL from Outscraper raw_data: {raw_data_url}"
+                )
+                business.website_validation_status = ValidationState.NEEDS_DISCOVERY.value
+                db.commit()
+
+                # Queue for full Playwright + LLM validation
+                from tasks.validation_tasks_enhanced import validate_business_website_v2
+                validation_task = validate_business_website_v2.delay(str(business.id))
+                logger.info(f"Queued validation for raw_data URL (task: {validation_task.id})")
+                return {
+                    "business_id": business_id,
+                    "status": "raw_data_url_found",
+                    "url": raw_data_url,
+                    "validation_task_id": validation_task.id
+                }
+
             # ================================================================
             # CHECK IF ALREADY ATTEMPTED
             # ================================================================
@@ -171,6 +205,46 @@ def discover_missing_websites_v2(self, business_id: str) -> Dict[str, Any]:
             raise self.retry(exc=e)
         except self.MaxRetriesExceededError:
             return _handle_discovery_error(business_id, e)
+
+
+_RAW_DATA_WEBSITE_FIELDS = ["website", "site", "url", "domain", "website_url", "business_url", "web", "homepage"]
+_SOCIAL_MEDIA_DOMAINS = {
+    "facebook.com", "instagram.com", "twitter.com", "x.com", "linkedin.com",
+    "youtube.com", "tiktok.com", "pinterest.com"
+}
+
+
+def _extract_website_from_raw_data(raw_data: dict) -> str | None:
+    """
+    Extract a real business website URL from Outscraper raw_data.
+
+    Checks every field name Outscraper might use for the website.
+    Returns None if the URL is a social media profile, directory, or looks invalid.
+    """
+    if not raw_data or not isinstance(raw_data, dict):
+        return None
+
+    for field in _RAW_DATA_WEBSITE_FIELDS:
+        val = raw_data.get(field)
+        if not val or not isinstance(val, str):
+            continue
+        url = val.strip()
+        if len(url) < 7 or url.lower() in ("", "null", "none", "n/a"):
+            continue
+
+        # Skip social media and obvious non-business URLs
+        try:
+            from urllib.parse import urlparse
+            host = urlparse(url).netloc.lower().lstrip("www.")
+            if any(host == d or host.endswith("." + d) for d in _SOCIAL_MEDIA_DOMAINS):
+                logger.info(f"Skipping social media URL from raw_data: {url}")
+                continue
+        except Exception:
+            pass
+
+        return url
+
+    return None
 
 
 def _run_scrapingdog_search(business: Business) -> Dict[str, Any]:
