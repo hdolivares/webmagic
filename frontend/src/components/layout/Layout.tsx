@@ -19,6 +19,7 @@ import {
   Wand2,
   ChevronDown,
   HeadphonesIcon,
+  ClipboardCheck,
 } from 'lucide-react'
 
 export const Layout = () => {
@@ -46,6 +47,7 @@ export const Layout = () => {
       label: 'Generated Sites',
       badge: 'AI'
     },
+    { to: '/verification', icon: ClipboardCheck, label: 'Verification' },
     { to: '/campaigns', icon: Mail, label: 'Campaigns' },
     { to: '/messages', icon: MessageSquare, label: 'Messages' },
     { to: '/customers', icon: Users, label: 'Customers' },

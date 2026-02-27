@@ -41,7 +41,14 @@ class ValidationState(str, Enum):
     INVALID_TECHNICAL = "invalid_technical"  # Technical issues (404, timeout, broken)
     INVALID_TYPE = "invalid_type"  # Wrong type (PDF, directory, aggregator)
     INVALID_MISMATCH = "invalid_mismatch"  # URL doesn't match business
-    
+
+    # ============================================================================
+    # HUMAN REVIEW STATE - Borderline cases requiring admin judgment
+    # ============================================================================
+    NEEDS_HUMAN_REVIEW = "needs_human_review"  # Real site found but LLM can't confirm it's this business
+    # Triggered when: wrong_business or no_contact AND page loaded successfully AND quality_score > 30
+    # Admin can decide: valid_manual | confirmed_no_website | re-run discovery
+
     # ============================================================================
     # TERMINAL STATES - Final outcomes
     # ============================================================================

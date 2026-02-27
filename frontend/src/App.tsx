@@ -30,6 +30,7 @@ import { ImageGenerationPage } from '@/pages/ImageGeneration/ImageGenerationPage
 import { MessagesPage } from '@/pages/Messages/MessagesPage'
 import AdminTicketsPage from '@/pages/Tickets/AdminTicketsPage'
 import AdminTicketDetailPage from '@/pages/Tickets/AdminTicketDetailPage'
+import { VerificationPage } from '@/pages/Verification/VerificationPage'
 
 // Customer Pages
 import MySitesPage from '@/pages/CustomerPortal/MySitesPage'
@@ -119,6 +120,7 @@ function App() {
             <Route path="coverage" element={<CoveragePage />} />
             <Route path="tickets" element={<AdminTicketsPage />} />
             <Route path="tickets/:ticketId" element={<AdminTicketDetailPage />} />
+            <Route path="verification" element={<VerificationPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
 

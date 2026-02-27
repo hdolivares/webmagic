@@ -323,11 +323,17 @@ async def _run_website_validation(
     if recommendation == ValidationRecommendation.KEEP_URL.value:
         # SUCCESS - Valid website found
         return _handle_valid_website(db, business, validation_result, metadata_service)
-    
+
     elif recommendation == ValidationRecommendation.TRIGGER_SCRAPINGDOG.value:
-        # REJECTED - Clear URL and trigger discovery
+        # CONTENT REJECTION - check whether a human should review this before re-discovery.
+        # Borderline cases (wrong_business / no_contact on a real, loaded site) benefit more
+        # from a 30-second admin check than bouncing through the ScrapingDog loop again.
+        if _is_content_mismatch_needing_review(validation_result):
+            return _handle_needs_human_review(db, business, validation_result)
+
+        # Clear-cut rejection (directory, aggregator, low-quality page) → re-run discovery
         return _handle_rejected_url(db, business, validation_result, metadata_service)
-    
+
     elif recommendation == ValidationRecommendation.RETRY_VALIDATION.value:
         # TECHNICAL FAILURE - Keep URL, retry later
         return _handle_technical_failure(db, business, validation_result)
@@ -346,6 +352,76 @@ async def _run_website_validation(
             "verdict": verdict,
             "recommendation": recommendation
         }
+
+
+def _is_content_mismatch_needing_review(validation_result: Dict[str, Any]) -> bool:
+    """
+    Returns True when the LLM rejected a URL for content reasons (wrong business or
+    missing contact info) AND the page actually loaded with meaningful content.
+
+    These borderline cases are better resolved by a human in 30 seconds than by
+    bouncing through another ScrapingDog discovery cycle which typically returns
+    the same result and ends in the loop-prevention path.
+
+    Does NOT route to human review when:
+    - The rejection is for a directory/aggregator/social URL (type issue, not content)
+    - Playwright failed to load the page at all (technical failure)
+    - The page is a parking/empty page (quality score <= 30)
+    """
+    from core.validation_enums import InvalidURLReason
+
+    invalid_reason = validation_result.get("invalid_reason")
+    if invalid_reason not in {
+        InvalidURLReason.WRONG_BUSINESS.value,
+        InvalidURLReason.NO_CONTACT.value,
+    }:
+        return False
+
+    playwright = validation_result.get("stages", {}).get("playwright", {})
+    if not playwright.get("is_valid", False):
+        return False
+
+    quality_score = playwright.get("quality_score", 0) or 0
+    return quality_score > 30
+
+
+def _handle_needs_human_review(
+    db,
+    business: Business,
+    validation_result: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Route a business to the admin verification queue.
+
+    A real website was found and successfully loaded, but the LLM could not
+    confirm the page belongs to this specific business.  An admin will review
+    the candidate URL, the scraped content, and the LLM's reasoning, then make
+    a final call.
+
+    The candidate website_url is intentionally preserved so the admin can open
+    it directly from the verification page.
+    """
+    invalid_reason = validation_result.get("invalid_reason", "unknown")
+    candidate_url = business.website_url
+
+    logger.info(
+        f"👤 Routing to human review: {business.name!r} → {candidate_url} "
+        f"(reason: {invalid_reason})"
+    )
+
+    business.website_validation_status = ValidationState.NEEDS_HUMAN_REVIEW.value
+    business.website_validation_result = validation_result
+    business.website_validated_at = datetime.utcnow()
+    # website_url is intentionally kept — admin needs the candidate URL to review
+
+    db.commit()
+
+    return {
+        "business_id": str(business.id),
+        "status": "needs_human_review",
+        "candidate_url": candidate_url,
+        "invalid_reason": invalid_reason,
+    }
 
 
 def _handle_valid_website(
