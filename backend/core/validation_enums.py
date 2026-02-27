@@ -188,6 +188,22 @@ DIRECTORY_DOMAINS: Set[str] = {
     'local.com',
     'mapquest.com',
     'dexknows.com',
+    # Generic plumber/contractor aggregator directories
+    '1001plumbers.com',
+    '411locals.com',
+    'chamberofcommerce.com',
+    'merchantcircle.com',
+    'brownbook.net',
+    'n49.com',
+    'hotfrog.com',
+    'cylex.us',
+    'find-us-here.com',
+    'tupalo.com',
+    'wheree.com',       # Business listing aggregator
+    'bizapedia.com',
+    'bizguru.us',
+    'localstar.com',
+    'showmelocal.com',
 }
 
 AGGREGATOR_DOMAINS: Set[str] = {
@@ -196,16 +212,30 @@ AGGREGATOR_DOMAINS: Set[str] = {
     'foursquare.com',
     'zomato.com',
     'opentable.com',
+    'angieslist.com',
+    'checkbook.org',
+    'expertise.com',
+    'bark.com',
+    'networx.com',
+    'buildzoom.com',
+    'contractortalk.com',
 }
 
 SOCIAL_MEDIA_DOMAINS: Set[str] = {
     'facebook.com',
     'instagram.com',
     'twitter.com',
+    'x.com',
     'linkedin.com',
     'youtube.com',
     'tiktok.com',
     'pinterest.com',
+    'nextdoor.com',     # Community social network, not a business website
+    'snapchat.com',
+    'threads.net',
+    'reddit.com',
+    'tumblr.com',
+    'blogger.com',      # Free blog host — usually not a real business site
 }
 
 SERVICE_PLATFORMS: Set[str] = {
@@ -217,6 +247,12 @@ SERVICE_PLATFORMS: Set[str] = {
     'taskrabbit.com',
     'fiverr.com',
     'upwork.com',
+    'hireahelper.com',
+    'servicemagic.com',
+    'improveit360.com',
+    'contractor.com',
+    'prolocal.com',
+    'servicetitan.com',
 }
 
 FILE_STORAGE_DOMAINS: Set[str] = {
