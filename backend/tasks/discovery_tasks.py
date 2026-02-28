@@ -421,8 +421,12 @@ def _handle_url_found(
         )
 
     business.raw_data = current_raw_data
-    
+
     db.commit()
+
+    # Queue Facebook activity check — the organic results we just saved may
+    # contain a Facebook page URL for this business.
+    _queue_facebook_check(business, current_raw_data)
 
     # If the business is outside our supported countries, don't queue for validation
     if not is_supported_country:
@@ -502,6 +506,10 @@ def _handle_no_url_found(
             + ", ".join(f"{k}={v}" for k, v in social_urls.items())
         )
     business.raw_data = current_raw_data
+
+    # Even when no website was found, the organic results may contain a
+    # Facebook page we can use for activity enrichment.
+    _queue_facebook_check(business, current_raw_data)
 
     # ----------------------------------------------------------------
     # GEO MISMATCH — business is confirmed non-US; do NOT mark as
@@ -586,6 +594,42 @@ def _handle_no_url_found(
         "status": "confirmed_missing",
         "triple_verified": True
     }
+
+
+def _queue_facebook_check(business: Business, raw_data: dict) -> None:
+    """
+    Queue a Facebook activity check if the ScrapingDog organic results
+    contain a Facebook URL and the business hasn't been checked yet.
+
+    Called immediately after ``scrapingdog_discovery`` is written to
+    ``raw_data`` and committed, so the task worker sees the latest data.
+    """
+    from core.config import get_settings
+    settings = get_settings()
+    if not settings.ENABLE_FACEBOOK_ACTIVITY_CHECK:
+        return
+    if business.last_facebook_post_date is not None:
+        return
+
+    from services.activity import extract_facebook_url_from_raw
+    fb_url = extract_facebook_url_from_raw(raw_data)
+    if not fb_url:
+        return
+
+    try:
+        from tasks.activity_tasks import fetch_facebook_activity
+        fetch_facebook_activity.delay(str(business.id))
+        logger.info(
+            "Queued Facebook activity check for %s: %s",
+            business.name,
+            fb_url,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Failed to queue Facebook activity check for %s: %s",
+            business.name,
+            exc,
+        )
 
 
 def _handle_discovery_error(business_id: str, error: Exception) -> Dict[str, Any]:
