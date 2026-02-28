@@ -1,9 +1,16 @@
 """
-Celery tasks for business activity signal collection.
+Celery tasks for business activity signal collection and contact enrichment.
 
 These tasks run after the main scraping loop and are purely additive —
-they enrich existing Business records with activity timestamps that are
-then used by the generation pipeline to gate site creation.
+they enrich existing Business records with signals fetched from Facebook:
+
+    - last_facebook_post_date  (activity gate for site generation)
+    - phone                    (only written when currently NULL)
+    - email                    (only written when currently NULL)
+    - website_url              (only written when currently NULL; triggers re-validation)
+
+A full audit record is always written to ``raw_data["facebook_enrichment"]``
+regardless of whether any main fields were updated.
 
 Designed to be non-blocking relative to the scrape itself: the scrape
 queues these tasks and moves on; they process independently at a rate
@@ -12,22 +19,23 @@ that respects ScrapingDog's credit budget.
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from celery import shared_task
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from core.database import CeleryAsyncSessionLocal
 from models.business import Business
 from services.activity.facebook_scraper import (
     FacebookActivityScraper,
+    FacebookPageData,
     extract_facebook_url_from_raw,
 )
 
 logger = logging.getLogger(__name__)
 
 
-# ── Single-business Facebook check ──────────────────────────────────────────
+# ── Single-business Facebook enrichment ──────────────────────────────────────
 
 @shared_task(
     name="tasks.activity.fetch_facebook_activity",
@@ -38,17 +46,26 @@ logger = logging.getLogger(__name__)
 )
 def fetch_facebook_activity(self, business_id: str) -> Dict[str, Any]:
     """
-    Fetch the last Facebook post date for a single business and persist it.
+    Scrape the Facebook page for a single business and persist all signals.
 
     Queued by ``HunterService`` after the main scrape loop for any business
-    that has a Facebook URL in ``raw_data["social_urls"]["facebook"]`` and
-    does not yet have a ``last_facebook_post_date``.
+    that has a Facebook URL in its ``raw_data`` and does not yet have a
+    ``last_facebook_post_date``.
+
+    Persists the following fields (non-destructively — existing values are
+    never overwritten):
+        - ``last_facebook_post_date``
+        - ``phone``
+        - ``email``
+        - ``website_url`` (also resets ``website_validation_status`` to "pending")
+
+    Always writes an audit record to ``raw_data["facebook_enrichment"]``.
 
     Args:
         business_id: UUID string of the target Business record.
 
     Returns:
-        Dict with ``status``, ``business_id``, and optionally ``last_post_date``.
+        Dict with ``status``, ``business_id``, and ``enriched`` field list.
     """
     return asyncio.run(_fetch_facebook_activity_async(business_id))
 
@@ -69,39 +86,34 @@ async def _fetch_facebook_activity_async(business_id: str) -> Dict[str, Any]:
             return {"status": "skipped", "business_id": business_id, "reason": "no_facebook_url"}
 
         scraper = FacebookActivityScraper()
-        last_post_date = await scraper.get_last_post_date(facebook_url)
+        data = await scraper.scrape_page(facebook_url)
 
-        if last_post_date is not None:
-            await db.execute(
-                update(Business)
-                .where(Business.id == business_id)
-                .values(
-                    last_facebook_post_date=last_post_date,
-                    updated_at=datetime.now(tz=timezone.utc),
-                )
-            )
+        enriched = _apply_enrichment(business, data, facebook_url)
+
+        if enriched:
             await db.commit()
             logger.info(
-                "Updated last_facebook_post_date for %s (%s): %s",
+                "Facebook enrichment for %s (%s): updated %s",
                 business.name,
                 business_id,
-                last_post_date.date(),
+                ", ".join(enriched),
             )
-            return {
-                "status": "success",
-                "business_id": business_id,
-                "last_post_date": last_post_date.isoformat(),
-            }
+        else:
+            logger.debug(
+                "No enrichment data found for %s (%s) at %s",
+                business.name,
+                business_id,
+                facebook_url,
+            )
 
-        logger.debug(
-            "No Facebook post timestamps found for %s (%s)",
-            business.name,
-            facebook_url,
-        )
-        return {"status": "no_data", "business_id": business_id}
+        return {
+            "status": "success" if enriched else "no_data",
+            "business_id": business_id,
+            "enriched": enriched,
+        }
 
 
-# ── Batch dispatcher ─────────────────────────────────────────────────────────
+# ── Batch dispatcher ──────────────────────────────────────────────────────────
 
 @shared_task(
     name="tasks.activity.batch_fetch_facebook_activity",
@@ -141,9 +153,9 @@ def batch_fetch_facebook_activity(
     return {"queued": queued, "failed": failed, "total": len(business_ids)}
 
 
-# ── Internal helpers ─────────────────────────────────────────────────────────
+# ── Internal helpers ──────────────────────────────────────────────────────────
 
-def _extract_facebook_url(business: Business) -> str | None:
+def _extract_facebook_url(business: Business) -> Optional[str]:
     """
     Extract the Facebook page URL from a Business record's raw_data.
 
@@ -151,3 +163,59 @@ def _extract_facebook_url(business: Business) -> str | None:
     explicit social_urls map and the ScrapingDog organic search results.
     """
     return extract_facebook_url_from_raw(business.raw_data or {})
+
+
+def _apply_enrichment(
+    business: Business,
+    data: FacebookPageData,
+    facebook_url: str,
+) -> List[str]:
+    """
+    Apply ``FacebookPageData`` signals to the Business ORM object in-place.
+
+    Rules:
+    - Each main field is only written when the Business field is currently
+      empty (``None`` or empty string), preserving validated data.
+    - ``website_url`` enrichment also resets ``website_validation_status``
+      to "pending" so the existing validator picks it up automatically.
+    - An audit record is always written to ``raw_data["facebook_enrichment"]``
+      so we can see what Facebook returned even when no fields changed.
+
+    Returns:
+        List of field names that were actually updated on the Business record.
+    """
+    now = datetime.now(tz=timezone.utc)
+    updated: List[str] = []
+
+    if data.last_post_date and not business.last_facebook_post_date:
+        business.last_facebook_post_date = data.last_post_date
+        updated.append("last_facebook_post_date")
+
+    if data.phone and not business.phone:
+        business.phone = data.phone
+        updated.append("phone")
+
+    if data.email and not business.email:
+        business.email = data.email
+        updated.append("email")
+
+    if data.website_url and not business.website_url:
+        business.website_url = data.website_url
+        business.website_validation_status = "pending"
+        updated.append("website_url")
+
+    # Always persist an audit record so we know the page was checked.
+    enrichment_record = {
+        "scraped_at": now.isoformat(),
+        "facebook_url": facebook_url,
+        "last_post_date": data.last_post_date.isoformat() if data.last_post_date else None,
+        "phone": data.phone,
+        "email": data.email,
+        "website": data.website_url,
+    }
+    business.raw_data = {**(business.raw_data or {}), "facebook_enrichment": enrichment_record}
+
+    if updated:
+        business.updated_at = now
+
+    return updated
