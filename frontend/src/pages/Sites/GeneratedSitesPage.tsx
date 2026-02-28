@@ -142,6 +142,35 @@ export const GeneratedSitesPage = () => {
     })
   }
 
+  // Detect closed/temporarily-closed status from the business record.
+  // Falls back to raw_data for records where the model column isn't yet populated.
+  const getClosedStatus = (business: any): 'temporarily_closed' | 'permanently_closed' | null => {
+    const status = (
+      business?.business_status ||
+      business?.raw_data?.business_status ||
+      ''
+    ).toUpperCase()
+    if (status === 'CLOSED_TEMPORARILY') return 'temporarily_closed'
+    if (status === 'CLOSED_PERMANENTLY') return 'permanently_closed'
+    return null
+  }
+
+  const getClosedBadge = (business: any) => {
+    const closed = getClosedStatus(business)
+    if (!closed) return null
+    const isPermanent = closed === 'permanently_closed'
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border ${
+        isPermanent
+          ? 'bg-gray-900 text-white border-gray-700'
+          : 'bg-amber-100 text-amber-900 border-amber-400'
+      }`}>
+        <XCircle className="w-3 h-3 flex-shrink-0" />
+        {isPermanent ? 'Permanently Closed' : 'Temporarily Closed'}
+      </span>
+    )
+  }
+
   const getStatusBadge = (status: string) => {
     const config: Record<string, { variant: any; label: string }> = {
       generating: { variant: 'info', label: 'Generating...' },
@@ -578,9 +607,14 @@ export const GeneratedSitesPage = () => {
               : (rawData?.link || rawData?.google_maps_url)
             
             const isSuperseded = site.status === 'superseded'
+            const closedStatus = getClosedStatus(business)
+            const isClosed = closedStatus !== null
 
             return (
-              <Card key={site.id} className={`hover:shadow-lg transition-shadow flex flex-col ${isSuperseded ? 'border-warning-300 border-2' : ''}`}>
+              <Card key={site.id} className={`hover:shadow-lg transition-shadow flex flex-col ${
+                isSuperseded ? 'border-warning-300 border-2' :
+                isClosed ? 'border-gray-400 border-2 opacity-85' : ''
+              }`}>
                 <CardBody className="p-4 flex flex-col h-full">
                   {/* Header with number and status */}
                   <div className="flex items-start justify-between mb-2">
@@ -626,8 +660,15 @@ export const GeneratedSitesPage = () => {
                     </div>
                   )}
                   
+                  {/* Closed business badge — shown prominently for any closed business */}
+                  {isClosed && (
+                    <div className="mb-3">
+                      {getClosedBadge(business)}
+                    </div>
+                  )}
+
                   {/* Validation status badge (non-superseded only) */}
-                  {!isSuperseded && (
+                  {!isSuperseded && !isClosed && (
                     <div className="mb-3">
                       {getValidationBadge(business?.website_validation_status)}
                     </div>
