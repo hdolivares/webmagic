@@ -18,9 +18,39 @@ import {
   Monitor,
   Maximize2,
   Minimize2,
+  XCircle,
 } from 'lucide-react'
 import { api } from '@/services/api'
 import { Badge, Button, Card, CardBody } from '@/components/ui'
+
+// Detect closed/temporarily-closed status from the business record.
+// Falls back to raw_data for records where the model column isn't yet populated.
+function getClosedStatus(business: any): 'temporarily_closed' | 'permanently_closed' | null {
+  const status = (
+    business?.business_status ||
+    business?.raw_data?.business_status ||
+    ''
+  ).toUpperCase()
+  if (status === 'CLOSED_TEMPORARILY') return 'temporarily_closed'
+  if (status === 'CLOSED_PERMANENTLY') return 'permanently_closed'
+  return null
+}
+
+function ClosedBadge({ business }: { business: any }) {
+  const closed = getClosedStatus(business)
+  if (!closed) return null
+  const isPermanent = closed === 'permanently_closed'
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
+      isPermanent
+        ? 'bg-gray-900 text-white border-gray-700'
+        : 'bg-amber-100 text-amber-900 border-amber-400'
+    }`}>
+      <XCircle className="w-3.5 h-3.5 flex-shrink-0" />
+      {isPermanent ? 'Permanently Closed' : 'Temporarily Closed'}
+    </span>
+  )
+}
 
 export const GeneratedSiteDetailPage = () => {
   const { siteId } = useParams<{ siteId: string }>()
@@ -86,9 +116,10 @@ export const GeneratedSiteDetailPage = () => {
             <ArrowLeft className="w-4 h-4" /> Back
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-text-primary flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-text-primary flex items-center gap-3 flex-wrap">
               {business?.name || site.subdomain}
               {getStatusBadge(site.status)}
+              <ClosedBadge business={business} />
             </h1>
             <p className="text-sm text-text-secondary mt-1">{site.subdomain}</p>
           </div>
@@ -201,6 +232,11 @@ export const GeneratedSiteDetailPage = () => {
                   <h3 className="font-semibold text-sm uppercase tracking-wide text-text-secondary mb-2">
                     Business
                   </h3>
+                  {getClosedStatus(business) && (
+                    <div className="mb-3">
+                      <ClosedBadge business={business} />
+                    </div>
+                  )}
                   <div className="flex items-start gap-2 text-sm">
                     <Building2 className="w-4 h-4 text-text-tertiary mt-0.5 shrink-0" />
                     <div>
