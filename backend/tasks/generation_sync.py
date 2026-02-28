@@ -319,6 +319,18 @@ def generate_site_for_business(self, business_id: str):
                                 f"[Gen] Fetched and cached {len(fetched)} reviews for "
                                 f"{business.name} ({business.gmb_place_id})"
                             )
+                            # Opportunistically populate last_review_date when it
+                            # was not set during scraping (e.g. for older records).
+                            if business.last_review_date is None:
+                                from services.activity.analyzer import extract_last_review_date
+                                last_date = extract_last_review_date(fetched)
+                                if last_date is not None:
+                                    business.last_review_date = last_date
+                                    logger.info(
+                                        "[Gen] Set last_review_date=%s for %s",
+                                        last_date.date(),
+                                        business.name,
+                                    )
                     except Exception as rev_err:
                         logger.warning(
                             f"[Gen] Review fetch failed for {business.name} "
