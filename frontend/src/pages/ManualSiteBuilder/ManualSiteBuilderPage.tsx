@@ -283,9 +283,9 @@ export default function ManualSiteBuilderPage() {
                   placeholder={
                     "Describe the business in your own words — what they sell or offer, " +
                     "who they are, what makes them special, any details you know.\n\n" +
-                    "Example: "A website for a store that sells only cat-related products " +
-                    "and home décor. The owner is Maria, a passionate cat lover, and the " +
-                    "store also has a podcast about cat care tips…""
+                    "Example: \"A website for a store that sells only cat-related products " +
+                    "and home decor. The owner is Maria, a passionate cat lover, and the " +
+                    "store also has a podcast about cat care tips...\""
                   }
                   className="manual-builder__textarea"
                 />
