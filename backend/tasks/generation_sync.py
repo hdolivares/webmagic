@@ -212,7 +212,12 @@ def generate_site_for_business(self, business_id: str):
                 #
                 # business_status falls back to raw_data for records scraped
                 # before the model column was populated.
+                #
+                # Manual businesses bypass this check entirely — an admin explicitly
+                # created them and vouches for their existence, so there is no need
+                # to verify reviews or Facebook activity.
                 _raw = business.raw_data or {}
+                _is_manual = bool(_raw.get("manual_generation"))
                 _biz_status = business.business_status or _raw.get("business_status")
                 activity = compute_activity_status(
                     last_review_date=business.last_review_date,
@@ -220,7 +225,7 @@ def generate_site_for_business(self, business_id: str):
                     business_status=_biz_status,
                     review_count=business.review_count,
                 )
-                if not activity.is_eligible:
+                if not activity.is_eligible and not _is_manual:
                     logger.info(
                         "Skipping site generation for %s — %s",
                         business.name,
