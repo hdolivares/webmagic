@@ -12,6 +12,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import logging
+import celery_app  # noqa: F401 — must be imported first to bind shared_task decorators
 from core.database import get_db_session_sync
 from models.business import Business
 from services.activity import extract_facebook_url_from_raw
