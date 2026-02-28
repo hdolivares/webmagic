@@ -371,6 +371,18 @@ class ApiClient {
     return response.data
   }
 
+  /**
+   * Export all site files as a ZIP download (index.html, styles.css,
+   * script.js + img/ folder).  Returns a Blob that the caller can trigger
+   * as a browser download via a temporary object URL.
+   */
+  async exportSiteFiles(siteId: string): Promise<Blob> {
+    const response = await this.client.get(`/sites/${siteId}/export`, {
+      responseType: 'blob',
+    })
+    return response.data
+  }
+
   async generateSite(data: GenerateSiteRequest): Promise<{ site_id: string }> {
     const response = await this.client.post('/sites/generate', data)
     return response.data

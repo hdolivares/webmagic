@@ -19,6 +19,7 @@ import {
   Maximize2,
   Minimize2,
   XCircle,
+  Download,
 } from 'lucide-react'
 import { api } from '@/services/api'
 import { Badge, Button, Card, CardBody } from '@/components/ui'
@@ -57,6 +58,24 @@ export const GeneratedSiteDetailPage = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [iframeFullscreen, setIframeFullscreen] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
+
+  const exportMutation = useMutation({
+    mutationFn: () => api.exportSiteFiles(siteId!),
+    onSuccess: (blob) => {
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${site?.subdomain ?? siteId}.zip`
+      a.click()
+      URL.revokeObjectURL(url)
+      setExportError(null)
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.detail ?? err?.message ?? 'Export failed'
+      setExportError(msg)
+    },
+  })
 
   const { data: site, isLoading, error } = useQuery({
     queryKey: ['generated-site-detail', siteId],
@@ -311,6 +330,23 @@ export const GeneratedSiteDetailPage = () => {
                 >
                   Add to Campaign
                 </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full flex items-center justify-center gap-2"
+                  onClick={() => exportMutation.mutate()}
+                  disabled={exportMutation.isPending || !site?.html_content}
+                  title={!site?.html_content ? 'Site has no content yet' : 'Download HTML, CSS, JS and images as a ZIP'}
+                >
+                  {exportMutation.isPending
+                    ? <RefreshCw className="w-4 h-4 animate-spin" />
+                    : <Download className="w-4 h-4" />
+                  }
+                  {exportMutation.isPending ? 'Preparing…' : 'Download Site Files'}
+                </Button>
+                {exportError && (
+                  <p className="text-xs text-error px-1">{exportError}</p>
+                )}
               </CardBody>
             </Card>
           </div>

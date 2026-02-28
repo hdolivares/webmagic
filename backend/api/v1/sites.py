@@ -6,9 +6,12 @@ Updated: January 22, 2026
 - Ensures all site generations have associated business records
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import Optional
 from uuid import UUID
+import io
 import logging
 
 from core.database import get_db
@@ -740,3 +743,75 @@ async def test_image_generation_download(
             status_code=500,
             detail=f"Image generation failed: {str(e)}"
         )
+
+
+# ── Site file export ──────────────────────────────────────────────────────────
+
+@router.get("/{site_id}/export")
+async def export_site_files(
+    site_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user),
+):
+    """
+    Export all files for a generated site as a downloadable ZIP archive.
+
+    The archive contains:
+      - index.html  (the full site HTML, from the database)
+      - styles.css  (the stylesheet, from the database)
+      - script.js   (JavaScript, from the database, if present)
+      - img/        (hero.jpg, about.jpg, services.jpg from disk, if present)
+
+    As a side-effect the text files are also written to
+    ``SITES_BASE_PATH/{subdomain}/`` so the folder is kept in sync with the
+    database and could be served statically if needed.
+    """
+    from models.site import GeneratedSite
+    from core.config import get_settings
+    from services.creative.site_export_service import write_site_files, build_site_zip
+
+    result = await db.execute(select(GeneratedSite).where(GeneratedSite.id == site_id))
+    site = result.scalar_one_or_none()
+
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    if not site.html_content:
+        raise HTTPException(
+            status_code=422,
+            detail="Site has no HTML content yet — generation may still be in progress.",
+        )
+
+    settings = get_settings()
+
+    # Write text files to disk so the folder is self-contained
+    write_site_files(
+        subdomain=site.subdomain,
+        html=site.html_content,
+        css=site.css_content,
+        js=site.js_content,
+        sites_base_path=settings.SITES_BASE_PATH,
+    )
+
+    # Build the ZIP in memory (includes images already on disk)
+    zip_bytes = build_site_zip(
+        subdomain=site.subdomain,
+        html=site.html_content,
+        css=site.css_content,
+        js=site.js_content,
+        sites_base_path=settings.SITES_BASE_PATH,
+    )
+
+    filename = f"{site.subdomain}.zip"
+    logger.info(
+        "Exporting site %r (%s) — %d bytes",
+        site.subdomain,
+        site_id,
+        len(zip_bytes),
+    )
+
+    return StreamingResponse(
+        io.BytesIO(zip_bytes),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
