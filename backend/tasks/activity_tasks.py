@@ -18,7 +18,7 @@ that respects ScrapingDog's credit budget.
 """
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from celery import shared_task
@@ -184,7 +184,7 @@ def _apply_enrichment(
     Returns:
         List of field names that were actually updated on the Business record.
     """
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.utcnow()
     updated: List[str] = []
 
     if data.last_post_date and not business.last_facebook_post_date:
