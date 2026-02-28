@@ -114,6 +114,26 @@ def score_modifier_from_review_date(last_review_date: Optional[datetime]) -> int
 _CLOSED_STATUSES = {"CLOSED_TEMPORARILY", "CLOSED_PERMANENTLY"}
 
 
+def is_business_closed(business: Any) -> bool:
+    """
+    Return True if the business is explicitly marked closed on Google Maps.
+
+    Checks the dedicated ``business_status`` model column first, then falls
+    back to ``raw_data['business_status']`` for records scraped before the
+    column was backfilled.  Both sources are compared case-insensitively.
+
+    This is the single canonical check used to short-circuit upstream tasks
+    (ScrapingDog discovery, Facebook enrichment) so we don't spend API credits
+    on businesses we will never generate a site for.
+    """
+    status = (
+        getattr(business, "business_status", None)
+        or (getattr(business, "raw_data", None) or {}).get("business_status")
+        or ""
+    ).upper().strip()
+    return status in _CLOSED_STATUSES
+
+
 def compute_activity_status(
     last_review_date: Optional[datetime],
     last_facebook_post_date: Optional[datetime] = None,
