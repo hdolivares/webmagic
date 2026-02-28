@@ -12,6 +12,7 @@ import logging
 
 from models.business import Business
 from core.exceptions import DatabaseException, ValidationException
+from services.activity.analyzer import extract_last_review_date
 
 logger = logging.getLogger(__name__)
 
@@ -146,11 +147,28 @@ class BusinessService:
                 "reviews_summary", "review_highlight", "brand_archetype",
                 "photos_urls", "logo_url",
                 "website_status", "contact_status", "qualification_score",
-                "website_validation_status", "website_validated_at",  # NEW: Website validation fields
+                "website_validation_status", "website_validated_at",
                 "creative_dna", "scraped_at",
-                "raw_data"  # NEW: Store full Outscraper response for reprocessing
+                "raw_data",
+                # Activity signal columns
+                "last_review_date", "last_facebook_post_date",
             }
-            
+
+            # ── Derive last_review_date from normalised reviews_data ─────────
+            # reviews_data is a transient field (not a DB column) that the
+            # scraper attaches to each business dict before saving.  We extract
+            # the most-recent date here and store it in the dedicated column so
+            # it is queryable without unpacking raw_data JSON every time.
+            reviews_list = data.get("reviews_data") or []
+            if not reviews_list:
+                # Fall back to raw_data if the normalised list wasn't attached
+                raw = data.get("raw_data") or {}
+                reviews_list = raw.get("reviews_data") or []
+
+            derived_last_review = extract_last_review_date(reviews_list)
+            if derived_last_review is not None:
+                data = {**data, "last_review_date": derived_last_review}
+
             # Filter business data to only valid fields
             # IMPORTANT: raw_data should ALWAYS be saved, even if it's a dict (don't check None)
             business_data = {}
@@ -164,7 +182,7 @@ class BusinessService:
                 # For other fields, skip if None
                 elif v is not None:
                     business_data[k] = v
-            
+
             # Add qualification score if provided
             if lead_score is not None:
                 business_data["qualification_score"] = int(lead_score)

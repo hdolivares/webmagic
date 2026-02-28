@@ -137,6 +137,17 @@ class Business(BaseModel):
     # Values: sms | email | call_later (see core.outreach_enums.OutreachChannel)
     phone_validated_at = Column(DateTime, nullable=True)
 
+    # ── Activity signals (used to filter out closed/inactive businesses) ──────
+    last_review_date = Column(DateTime(timezone=True), nullable=True, index=True)
+    # UTC datetime of the most recent Google review for this business.
+    # Populated from raw_data["reviews_data"] at scrape time.
+    # None means no individual review timestamps were available (not necessarily inactive).
+
+    last_facebook_post_date = Column(DateTime(timezone=True), nullable=True, index=True)
+    # UTC datetime of the most recent public Facebook post.
+    # Populated via ScrapingDog GWS when a Facebook URL is present in raw_data.
+    # None means Facebook was not checked or no posts were found.
+
     # Relationships
     # coverage_grid = relationship("CoverageGrid", back_populates="businesses")
     generated_sites = relationship("GeneratedSite", back_populates="business", lazy="select")

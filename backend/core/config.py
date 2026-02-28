@@ -92,6 +92,12 @@ class Settings(BaseSettings):
     SMS_ENFORCE_BUSINESS_HOURS: str = "true"
     SMS_DEFAULT_TIMEZONE: str = "America/Chicago"
     
+    # Activity filtering — gates site generation on review/social recency
+    ENABLE_FACEBOOK_ACTIVITY_CHECK: bool = True
+    # When True, scrapes the Facebook page URL (if present) via ScrapingDog GWS
+    # to capture last_facebook_post_date.  Costs 5 ScrapingDog credits per business.
+    # Set to False to disable without a code deploy.
+
     # Website Validation (NEW)
     ENABLE_AUTO_VALIDATION: bool = True  # Auto-validate websites after scraping
     VALIDATION_BATCH_SIZE: int = 10  # Max businesses to validate per batch

@@ -2,8 +2,11 @@
 Lead qualification and filtering logic.
 """
 from typing import List, Dict, Any, Optional
+from datetime import datetime, timezone
 import re
 import logging
+
+from services.activity.analyzer import score_modifier_from_review_date
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +133,19 @@ class LeadQualifier:
             reasons.append("Chain/Franchise (0)")
             # Heavily penalize chains
             score = max(0, score - 50)
-        
+
+        # 6. Review recency signal (±points based on last review age)
+        #    Positive bonus for recently active, penalty for potentially closed.
+        #    No penalty when review date is unknown — absence of data ≠ inactive.
+        last_review_date: Optional[datetime] = business.get("last_review_date")
+        activity_modifier = score_modifier_from_review_date(last_review_date)
+        if activity_modifier > 0:
+            score += activity_modifier
+            reasons.append(f"Recent review activity (+{activity_modifier})")
+        elif activity_modifier < 0:
+            score = max(0, score + activity_modifier)  # modifier is already negative
+            reasons.append(f"Stale review activity ({activity_modifier})")
+
         # Apply hard requirements
         qualified = score >= self.min_score
         
