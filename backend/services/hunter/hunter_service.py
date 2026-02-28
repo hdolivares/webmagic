@@ -476,7 +476,7 @@ class HunterService:
                         # Facebook URL in its raw_data but no date yet.
                         if business and settings.ENABLE_FACEBOOK_ACTIVITY_CHECK:
                             fb_url = extract_facebook_url_from_raw(
-                                biz_data.get("raw_data") or {}
+                                business.raw_data or {}
                             )
                             if fb_url and business.last_facebook_post_date is None:
                                 businesses_for_facebook_check.append(str(business.id))
@@ -851,7 +851,7 @@ class HunterService:
                         # Queue Facebook activity check when a URL is available
                         if business and settings.ENABLE_FACEBOOK_ACTIVITY_CHECK:
                             fb_url = extract_facebook_url_from_raw(
-                                biz_data.get("raw_data") or {}
+                                business.raw_data or {}
                             )
                             if fb_url and business.last_facebook_post_date is None:
                                 businesses_for_facebook_check.append(str(business.id))
