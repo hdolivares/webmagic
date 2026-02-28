@@ -111,9 +111,14 @@ def score_modifier_from_review_date(last_review_date: Optional[datetime]) -> int
 
 # ── Activity assessment ──────────────────────────────────────────────────────
 
+_CLOSED_STATUSES = {"CLOSED_TEMPORARILY", "CLOSED_PERMANENTLY"}
+
+
 def compute_activity_status(
     last_review_date: Optional[datetime],
     last_facebook_post_date: Optional[datetime] = None,
+    business_status: Optional[str] = None,
+    review_count: Optional[int] = None,
 ) -> ActivityStatus:
     """
     Determine whether a business is eligible for site generation, and what
@@ -121,19 +126,29 @@ def compute_activity_status(
 
     Rules (evaluated in priority order):
 
-    1. **Last review > REVIEW_CUTOFF_DAYS** → ineligible.
-       This is the primary and most reliable signal.
+    0. **business_status is CLOSED_TEMPORARILY or CLOSED_PERMANENTLY** → ineligible.
+       Google explicitly marks the business as closed — do not generate.
 
-    2. **No review date AND last Facebook post > FACEBOOK_CUTOFF_DAYS** → ineligible.
+    1. **review_count == 0 AND last_facebook_post_date is None** → ineligible.
+       Zero Google reviews with no verifiable Facebook activity means we cannot
+       confirm the business is real or still operating.
+
+    2. **Last review > REVIEW_CUTOFF_DAYS** → ineligible.
+       This is the primary and most reliable activity signal.
+
+    3. **No review date AND last Facebook post > FACEBOOK_CUTOFF_DAYS** → ineligible.
        Facebook is used only as a secondary signal.  When review data exists
        we trust it over Facebook activity.
 
-    3. **Otherwise** → eligible.  The score modifier from review recency is
+    4. **Otherwise** → eligible.  The score modifier from review recency is
        still applied so the lead scorer can prioritise active businesses.
 
     Args:
         last_review_date:         Most recent Google review date (UTC), or None.
         last_facebook_post_date:  Most recent Facebook post date (UTC), or None.
+        business_status:          Raw Outscraper status string, e.g. "OPERATIONAL",
+                                  "CLOSED_TEMPORARILY", "CLOSED_PERMANENTLY".
+        review_count:             Total number of Google reviews (0 = no reviews).
 
     Returns:
         An :class:`ActivityStatus` instance summarising the decision.
@@ -141,8 +156,35 @@ def compute_activity_status(
     review_days = _days_since(last_review_date)
     facebook_days = _days_since(last_facebook_post_date)
     modifier = score_modifier_from_review_date(last_review_date)
+    normalised_status = (business_status or "").upper().strip()
 
-    # ── Rule 1: stale review data ────────────────────────────────────────────
+    # ── Rule 0: business explicitly marked as closed ──────────────────────────
+    if normalised_status in _CLOSED_STATUSES:
+        return ActivityStatus(
+            is_eligible=False,
+            ineligibility_reason="business_closed",
+            score_modifier=0,
+            last_review_days_ago=review_days,
+            last_facebook_days_ago=facebook_days,
+            detail=f"Business is marked as {normalised_status} on Google Maps",
+        )
+
+    # ── Rule 1: zero reviews + no Facebook activity ───────────────────────────
+    # Only applies when review_count is explicitly 0 (not None/unknown).
+    if review_count == 0 and last_facebook_post_date is None:
+        return ActivityStatus(
+            is_eligible=False,
+            ineligibility_reason="unverifiable_no_reviews_no_facebook",
+            score_modifier=0,
+            last_review_days_ago=review_days,
+            last_facebook_days_ago=facebook_days,
+            detail=(
+                "Business has 0 Google reviews and no verifiable Facebook activity — "
+                "cannot confirm the business is real or still operating"
+            ),
+        )
+
+    # ── Rule 2: stale review data ─────────────────────────────────────────────
     if review_days is not None and review_days > REVIEW_CUTOFF_DAYS:
         return ActivityStatus(
             is_eligible=False,
@@ -156,7 +198,7 @@ def compute_activity_status(
             ),
         )
 
-    # ── Rule 2: no review signal + stale Facebook ────────────────────────────
+    # ── Rule 3: no review signal + stale Facebook ─────────────────────────────
     if (
         review_days is None
         and facebook_days is not None
@@ -174,7 +216,7 @@ def compute_activity_status(
             ),
         )
 
-    # ── Rule 3: eligible ─────────────────────────────────────────────────────
+    # ── Rule 4: eligible ──────────────────────────────────────────────────────
     if review_days is not None:
         detail = f"Last review {review_days} days ago — eligible (modifier: {modifier:+d})"
     elif facebook_days is not None:

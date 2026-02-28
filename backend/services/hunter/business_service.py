@@ -150,6 +150,8 @@ class BusinessService:
                 "website_validation_status", "website_validated_at",
                 "creative_dna", "scraped_at",
                 "raw_data",
+                # Operational status from Outscraper
+                "business_status", "operational",
                 # Activity signal columns
                 "last_review_date", "last_facebook_post_date",
             }

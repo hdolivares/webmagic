@@ -207,12 +207,18 @@ def generate_site_for_business(self, business_id: str):
                 # ─────────────────────────────────────────────────────────────
 
                 # ── Activity check ────────────────────────────────────────────
-                # Skip businesses that show no signs of activity within the
-                # configured windows (18-month review cutoff, 2-year Facebook
-                # cutoff when review data is absent).
+                # Skip businesses that are closed, have no verifiable activity,
+                # or whose last signals fall outside the configured cutoff windows.
+                #
+                # business_status falls back to raw_data for records scraped
+                # before the model column was populated.
+                _raw = business.raw_data or {}
+                _biz_status = business.business_status or _raw.get("business_status")
                 activity = compute_activity_status(
                     last_review_date=business.last_review_date,
                     last_facebook_post_date=business.last_facebook_post_date,
+                    business_status=_biz_status,
+                    review_count=business.review_count,
                 )
                 if not activity.is_eligible:
                     logger.info(
