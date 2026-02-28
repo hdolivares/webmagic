@@ -47,6 +47,7 @@ celery_app.autodiscover_tasks([
     "tasks.phone_validation_tasks",  # Pre-generation phone validation (outreach_channel)
     "tasks.ticket_tasks",  # Support ticket AI processing
     "tasks.abandoned_cart_tasks",  # Abandoned cart recovery (15min window, 24h coupon)
+    "tasks.activity_tasks",  # Facebook activity & contact enrichment
 ])
 
 # Periodic task schedule (using SYNC tasks only)
