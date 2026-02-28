@@ -39,6 +39,42 @@ _TIMESTAMP_PATTERNS = [
 _REQUEST_TIMEOUT_SECONDS = 60
 
 
+# ── Public utility ────────────────────────────────────────────────────────────
+
+def extract_facebook_url_from_raw(raw_data: dict) -> Optional[str]:
+    """
+    Find the Facebook page URL from a Business's ``raw_data``.
+
+    Searches two locations in priority order:
+
+    1. ``raw_data["social_urls"]["facebook"]`` — explicit social-URL map
+       populated by some scraper paths.
+    2. ``raw_data["scrapingdog_discovery"]["search_results"]["organic_results"]``
+       — Google Search results stored by the ScrapingDog discovery step.
+       Facebook links appear here as organic results ranked by Google.
+
+    Returns the first matching ``facebook.com`` URL found, or ``None``.
+    """
+    if not raw_data:
+        return None
+
+    # Path 1: explicit social_urls map
+    social_urls = raw_data.get("social_urls") or {}
+    url = social_urls.get("facebook") or social_urls.get("Facebook")
+    if url and "facebook.com" in url:
+        return url
+
+    # Path 2: ScrapingDog organic search results
+    sd = raw_data.get("scrapingdog_discovery") or {}
+    organic_results = sd.get("search_results", {}).get("organic_results", [])
+    for result in organic_results:
+        link = result.get("link") or ""
+        if "facebook.com" in link:
+            return link
+
+    return None
+
+
 class FacebookActivityScraper:
     """
     Fetches the last post date for a public Facebook page.

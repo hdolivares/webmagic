@@ -18,6 +18,7 @@ from .analyzer import (
     score_modifier_from_review_date,
     compute_activity_status,
 )
+from .facebook_scraper import extract_facebook_url_from_raw
 
 __all__ = [
     # Constants
@@ -32,4 +33,5 @@ __all__ = [
     "extract_last_review_date",
     "score_modifier_from_review_date",
     "compute_activity_status",
+    "extract_facebook_url_from_raw",
 ]

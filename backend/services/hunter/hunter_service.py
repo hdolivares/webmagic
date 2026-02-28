@@ -24,6 +24,7 @@ from services.progress.redis_service import RedisService
 from services.progress.progress_publisher import ProgressPublisher
 from core.exceptions import ExternalAPIException
 from core.config import get_settings
+from services.activity import extract_facebook_url_from_raw
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -474,10 +475,8 @@ class HunterService:
                         # only when the feature is enabled and the business has a
                         # Facebook URL in its raw_data but no date yet.
                         if business and settings.ENABLE_FACEBOOK_ACTIVITY_CHECK:
-                            fb_url = (
-                                (biz_data.get("raw_data") or {})
-                                .get("social_urls", {})
-                                .get("facebook")
+                            fb_url = extract_facebook_url_from_raw(
+                                biz_data.get("raw_data") or {}
                             )
                             if fb_url and business.last_facebook_post_date is None:
                                 businesses_for_facebook_check.append(str(business.id))
@@ -851,10 +850,8 @@ class HunterService:
 
                         # Queue Facebook activity check when a URL is available
                         if business and settings.ENABLE_FACEBOOK_ACTIVITY_CHECK:
-                            fb_url = (
-                                (biz_data.get("raw_data") or {})
-                                .get("social_urls", {})
-                                .get("facebook")
+                            fb_url = extract_facebook_url_from_raw(
+                                biz_data.get("raw_data") or {}
                             )
                             if fb_url and business.last_facebook_post_date is None:
                                 businesses_for_facebook_check.append(str(business.id))
