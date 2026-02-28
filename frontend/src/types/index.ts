@@ -131,6 +131,24 @@ export interface GenerateSiteRequest {
   force_regenerate?: boolean
 }
 
+export interface ManualGenerationRequest {
+  /** Free-form business description — the primary input */
+  description: string
+  /** Hard facts — used verbatim on the generated site */
+  name?: string
+  phone?: string
+  email?: string
+  address?: string
+  city?: string
+  state?: string
+  /** Layout style */
+  website_type?: 'informational' | 'ecommerce'
+  /** Free-text color/style description */
+  branding_notes?: string
+  /** Base64 data URIs of logo/brand images */
+  branding_images?: string[]
+}
+
 // ============================================
 // PROMPT TYPES
 // ============================================

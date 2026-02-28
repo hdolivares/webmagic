@@ -2,7 +2,7 @@
 Generated Site schemas for API validation.
 """
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Literal, Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
 
@@ -11,6 +11,50 @@ class SiteGenerateRequest(BaseModel):
     """Request to generate a new site."""
     business_id: UUID = Field(..., description="Business ID to generate site for")
     force_regenerate: bool = Field(default=False, description="Force regeneration if site exists")
+
+
+class ManualGenerationRequest(BaseModel):
+    """
+    Request to generate a site from a free-form business description.
+
+    The description is the primary required input. Claude interprets and expands
+    it into a rich structured profile before the normal 4-stage pipeline runs.
+
+    Hard facts (name, phone, email, address, city, state) are optional but, when
+    provided, are used verbatim on the generated site — they are never overridden
+    or embellished by the LLM.
+    """
+
+    # Primary narrative — required
+    description: str = Field(
+        ...,
+        min_length=10,
+        description="Free-form description of the business. The more detail, the better.",
+    )
+
+    # Hard facts — used exactly as entered
+    name: Optional[str] = Field(None, description="Business name (verbatim)")
+    phone: Optional[str] = Field(None, description="Contact phone (verbatim)")
+    email: Optional[str] = Field(None, description="Contact email (verbatim)")
+    address: Optional[str] = Field(None, description="Street address (verbatim)")
+    city: Optional[str] = Field(None, description="City (verbatim)")
+    state: Optional[str] = Field(None, description="State (verbatim)")
+
+    # Website configuration
+    website_type: Literal["informational", "ecommerce"] = Field(
+        default="informational",
+        description="Layout style — informational or ecommerce",
+    )
+
+    # Branding signals (all optional, any combination works)
+    branding_notes: Optional[str] = Field(
+        None,
+        description="Color/style description, e.g. 'deep navy and gold, luxury minimal'",
+    )
+    branding_images: Optional[List[str]] = Field(
+        None,
+        description="Base64 data URIs of logo, brand photos, or any visual references",
+    )
 
 
 class SiteResponse(BaseModel):

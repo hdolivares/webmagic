@@ -358,7 +358,30 @@ def generate_site_for_business(self, business_id: str):
                     "reviews_summary": business.reviews_summary,
                     "reviews_data": reviews_data,
                 }
-                
+
+                # For manually-created businesses, unpack the user's original input
+                # into the business_data dict so the orchestrator can run Stage 0.
+                manual_input: dict = (business.raw_data or {}).get("manual_input") or {}
+                if manual_input or (business.raw_data or {}).get("manual_generation"):
+                    business_data["is_manual"] = True
+                    business_data["raw_description"] = manual_input.get("description", "")
+                    business_data["website_type"] = manual_input.get("website_type", "informational")
+
+                    branding_notes = manual_input.get("branding_notes")
+                    branding_images = manual_input.get("branding_images") or []
+                    if branding_notes or branding_images:
+                        business_data["branding_context"] = {
+                            "notes": branding_notes,
+                            "images": branding_images,
+                        }
+
+                    logger.info(
+                        "[Gen] Manual mode for %s — website_type=%s, branding=%s",
+                        business.name,
+                        business_data["website_type"],
+                        "yes" if business_data.get("branding_context") else "no",
+                    )
+
                 # Pass subdomain so architect can generate and save images
                 result = await orchestrator.generate_website(
                     business_data,

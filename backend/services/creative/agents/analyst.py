@@ -56,12 +56,18 @@ class AnalystAgent(BaseAgent):
                 - content_themes: Main themes to emphasize
         """
         logger.info(f"Analyzing business: {business_data.get('name')}")
-        
-        # Prepare review text
-        review_texts = self._format_reviews(
-            business_data.get("reviews_data", [])
-        )
-        
+
+        # When an interpreted_profile is present (manual mode), use it as the
+        # primary context source instead of raw reviews.  The profile already
+        # contains brand personality, differentiators, tone, and content themes
+        # — exactly what the analyst derives from reviews in scrape mode.
+        interpreted_profile: Optional[Dict[str, Any]] = business_data.get("interpreted_profile")
+        if interpreted_profile:
+            review_texts = self._format_interpreted_profile(interpreted_profile)
+            logger.info("[analyst] Using interpreted_profile as context (manual mode)")
+        else:
+            review_texts = self._format_reviews(business_data.get("reviews_data", []))
+
         # Build prompts
         system_prompt, user_prompt = await self.prompt_builder.build_prompts(
             agent_name="analyst",
@@ -99,17 +105,56 @@ class AnalystAgent(BaseAgent):
         """Format reviews for prompt."""
         if not reviews_data:
             return "No reviews available."
-        
+
         formatted = []
         for i, review in enumerate(reviews_data[:20], 1):  # Max 20 reviews
             text = review.get("text", "").strip()
             rating = review.get("rating")
             if text:
-                formatted.append(
-                    f"Review {i} ({rating}★): {text}"
-                )
-        
+                formatted.append(f"Review {i} ({rating}★): {text}")
+
         return "\n\n".join(formatted) if formatted else "No reviews available."
+
+    def _format_interpreted_profile(self, profile: Dict[str, Any]) -> str:
+        """
+        Format an ``interpreted_profile`` dict as a structured context block
+        that reads like rich review data for the analyst prompt template.
+
+        This lets the Analyst produce the same quality ``analysis`` output for
+        manually-entered businesses as for businesses with dozens of reviews.
+        """
+        lines = [
+            "=== BUSINESS PROFILE (pre-interpreted by AI strategist) ===",
+            f"Name: {profile.get('name', '')}",
+            f"Category: {profile.get('category', '')} / {profile.get('subcategory', '')}",
+            f"About: {profile.get('about', '')}",
+            f"Tagline: {profile.get('tagline', '')}",
+            f"Target audience: {profile.get('target_audience', '')}",
+            f"Tone of voice: {profile.get('tone_of_voice', '')}",
+            f"Unique value: {profile.get('unique_value', '')}",
+        ]
+
+        services = profile.get("services") or []
+        if services:
+            lines.append("Services/offerings: " + "; ".join(services))
+
+        traits = profile.get("brand_personality") or []
+        if traits:
+            lines.append("Brand personality: " + ", ".join(traits))
+
+        differentiators = profile.get("key_differentiators") or []
+        if differentiators:
+            lines.append("Key differentiators: " + "; ".join(differentiators))
+
+        themes = profile.get("content_themes") or []
+        if themes:
+            lines.append("Content themes: " + ", ".join(themes))
+
+        owner = profile.get("owner_name")
+        if owner:
+            lines.append(f"Owner/founder: {owner}")
+
+        return "\n".join(lines)
     
     def _validate_analysis(
         self,

@@ -17,7 +17,7 @@ import {
   Sun,
   Moon,
   Wand2,
-  ChevronDown,
+  PenLine,
   HeadphonesIcon,
   ClipboardCheck,
 } from 'lucide-react'
@@ -41,11 +41,16 @@ export const Layout = () => {
       label: 'Customer Sites',
       badge: 'Deployed'
     },
-    { 
-      to: '/sites/generated', 
-      icon: Wand2, 
+    {
+      to: '/sites/generated',
+      icon: Wand2,
       label: 'Generated Sites',
       badge: 'AI'
+    },
+    {
+      to: '/sites/manual-builder',
+      icon: PenLine,
+      label: 'Manual Builder',
     },
     { to: '/verification', icon: ClipboardCheck, label: 'Verification' },
     { to: '/campaigns', icon: Mail, label: 'Campaigns' },

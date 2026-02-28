@@ -5,7 +5,7 @@ Selects vibe, typography, colors, animations, and visual style.
 Enhanced with industry-specific color psychology recommendations based on
 neuromarketing research (users form 90% of opinion based on color within 50ms).
 """
-from typing import Dict, Any, List
+from typing import Any, Dict, List, Optional
 import logging
 
 from services.creative.agents.base import BaseAgent
@@ -92,10 +92,30 @@ class ArtDirectorAgent(BaseAgent):
             }
         )
         
+        # If branding signals are present (images and/or text notes), run a
+        # dedicated vision pass first and inject the derived palette into the
+        # main prompt as client-specified constraints the Director must honour.
+        branding_context: Optional[Dict[str, Any]] = business_data.get("branding_context")
+        branding_constraints: str = ""
+        if branding_context:
+            try:
+                interpreted = await self._interpret_branding_signals(branding_context)
+                if interpreted:
+                    branding_constraints = self._format_branding_constraints(interpreted)
+                    user_prompt += f"\n\n{branding_constraints}"
+                    logger.info(
+                        "[art_director] Branding signals interpreted and injected into brief prompt"
+                    )
+            except Exception as branding_err:
+                logger.warning(
+                    "[art_director] Branding signal interpretation failed (non-fatal): %s",
+                    branding_err,
+                )
+
         # Generate design brief
         try:
             result = await self.generate_json(system_prompt, user_prompt)
-            
+
             # Validate and enhance (pass style overrides for fallback colors)
             brief = self._validate_brief(result, business_data, creative_dna, style_overrides)
             
@@ -442,5 +462,123 @@ class ArtDirectorAgent(BaseAgent):
         # Add industry persona if matched
         if industry_persona:
             brief["industry_persona"] = industry_persona
-        
+
         return brief
+
+    # ------------------------------------------------------------------
+    # Branding signal interpretation (manual mode only)
+    # ------------------------------------------------------------------
+
+    _BRANDING_SYSTEM_PROMPT = """\
+You are a senior brand designer with deep expertise in color theory and visual identity.
+Your task is to derive a complete, harmonious color system and typography direction from
+client-provided branding signals (images and/or text descriptions).
+
+Rules:
+1. Analyze every image for dominant, supporting, and accent colors — extract exact hex values.
+2. Read text notes as client intent. Vague phrases like "luxury feel" or "earthy tones" are valid
+   signals — translate them into a concrete palette using your design judgment.
+3. Cross-reference images and text when both are present — text refines what you see.
+4. Build a COMPLETE color system (all slots below must be filled — no nulls).
+5. Apply color theory to fill gaps: complementary, analogous, or triadic relationships.
+6. Suggest a typography direction consistent with the visual signals.
+
+Respond with valid JSON only. No markdown, no explanation.
+"""
+
+    async def _interpret_branding_signals(
+        self, branding_context: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Run a dedicated Claude call to derive a complete color system and
+        typography direction from client-provided branding images and/or notes.
+
+        Returns a dict with ``colors`` and ``typography`` sub-dicts, or None if
+        there are no signals to interpret.
+        """
+        images: List[str] = branding_context.get("images", []) or []
+        notes: str = (branding_context.get("notes") or "").strip()
+
+        if not images and not notes:
+            return None
+
+        # Build multimodal content blocks
+        content_blocks: List[Dict[str, Any]] = []
+
+        for data_uri in images[:5]:  # cap at 5 images
+            try:
+                # data_uri format: "data:<media_type>;base64,<data>"
+                header, b64_data = data_uri.split(",", 1)
+                media_type = header.split(":")[1].split(";")[0]
+                content_blocks.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": media_type,
+                        "data": b64_data,
+                    },
+                })
+            except Exception as parse_err:
+                logger.warning("[art_director] Could not parse branding image: %s", parse_err)
+
+        instruction = f"""\
+{"Client branding images are attached above." if content_blocks else "No images provided."}
+{"Client style notes: " + notes if notes else "No text notes provided."}
+
+Derive a complete brand color system and typography direction.
+Return JSON with exactly this structure:
+{{
+  "colors": {{
+    "primary": "#hex",
+    "secondary": "#hex",
+    "accent": "#hex",
+    "background": "#hex",
+    "surface": "#hex",
+    "text": "#hex",
+    "text_muted": "#hex",
+    "gradient_start": "#hex",
+    "gradient_end": "#hex",
+    "background_dark": "#hex",
+    "surface_dark": "#hex",
+    "text_dark": "#hex",
+    "text_muted_dark": "#hex"
+  }},
+  "typography": {{
+    "direction": "Short description of type style, e.g. 'Modern sans-serif with editorial serif accents'",
+    "display": "Suggested Google Fonts heading font name",
+    "body": "Suggested Google Fonts body font name"
+  }},
+  "vibe": "One-word or short design vibe, e.g. 'Luxury Minimal' or 'Warm Playful'"
+}}
+"""
+        content_blocks.append({"type": "text", "text": instruction})
+
+        return await self.generate_json(
+            self._BRANDING_SYSTEM_PROMPT,
+            content_blocks,
+        )
+
+    def _format_branding_constraints(self, interpreted: Dict[str, Any]) -> str:
+        """Format the interpreted branding signals as injected prompt constraints."""
+        colors = interpreted.get("colors", {})
+        typography = interpreted.get("typography", {})
+        vibe = interpreted.get("vibe", "")
+
+        color_lines = "\n".join(
+            f"  - {slot}: {hex_val}"
+            for slot, hex_val in colors.items()
+            if hex_val
+        )
+        return f"""\
+---
+CLIENT BRANDING CONSTRAINTS (must be honored — these are confirmed client specifications):
+Vibe: {vibe}
+Typography direction: {typography.get("direction", "")}
+Suggested heading font: {typography.get("display", "")}
+Suggested body font: {typography.get("body", "")}
+Color system:
+{color_lines}
+
+Use these values as the foundation. You may refine shades for accessibility or harmony,
+but the overall palette, vibe, and typography direction must match the client's intent.
+---"""

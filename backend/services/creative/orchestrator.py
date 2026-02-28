@@ -12,6 +12,7 @@ from services.creative.agents.analyst import AnalystAgent
 from services.creative.agents.concept import ConceptAgent
 from services.creative.agents.director import ArtDirectorAgent
 from services.creative.agents.architect_v2 import ArchitectAgentV2
+from services.creative.agents.interpreter import BusinessInterpreterAgent
 from services.creative.prompts.loader import PromptLoader
 from services.creative.prompts.builder import PromptBuilder
 from services.system_settings_service import SystemSettingsService
@@ -106,8 +107,43 @@ class CreativeOrchestrator:
             "status": "in_progress",
             "ai_model": model
         }
-        
+
         try:
+            # Stage 0: Interpreter (manual mode only)
+            # Expands the user's free-form description into a rich structured
+            # profile that replaces review-derived insights for the downstream agents.
+            if business_data.get("is_manual"):
+                logger.info(f"[{business_name}] Stage 0: Interpreting business description...")
+                stage_start = time.time()
+
+                interpreter = BusinessInterpreterAgent(model=model)
+                hard_facts = {
+                    k: business_data.get(k)
+                    for k in ("name", "phone", "email", "address", "city", "state")
+                }
+                interpreted = await interpreter.interpret(
+                    description=business_data.get("raw_description", ""),
+                    hard_facts=hard_facts,
+                )
+
+                # Merge interpreted fields into business_data so every downstream
+                # agent sees enriched data (name, category, services, etc.).
+                # Keep the original dict under "interpreted_profile" so the Analyst
+                # can use it as primary context instead of reviews.
+                business_data.update(interpreted)
+                business_data["interpreted_profile"] = interpreted
+
+                # If the interpreter resolved a real name and the placeholder was
+                # used, update business_name for logging.
+                business_name = business_data.get("name", business_name)
+
+                results["stage_0_duration_ms"] = (time.time() - stage_start) * 1000
+                logger.info(
+                    f"[{business_name}] Interpretation complete in "
+                    f"{results['stage_0_duration_ms']:.0f}ms: "
+                    f"'{interpreted.get('name')}' / {interpreted.get('category')}"
+                )
+
             # Stage 1: Analyst
             logger.info(f"[{business_name}] Stage 1/4: Analyzing business...")
             stage_start = time.time()
