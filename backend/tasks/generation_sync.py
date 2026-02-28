@@ -17,6 +17,7 @@ from core.database import get_db_session_sync, CeleryAsyncSessionLocal
 from core.outreach_enums import OutreachChannel
 from models.business import Business
 from models.site import GeneratedSite
+from services.activity.analyzer import compute_activity_status
 from services.creative.orchestrator import CreativeOrchestrator
 from services.hunter.scraper import OutscraperClient
 from services.sms.number_lookup import NumberLookupService
@@ -202,6 +203,32 @@ def generate_site_for_business(self, business_id: str):
                         "reason": "landline_no_email",
                         "business_id": business_id,
                         "line_type": business.phone_line_type,
+                    }
+                # ─────────────────────────────────────────────────────────────
+
+                # ── Activity check ────────────────────────────────────────────
+                # Skip businesses that show no signs of activity within the
+                # configured windows (18-month review cutoff, 2-year Facebook
+                # cutoff when review data is absent).
+                activity = compute_activity_status(
+                    last_review_date=business.last_review_date,
+                    last_facebook_post_date=business.last_facebook_post_date,
+                )
+                if not activity.is_eligible:
+                    logger.info(
+                        "Skipping site generation for %s — %s",
+                        business.name,
+                        activity.detail,
+                    )
+                    business.website_status = "ineligible"
+                    business.generation_queued_at = None
+                    business.generation_started_at = None
+                    await db.commit()
+                    return {
+                        "status": "skipped",
+                        "reason": activity.ineligibility_reason,
+                        "business_id": business_id,
+                        "detail": activity.detail,
                     }
                 # ─────────────────────────────────────────────────────────────
 

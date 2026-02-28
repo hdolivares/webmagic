@@ -214,7 +214,8 @@ class HunterService:
             businesses_verified_by_llm = 0
             businesses_needing_generation = []
             businesses_to_validate = []  # For async Playwright validation
-            
+            businesses_for_facebook_check = []  # For async Facebook activity enrichment
+
             # Initialize data quality service for enhanced processing
             data_quality_service = DataQualityService()
             
@@ -468,7 +469,19 @@ class HunterService:
                                     logger.warning(f"Failed to publish validation progress: {e}")
                         else:
                             logger.warning(f"  └─ ⚠️  Failed to save business")
-                        
+
+                        # Track businesses that need Facebook activity enrichment:
+                        # only when the feature is enabled and the business has a
+                        # Facebook URL in its raw_data but no date yet.
+                        if business and settings.ENABLE_FACEBOOK_ACTIVITY_CHECK:
+                            fb_url = (
+                                (biz_data.get("raw_data") or {})
+                                .get("social_urls", {})
+                                .get("facebook")
+                            )
+                            if fb_url and business.last_facebook_post_date is None:
+                                businesses_for_facebook_check.append(str(business.id))
+
                         # Rate limiting for ScrapingDog (if we ran deep verification)
                         if biz_data.get("verified") or biz_data["website_validation_status"] == "confirmed_missing":
                             logger.debug(f"  └─ ⏱️  Rate limit: waiting {scrapingdog_delay}s...")
@@ -502,7 +515,20 @@ class HunterService:
                     f"Queued {queue_result['queued']}/{len(businesses_needing_generation)} "
                     f"businesses for website generation"
                 )
-            
+
+            # **Queue Facebook activity enrichment**
+            # Each task costs 5 ScrapingDog credits (same as a Google Search lookup).
+            # Runs asynchronously so it never blocks the scrape loop.
+            if businesses_for_facebook_check:
+                try:
+                    from tasks.activity_tasks import batch_fetch_facebook_activity
+                    batch_fetch_facebook_activity.delay(businesses_for_facebook_check)
+                    logger.info(
+                        f"Queued {len(businesses_for_facebook_check)} businesses for Facebook activity check"
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to queue Facebook activity tasks: {e}")
+
             # **FIX: Coverage was already created at the start, just update it now**
             # **NEW Phase 2 & 3: Store detailed scrape metrics**
             last_scrape_details = {
@@ -779,7 +805,8 @@ class HunterService:
         # Process businesses with simple website validator for initial filtering
         qualified_count = 0
         businesses_to_validate = []  # Track businesses that need deep validation
-        
+        businesses_for_facebook_check = []  # Track businesses for Facebook activity enrichment
+
         async with WebsiteValidator() as website_validator:
             for biz_data in raw_businesses:
                 try:
@@ -821,7 +848,17 @@ class HunterService:
                             business.website_url and 
                             business.website_validation_status == "pending"):
                             businesses_to_validate.append(str(business.id))
-                            
+
+                        # Queue Facebook activity check when a URL is available
+                        if business and settings.ENABLE_FACEBOOK_ACTIVITY_CHECK:
+                            fb_url = (
+                                (biz_data.get("raw_data") or {})
+                                .get("social_urls", {})
+                                .get("facebook")
+                            )
+                            if fb_url and business.last_facebook_post_date is None:
+                                businesses_for_facebook_check.append(str(business.id))
+
                 except Exception as e:
                     logger.error(f"Error processing business: {e}")
                     continue
@@ -847,6 +884,17 @@ class HunterService:
                 logger.error(f"Failed to queue V2 validation tasks: {e}", exc_info=True)
                 # Don't fail scraping if validation queueing fails
         
+        # Queue Facebook activity enrichment
+        if businesses_for_facebook_check:
+            try:
+                from tasks.activity_tasks import batch_fetch_facebook_activity
+                batch_fetch_facebook_activity.delay(businesses_for_facebook_check)
+                logger.info(
+                    f"Queued {len(businesses_for_facebook_check)} businesses for Facebook activity check"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to queue Facebook activity tasks: {e}")
+
         # Update coverage
         await self.coverage_service.update_or_create_coverage(
             city=city,
