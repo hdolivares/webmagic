@@ -12,6 +12,7 @@ import type {
   CoverageGrid,
   GeneratedSite,
   GenerateSiteRequest,
+  ManualGenerationRequest,
   PromptTemplate,
   PromptSetting,
   PromptSettingUpdate,
@@ -386,6 +387,51 @@ class ApiClient {
   async generateSite(data: GenerateSiteRequest): Promise<{ site_id: string }> {
     const response = await this.client.post('/sites/generate', data)
     return response.data
+  }
+
+  // ─── Manual Site Builder ──────────────────────────────────────────────────
+
+  /**
+   * Submit a manual site generation request.
+   * Returns a site_id that can be polled via getSiteDetail() until status is
+   * "completed" or "failed".
+   */
+  async generateManualSite(data: ManualGenerationRequest): Promise<{ site_id: string; status: string; message: string }> {
+    const response = await this.client.post('/sites/generate-manual', data)
+    return response.data
+  }
+
+  /**
+   * Poll a site's detail until its status is "completed" or "failed".
+   * Resolves with the final GeneratedSite object or rejects on "failed".
+   */
+  async pollSiteUntilComplete(
+    siteId: string,
+    onProgress?: (status: string) => void,
+    intervalMs = 3000,
+    timeoutMs = 600_000,
+  ): Promise<GeneratedSite> {
+    const start = Date.now()
+    return new Promise((resolve, reject) => {
+      const tick = async () => {
+        try {
+          const site = await this.getSite(siteId)
+          onProgress?.(site.status)
+          if (site.status === 'completed') {
+            resolve(site)
+          } else if (site.status === 'failed') {
+            reject(new Error(`Site generation failed for ${siteId}`))
+          } else if (Date.now() - start > timeoutMs) {
+            reject(new Error('Site generation timed out'))
+          } else {
+            setTimeout(tick, intervalMs)
+          }
+        } catch (err) {
+          reject(err)
+        }
+      }
+      setTimeout(tick, intervalMs)
+    })
   }
 
   // ============================================

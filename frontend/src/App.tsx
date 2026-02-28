@@ -22,6 +22,7 @@ import { BusinessesPage } from '@/pages/Businesses/BusinessesPage'
 import { SitesPage } from '@/pages/Sites/SitesPage'
 import { GeneratedSitesPage } from '@/pages/Sites/GeneratedSitesPage'
 import { GeneratedSiteDetailPage } from '@/pages/Sites/GeneratedSiteDetailPage'
+import ManualSiteBuilderPage from '@/pages/ManualSiteBuilder/ManualSiteBuilderPage'
 import { CampaignsPage } from '@/pages/Campaigns/CampaignsPage'
 import { CustomersPage } from '@/pages/Customers/CustomersPage'
 import { CoveragePage } from '@/pages/Coverage/CoveragePage'
@@ -113,6 +114,7 @@ function App() {
             <Route path="sites" element={<SitesPage />} />
             <Route path="sites/generated" element={<GeneratedSitesPage />} />
             <Route path="sites/generated/:siteId" element={<GeneratedSiteDetailPage />} />
+            <Route path="sites/manual-builder" element={<ManualSiteBuilderPage />} />
             <Route path="sites/image-generator" element={<ImageGenerationPage />} />
             <Route path="campaigns" element={<CampaignsPage />} />
             <Route path="messages" element={<MessagesPage />} />

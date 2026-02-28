@@ -202,6 +202,11 @@ document.addEventListener('DOMContentLoaded', () => {
 3. Use exactly these delimiters: === HTML ===, === CSS ===, === JS ===, === METADATA ===
 """
         
+        # STEP 6b: Inject ecommerce layout instructions when requested
+        website_type = business_data.get("website_type", "informational")
+        if website_type == "ecommerce":
+            user_prompt += self._build_ecommerce_instructions()
+
         # STEP 7: Generate code using text (not JSON)
         raw_output = await self.generate(system_prompt, user_prompt, max_tokens=64000)
         
@@ -241,6 +246,55 @@ document.addEventListener('DOMContentLoaded', () => {
         
         return website
     
+    # ── Ecommerce layout instructions ─────────────────────────────────────────
+
+    def _build_ecommerce_instructions(self) -> str:
+        """
+        Return a prompt block that instructs the architect to produce an
+        ecommerce-style layout instead of the default informational layout.
+
+        The ecommerce site is a visually complete static HTML page — no real
+        cart, checkout, or payment backend is included.
+        """
+        return """
+
+---
+**WEBSITE TYPE: E-COMMERCE**
+
+Override the default informational layout with a full e-commerce page layout.
+Use this exact section order in the METADATA "sections" array:
+["nav", "hero", "categories", "featured-products", "deals", "bestsellers", "social-proof", "newsletter", "footer"]
+
+Layout requirements:
+1. NAV — sticky header with logo, category links, a cart icon (decorative, no JS logic), and search bar (cosmetic only).
+2. HERO — full-width banner with "Shop Now" CTA button and a compelling headline about the shop.
+3. CATEGORIES — 3–6 visual category cards in a CSS grid, each with a category image placeholder, name, and "Browse →" link.
+4. FEATURED PRODUCTS — 4-product grid. Each product card must include:
+   - Product image (use img/services.jpg or a CSS placeholder if no image)
+   - Product name
+   - Short one-line description
+   - Price (use a realistic placeholder like "$29.99" or "$49.00")
+   - "Add to Cart" button (decorative — no real cart logic)
+   - Optional "Wishlist ♡" icon link
+5. DEALS OF THE DAY — a highlighted banner or 2-product row with a countdown timer label (static text "Limited time offer").
+6. BESTSELLERS — horizontal scroll row of 4–6 compact product cards with name, price, and star rating (5 static stars).
+7. SOCIAL PROOF — 2-3 short customer quote cards (testimonials) and a trust badge row (e.g. "Free Shipping", "30-Day Returns", "Secure Checkout").
+8. NEWSLETTER SIGNUP — centered email capture section: headline + email input + "Subscribe" button.
+9. FOOTER — multi-column with logo, shop links, social links, and copyright.
+
+CSS rules specific to ecommerce:
+- Product cards: use `display: grid` or `display: flex` for the product grid, with `gap: var(--spacing-lg)`.
+- Product images: `aspect-ratio: 1; object-fit: cover; border-radius: var(--border-radius);`.
+- "Add to Cart" button: uses `--color-primary`, fully rounded (`border-radius: 2rem`).
+- Price: bold, `--color-primary` or a dedicated `--color-price` variable.
+- Strikethrough original price (if showing a deal): `text-decoration: line-through; color: var(--color-text-muted);`.
+- Cart icon in nav: decorative SVG or Unicode cart symbol with a small badge dot — no click handler needed.
+- Sticky nav: `position: sticky; top: 0; z-index: 100; background: var(--color-surface); box-shadow: var(--shadow-md);`.
+
+Do NOT use Tailwind or any CSS framework. All styles must be in the === CSS === section using CSS variables.
+---
+"""
+
     # ── Image context ─────────────────────────────────────────────────────────
 
     def _build_image_context(self, images: List[Dict[str, Any]]) -> str:

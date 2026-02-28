@@ -2,7 +2,7 @@
 Base Agent class for all AI agents.
 Handles Claude API communication, error handling, and retry logic.
 """
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from anthropic import Anthropic, AsyncAnthropic
 from anthropic.types import Message
 import json
@@ -52,34 +52,37 @@ class BaseAgent:
     async def generate(
         self,
         system_prompt: str,
-        user_prompt: str,
+        user_prompt: Union[str, List[Dict[str, Any]]],
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None
     ) -> str:
         """
         Generate text completion from Claude using streaming.
-        
+
         Uses streaming internally to support large max_tokens (up to 64K)
         without hitting the 10-minute timeout limit for non-streaming requests.
         Returns the complete response as a single string.
-        
+
         Args:
-            system_prompt: System instructions
-            user_prompt: User message
-            temperature: Override default temperature
-            max_tokens: Override default max_tokens
-            
+            system_prompt: System instructions.
+            user_prompt: Either a plain string (text-only) or a list of Anthropic
+                content blocks (e.g. ``[{"type": "image", ...}, {"type": "text", ...}]``)
+                for multimodal / vision calls.
+            temperature: Override default temperature.
+            max_tokens: Override default max_tokens.
+
         Returns:
-            Generated text
-            
+            Generated text.
+
         Raises:
-            ExternalAPIException: If API call fails
+            ExternalAPIException: If API call fails.
         """
         try:
             logger.info(f"[{self.agent_name}] Generating completion...")
+            prompt_len = len(user_prompt) if isinstance(user_prompt, str) else len(user_prompt)
             logger.debug(f"System prompt length: {len(system_prompt)} chars")
-            logger.debug(f"User prompt length: {len(user_prompt)} chars")
-            
+            logger.debug(f"User prompt length/blocks: {prompt_len}")
+
             # Use streaming to avoid timeout limits on large max_tokens
             async with self.client.messages.stream(
                 model=self.model,
@@ -127,7 +130,7 @@ class BaseAgent:
     async def generate_json(
         self,
         system_prompt: str,
-        user_prompt: str,
+        user_prompt: Union[str, List[Dict[str, Any]]],
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None
     ) -> Dict[str, Any]:

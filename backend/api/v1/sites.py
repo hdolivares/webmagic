@@ -13,11 +13,13 @@ from typing import Optional
 from uuid import UUID
 import io
 import logging
+import re
 
 from core.database import get_db
 from api.deps import get_current_user
 from api.schemas.site import (
     SiteGenerateRequest,
+    ManualGenerationRequest,
     SiteResponse,
     SiteDetailResponse,
     SiteListResponse,
@@ -30,6 +32,8 @@ from services.creative.site_service import SiteService
 from services.creative.orchestrator import CreativeOrchestrator
 from services.crm import BusinessLifecycleService
 from models.user import AdminUser
+from models.business import Business
+from models.site import GeneratedSite
 
 router = APIRouter(prefix="/sites", tags=["sites"])
 logger = logging.getLogger(__name__)
@@ -137,6 +141,104 @@ async def generate_site(
         message=f"Site generation started for {business.name}",
         duration_ms=None,
         summary=None
+    )
+
+
+@router.post("/generate-manual", response_model=SiteGenerationResult)
+async def generate_manual_site(
+    request: ManualGenerationRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user),
+):
+    """
+    Generate a website from a free-form business description.
+
+    Creates a Business record using provided details (or a placeholder derived
+    from the description), stores the full request in ``raw_data["manual_input"]``,
+    and queues the existing generation pipeline.  Stage 0 of the pipeline
+    (BusinessInterpreterAgent) will interpret and enrich the description before
+    the main agents run.
+    """
+    from tasks.generation_sync import generate_site_for_business  # lazy import to avoid circular
+
+    # Derive a display name: use the hard-fact name if given, otherwise take
+    # the first 5 words of the description as a working title.
+    display_name: str = (
+        request.name
+        or " ".join(request.description.split()[:5]).rstrip(".,!?")
+    )
+
+    # Generate a URL-safe slug from the display name.
+    base_slug = re.sub(r"[^a-z0-9]+", "-", display_name.lower()).strip("-")
+    # Ensure uniqueness by appending a short random suffix.
+    import uuid as _uuid
+    slug = f"{base_slug}-{str(_uuid.uuid4())[:8]}"
+
+    # Build raw_data payload — everything the pipeline needs.
+    manual_input = {
+        "description": request.description,
+        "website_type": request.website_type,
+        "branding_notes": request.branding_notes,
+        "branding_images": request.branding_images or [],
+    }
+    hard_facts = {
+        k: getattr(request, k)
+        for k in ("name", "phone", "email", "address", "city", "state")
+        if getattr(request, k)
+    }
+    manual_input.update(hard_facts)
+
+    raw_data = {
+        "manual_generation": True,
+        "manual_input": manual_input,
+    }
+
+    # Create the Business record.
+    business = Business(
+        name=display_name,
+        slug=slug,
+        phone=request.phone,
+        email=request.email,
+        address=request.address,
+        city=request.city,
+        state=request.state,
+        website_status="queued",
+        raw_data=raw_data,
+    )
+    db.add(business)
+    await db.flush()
+    await db.refresh(business)
+
+    # Create a placeholder GeneratedSite record so the frontend can poll its status.
+    site_service = SiteService(db)
+    subdomain = await site_service.generate_subdomain(display_name)
+    site = GeneratedSite(
+        business_id=business.id,
+        subdomain=subdomain,
+        status="generating",
+    )
+    db.add(site)
+    await db.flush()
+    await db.refresh(site)
+    await db.commit()
+
+    # Queue the existing generation task (it now reads manual_input from raw_data).
+    generate_site_for_business.delay(str(business.id))
+
+    logger.info(
+        "Manual site generation queued for '%s' (business=%s, site=%s, type=%s)",
+        display_name,
+        business.id,
+        site.id,
+        request.website_type,
+    )
+
+    return SiteGenerationResult(
+        site_id=site.id,
+        status="generating",
+        message=f"Manual site generation started for '{display_name}'",
+        duration_ms=None,
+        summary=None,
     )
 
 
