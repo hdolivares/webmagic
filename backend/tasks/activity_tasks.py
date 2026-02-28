@@ -19,7 +19,10 @@ from sqlalchemy import select, update
 
 from core.database import CeleryAsyncSessionLocal
 from models.business import Business
-from services.activity.facebook_scraper import FacebookActivityScraper
+from services.activity.facebook_scraper import (
+    FacebookActivityScraper,
+    extract_facebook_url_from_raw,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -144,14 +147,7 @@ def _extract_facebook_url(business: Business) -> str | None:
     """
     Extract the Facebook page URL from a Business record's raw_data.
 
-    Returns the URL string, or None if not present.
+    Delegates to ``extract_facebook_url_from_raw`` which checks both the
+    explicit social_urls map and the ScrapingDog organic search results.
     """
-    raw_data = business.raw_data or {}
-    social_urls = raw_data.get("social_urls") or {}
-
-    # Outscraper stores it under "facebook" within social_urls
-    url = social_urls.get("facebook") or social_urls.get("Facebook")
-    if url and "facebook.com" in url:
-        return url
-
-    return None
+    return extract_facebook_url_from_raw(business.raw_data or {})
