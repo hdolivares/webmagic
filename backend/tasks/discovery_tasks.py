@@ -22,6 +22,7 @@ from core.validation_enums import (
     URLSource,
     ValidationConfig
 )
+from services.activity.analyzer import is_business_closed
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +160,28 @@ def discover_missing_websites_v2(self, business_id: str) -> Dict[str, Any]:
                     "status": "raw_data_url_found",
                     "url": raw_data_url,
                     "validation_task_id": validation_task.id
+                }
+
+            # ================================================================
+            # CLOSED BUSINESS GUARD — stop here, don't spend ScrapingDog
+            # credits on a business we will never generate a site for.
+            # ================================================================
+            if is_business_closed(business):
+                closed_status = (
+                    business.business_status
+                    or (business.raw_data or {}).get("business_status", "unknown")
+                )
+                logger.info(
+                    "Skipping ScrapingDog discovery for closed business %r "
+                    "(business_status=%r)",
+                    business.name,
+                    closed_status,
+                )
+                return {
+                    "business_id": business_id,
+                    "status": "skipped",
+                    "reason": "business_closed",
+                    "business_status": closed_status,
                 }
 
             # ================================================================
@@ -607,6 +630,11 @@ def _queue_facebook_check(business: Business, raw_data: dict) -> None:
     from core.config import get_settings
     settings = get_settings()
     if not settings.ENABLE_FACEBOOK_ACTIVITY_CHECK:
+        return
+    if is_business_closed(business):
+        logger.info(
+            "Skipping Facebook enrichment queue for closed business %r", business.name
+        )
         return
     if business.last_facebook_post_date is not None:
         return

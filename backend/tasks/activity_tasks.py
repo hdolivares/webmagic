@@ -26,6 +26,7 @@ from sqlalchemy import select
 
 from core.database import CeleryAsyncSessionLocal
 from models.business import Business
+from services.activity.analyzer import is_business_closed
 from services.activity.facebook_scraper import (
     FacebookActivityScraper,
     FacebookPageData,
@@ -80,6 +81,14 @@ async def _fetch_facebook_activity_async(business_id: str) -> Dict[str, Any]:
         if not business:
             logger.error("fetch_facebook_activity: Business not found: %s", business_id)
             return {"status": "error", "business_id": business_id, "error": "not_found"}
+
+        if is_business_closed(business):
+            logger.info(
+                "Skipping Facebook enrichment for closed business: %r (id=%s)",
+                business.name,
+                business_id,
+            )
+            return {"status": "skipped", "business_id": business_id, "reason": "business_closed"}
 
         facebook_url = _extract_facebook_url(business)
         if not facebook_url:
