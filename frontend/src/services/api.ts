@@ -501,6 +501,11 @@ class ApiClient {
     return response.data
   }
 
+  async regenerateSite(siteId: string): Promise<{ site_id: string; status: string; message: string }> {
+    const response = await this.client.post(`/sites/${siteId}/regenerate`)
+    return response.data
+  }
+
   // ============================================
   // PROMPT SETTINGS METHODS
   // ============================================

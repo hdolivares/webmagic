@@ -13,6 +13,8 @@ import {
   Phone,
   MapPin,
   Globe,
+  PhoneOff,
+  ImagePlus,
   Calendar,
   RefreshCw,
   Monitor,
@@ -22,7 +24,8 @@ import {
   Download,
 } from 'lucide-react'
 import { api } from '@/services/api'
-import { Badge, Button, Card, CardBody } from '@/components/ui'
+import { Badge, Button, Card, CardBody, ConfirmModal } from '@/components/ui'
+import type { ConfirmAction } from '@/components/ui'
 
 // Detect closed/temporarily-closed status from the business record.
 // Falls back to raw_data for records where the model column isn't yet populated.
@@ -59,6 +62,12 @@ export const GeneratedSiteDetailPage = () => {
   const queryClient = useQueryClient()
   const [iframeFullscreen, setIframeFullscreen] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [pendingAction, setPendingAction] = useState<ConfirmAction | null>(null)
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['generated-site-detail', siteId] })
+    queryClient.invalidateQueries({ queryKey: ['generated-sites'] })
+  }
 
   const exportMutation = useMutation({
     mutationFn: () => api.exportSiteFiles(siteId!),
@@ -76,6 +85,63 @@ export const GeneratedSiteDetailPage = () => {
       setExportError(msg)
     },
   })
+
+  const regenerateMutation = useMutation({
+    mutationFn: () => api.regenerateSite(siteId!),
+    onSuccess: () => {
+      invalidate()
+      setPendingAction(null)
+    },
+    onError: (err: any) => {
+      setPendingAction(null)
+      alert(`❌ Regeneration failed: ${err?.response?.data?.detail ?? err?.message}`)
+    },
+  })
+
+  const regenImagesMutation = useMutation({
+    mutationFn: () => api.regenerateSiteImages(siteId!),
+    onSuccess: (data) => {
+      invalidate()
+      setPendingAction(null)
+      if (data.failed_slots?.length) {
+        alert(`⚠️ Images regenerated with some failures. Failed slots: ${data.failed_slots.join(', ')}`)
+      }
+    },
+    onError: (err: any) => {
+      setPendingAction(null)
+      alert(`❌ Image regeneration failed: ${err?.response?.data?.detail ?? err?.message}`)
+    },
+  })
+
+  const markHasWebsiteMutation = useMutation({
+    mutationFn: () => api.markSiteHasWebsite(siteId!),
+    onSuccess: () => {
+      invalidate()
+      setPendingAction(null)
+    },
+    onError: (err: any) => {
+      setPendingAction(null)
+      alert(`❌ Failed: ${err?.response?.data?.detail ?? err?.message}`)
+    },
+  })
+
+  const markUnreachableMutation = useMutation({
+    mutationFn: () => api.markSiteUnreachable(siteId!),
+    onSuccess: () => {
+      invalidate()
+      setPendingAction(null)
+    },
+    onError: (err: any) => {
+      setPendingAction(null)
+      alert(`❌ Failed: ${err?.response?.data?.detail ?? err?.message}`)
+    },
+  })
+
+  const isAnyMutationPending =
+    regenerateMutation.isPending ||
+    regenImagesMutation.isPending ||
+    markHasWebsiteMutation.isPending ||
+    markUnreachableMutation.isPending
 
   const { data: site, isLoading, error } = useQuery({
     queryKey: ['generated-site-detail', siteId],
@@ -347,11 +413,122 @@ export const GeneratedSiteDetailPage = () => {
                 {exportError && (
                   <p className="text-xs text-error px-1">{exportError}</p>
                 )}
+
+                {/* ── Divider */}
+                {(site.status === 'completed' || site.status === 'published' || site.status === 'failed') && (
+                  <div className="border-t border-border pt-2 mt-1 space-y-2">
+                    <p className="text-xs text-text-secondary font-medium uppercase tracking-wide">
+                      Site Management
+                    </p>
+
+                    {/* Regenerate site — any status */}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full flex items-center justify-center gap-2 text-warning-700 border-warning-300 hover:bg-warning-50"
+                      onClick={() =>
+                        setPendingAction({
+                          title: 'Regenerate Site?',
+                          message:
+                            'This will clear the existing HTML, CSS and JS and re-run the full AI pipeline from scratch. The process takes 1–3 minutes.',
+                          confirmLabel: 'Yes, Regenerate',
+                          variant: 'warning',
+                          onConfirm: () => regenerateMutation.mutate(),
+                        })
+                      }
+                      disabled={regenerateMutation.isPending}
+                    >
+                      <RefreshCw className={`w-4 h-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
+                      {regenerateMutation.isPending ? 'Queueing…' : 'Regenerate Site'}
+                    </Button>
+
+                    {/* Regen images — completed / published only */}
+                    {(site.status === 'completed' || site.status === 'published') && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="w-full flex items-center justify-center gap-2 text-purple-700 hover:bg-purple-50"
+                        onClick={() =>
+                          setPendingAction({
+                            title: 'Regenerate Images?',
+                            message:
+                              'This will regenerate the AI images (hero, about, services) using the original brand context. The existing HTML structure is kept — only the image files are overwritten.',
+                            confirmLabel: 'Yes, Regenerate Images',
+                            variant: 'default',
+                            onConfirm: () => regenImagesMutation.mutate(),
+                          })
+                        }
+                        disabled={regenImagesMutation.isPending}
+                      >
+                        <ImagePlus className={`w-4 h-4 ${regenImagesMutation.isPending ? 'animate-spin' : ''}`} />
+                        {regenImagesMutation.isPending ? 'Generating…' : 'Regenerate Images'}
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Status actions */}
+                {site.status !== 'superseded' && (
+                  <div className="border-t border-border pt-2 mt-1 space-y-2">
+                    <p className="text-xs text-text-secondary font-medium uppercase tracking-wide">
+                      Flag Business
+                    </p>
+
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full flex items-center justify-center gap-2 text-warning-700 hover:bg-warning-50"
+                      onClick={() =>
+                        setPendingAction({
+                          title: 'Mark as Has Website?',
+                          message:
+                            'This flags the business as already having their own website. The generated site will be marked as superseded and removed from campaigns.',
+                          confirmLabel: 'Yes, Mark as Has Website',
+                          variant: 'warning',
+                          onConfirm: () => markHasWebsiteMutation.mutate(),
+                        })
+                      }
+                      disabled={markHasWebsiteMutation.isPending}
+                    >
+                      <Globe className="w-4 h-4" />
+                      Has Website
+                    </Button>
+
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full flex items-center justify-center gap-2 text-error-600 hover:bg-error-50"
+                      onClick={() =>
+                        setPendingAction({
+                          title: 'Mark as Unreachable?',
+                          message:
+                            'This flags the business as unreachable (no valid phone or email found). The generated site will be marked as superseded.',
+                          confirmLabel: 'Yes, Mark as Unreachable',
+                          variant: 'danger',
+                          onConfirm: () => markUnreachableMutation.mutate(),
+                        })
+                      }
+                      disabled={markUnreachableMutation.isPending}
+                    >
+                      <PhoneOff className="w-4 h-4" />
+                      Unreachable
+                    </Button>
+                  </div>
+                )}
               </CardBody>
             </Card>
           </div>
         )}
       </div>
+
+      {/* Confirmation modal */}
+      {pendingAction && (
+        <ConfirmModal
+          {...pendingAction}
+          isLoading={isAnyMutationPending}
+          onCancel={() => setPendingAction(null)}
+        />
+      )}
     </div>
   )
 }
