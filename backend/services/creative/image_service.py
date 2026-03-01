@@ -178,6 +178,42 @@ _CATEGORY_PROMPTS: Dict[str, List[Dict[str, str]]] = {
             ),
         },
     ],
+    # ── Pet store / cat shop ──────────────────────────────────────────────────
+    "pet_store": [
+        {
+            "slot": "hero",
+            "aspect": "16:9",
+            "desc": (
+                "A gorgeous, cozy modern home living room bathed in warm natural light. "
+                "A beautiful fluffy cat is comfortably perched on a tall multi-level cat "
+                "tower with sisal posts and plush hammocks. Nearby, a sleek automatic cat "
+                "water fountain gently trickles. Scattered around are colorful cat toys, "
+                "a plush round cat bed, and a stylish ceramic elevated feeder on a bamboo "
+                "stand. The room feels warm, premium, and pet-loving. No humans. "
+                "Cinematic wide-angle photography, 8K, ultra-realistic, warm interior lighting."
+            ),
+        },
+        {
+            "slot": "about",
+            "aspect": "4:3",
+            "desc": (
+                "A flat-lay arrangement of premium cat accessories on a clean white surface: "
+                "a soft plush cat bed, a sparkly collar with a heart tag, a feather wand toy, "
+                "a small bag of cat treats, and a beautiful ceramic bowl. Soft overhead studio "
+                "lighting, pastel pink and white tones, lifestyle product photography."
+            ),
+        },
+        {
+            "slot": "services",
+            "aspect": "4:3",
+            "desc": (
+                "A collection of top-tier cat products artfully displayed on a wooden shelf: "
+                "a modern white automatic water fountain, a plush round bed, a sisal scratcher, "
+                "and a set of colorful toys. Clean white background, warm lighting, premium "
+                "product lifestyle photography."
+            ),
+        },
+    ],
     "veterinarian": [
         {
             "slot": "hero",
@@ -291,8 +327,12 @@ _CATEGORY_KEYWORDS: Dict[str, str] = {
     "psychiatr": "counselor",
     "mental health": "counselor",
     "vet": "veterinarian",
-    "animal": "veterinarian",
-    "pet": "veterinarian",
+    "animal": "pet_store",
+    "pet": "pet_store",
+    "cat": "pet_store",
+    "gato": "pet_store",
+    "michi": "pet_store",
+    "mascota": "pet_store",
     "account": "accountant",
     "cpa": "accountant",
     "tax": "accountant",

@@ -206,7 +206,8 @@ document.addEventListener('DOMContentLoaded', () => {
         # STEP 6b: Inject ecommerce layout instructions when requested
         website_type = business_data.get("website_type", "informational")
         if website_type == "ecommerce":
-            user_prompt += self._build_ecommerce_instructions()
+            currency_symbol = business_data.get("currency_symbol") or "$"
+            user_prompt += self._build_ecommerce_instructions(currency_symbol=currency_symbol)
 
         # STEP 7: Generate code using text (not JSON)
         raw_output = await self.generate(system_prompt, user_prompt, max_tokens=64000)
@@ -249,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     # ── Ecommerce layout instructions ─────────────────────────────────────────
 
-    def _build_ecommerce_instructions(self) -> str:
+    def _build_ecommerce_instructions(self, currency_symbol: str = "$") -> str:
         """
         Return a prompt block that instructs the architect to produce an
         ecommerce-style layout instead of the default informational layout.
@@ -257,7 +258,8 @@ document.addEventListener('DOMContentLoaded', () => {
         The ecommerce site is a visually complete static HTML page — no real
         cart, checkout, or payment backend is included.
         """
-        return """
+        _CUR = currency_symbol  # short alias for the template replacement below
+        _template = """
 
 ---
 **WEBSITE TYPE: E-COMMERCE**
@@ -278,7 +280,7 @@ Layout requirements:
      NEVER use the same image for more than one card.
    - Product name — MUST describe what is depicted in the card's image
    - Short one-line description that matches the image content
-   - Price (realistic placeholder like "$29.99" or "$49.00")
+   - Price (realistic placeholder like "__CUR__29.99" or "__CUR__49.00" — always use __CUR__ as the currency prefix)
    - "Add to Cart" button (decorative — no real cart logic)
    - Optional "Wishlist ♡" icon link
    - Optional discount badge (e.g. "Nuevo", "Popular", "-20%")
@@ -332,6 +334,7 @@ CSS rules specific to ecommerce:
 Do NOT use Tailwind or any CSS framework. All styles must be in the === CSS === section using CSS variables.
 ---
 """
+        return _template.replace("__CUR__", _CUR)
 
     # ── Image context ─────────────────────────────────────────────────────────
 

@@ -150,6 +150,7 @@ export default function ManualSiteBuilderPage() {
   // Pricing (optional — defaults applied on the backend)
   const [oneTimePrice, setOneTimePrice] = useState<string>('')
   const [monthlyPrice, setMonthlyPrice] = useState<string>('')
+  const [currencySymbol, setCurrencySymbol] = useState<string>('$')
 
   // ── Generation state ─────────────────────────────────────────────────────────
   const [isGenerating, setIsGenerating]     = useState(false)
@@ -215,6 +216,7 @@ export default function ManualSiteBuilderPage() {
       ...(brandingImages.length && { branding_images: brandingImages }),
       ...(parsedOneTime !== undefined && !isNaN(parsedOneTime) && { one_time_price: parsedOneTime }),
       ...(parsedMonthly !== undefined && !isNaN(parsedMonthly) && { monthly_price: parsedMonthly }),
+      ...(currencySymbol.trim() && currencySymbol.trim() !== '$' && { currency_symbol: currencySymbol.trim() }),
     }
 
     try {
@@ -501,13 +503,35 @@ export default function ManualSiteBuilderPage() {
                   <span className="manual-builder__optional-badge">Optional</span>
                 </h2>
 
+                {/* Currency symbol row */}
+                <div className="manual-builder__field" style={{ marginBottom: '1rem' }}>
+                  <label htmlFor="currency-symbol" className="manual-builder__label">
+                    Currency symbol
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <input
+                      id="currency-symbol"
+                      type="text"
+                      maxLength={8}
+                      value={currencySymbol}
+                      onChange={(e) => setCurrencySymbol(e.target.value)}
+                      placeholder="$"
+                      className="manual-builder__price-input"
+                      style={{ maxWidth: '6rem' }}
+                    />
+                    <span className="manual-builder__pricing-hint" style={{ margin: 0 }}>
+                      e.g. <code>$</code>&nbsp;USD · <code>Q</code>&nbsp;Quetzal · <code>€</code>&nbsp;Euro
+                    </span>
+                  </div>
+                </div>
+
                 <div className="manual-builder__pricing-row">
                   <div className="manual-builder__field">
                     <label htmlFor="price-one-time" className="manual-builder__label">
                       One-time claim price
                     </label>
                     <div className="manual-builder__price-input-wrap">
-                      <span className="manual-builder__price-symbol">$</span>
+                      <span className="manual-builder__price-symbol">{currencySymbol || '$'}</span>
                       <input
                         id="price-one-time"
                         type="number"
@@ -526,7 +550,7 @@ export default function ManualSiteBuilderPage() {
                       Monthly subscription
                     </label>
                     <div className="manual-builder__price-input-wrap">
-                      <span className="manual-builder__price-symbol">$</span>
+                      <span className="manual-builder__price-symbol">{currencySymbol || '$'}</span>
                       <input
                         id="price-monthly"
                         type="number"
@@ -543,6 +567,7 @@ export default function ManualSiteBuilderPage() {
 
                 {/* Live pricing breakdown */}
                 {(oneTimePrice !== '' || monthlyPrice !== '') && (() => {
+                  const cur     = currencySymbol || '$'
                   const total   = parseFloat(oneTimePrice)  || 0
                   const monthly = parseFloat(monthlyPrice)  || 0
                   const setup   = total - monthly
@@ -551,23 +576,23 @@ export default function ManualSiteBuilderPage() {
                       <div className="manual-builder__pricing-breakdown-row">
                         <span>Setup fee (one-time)</span>
                         <span className="manual-builder__pricing-breakdown-value">
-                          ${fmtPrice(Math.max(0, setup))}
+                          {cur}{fmtPrice(Math.max(0, setup))}
                         </span>
                       </div>
                       <div className="manual-builder__pricing-breakdown-row">
                         <span>+ First month&apos;s subscription</span>
                         <span className="manual-builder__pricing-breakdown-value">
-                          ${fmtPrice(monthly)}
+                          {cur}{fmtPrice(monthly)}
                         </span>
                       </div>
                       <div className="manual-builder__pricing-breakdown-row manual-builder__pricing-breakdown-row--total">
                         <span>First charge (shown on claim bar)</span>
                         <span className="manual-builder__pricing-breakdown-value">
-                          ${fmtPrice(total)}
+                          {cur}{fmtPrice(total)}
                         </span>
                       </div>
                       <p className="manual-builder__pricing-hint">
-                        After the first payment, the customer is billed ${fmtPrice(monthly)}/month.
+                        After the first payment, the customer is billed {cur}{fmtPrice(monthly)}/month.
                       </p>
                     </div>
                   )

@@ -380,11 +380,16 @@ def generate_site_for_business(self, business_id: str):
                             "images": branding_images,
                         }
 
+                    currency_symbol = manual_input.get("currency_symbol")
+                    if currency_symbol:
+                        business_data["currency_symbol"] = currency_symbol
+
                     logger.info(
-                        "[Gen] Manual mode for %s — website_type=%s, branding=%s",
+                        "[Gen] Manual mode for %s — website_type=%s, branding=%s, currency=%s",
                         business.name,
                         business_data["website_type"],
                         "yes" if business_data.get("branding_context") else "no",
+                        business_data.get("currency_symbol", "$"),
                     )
 
                 # Pass subdomain so architect can generate and save images

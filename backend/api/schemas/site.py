@@ -74,6 +74,14 @@ class ManualGenerationRequest(BaseModel):
         ge=0,
         description="Monthly subscription price shown on the site. E.g. 30.",
     )
+    currency_symbol: Optional[str] = Field(
+        None,
+        max_length=8,
+        description=(
+            "Currency symbol or prefix used for all prices on the site. "
+            "Defaults to '$'. Use 'Q' for Guatemalan Quetzal, '€' for Euro, etc."
+        ),
+    )
 
 
 class SiteResponse(BaseModel):
