@@ -158,6 +158,11 @@ export interface ManualGenerationRequest {
    * Defaults to $97 when omitted.
    */
   monthly_price?: number
+  /**
+   * Currency symbol/prefix used for all product prices (default "$").
+   * E.g. "Q" for Guatemalan Quetzal → prices display as "Q 249.99".
+   */
+  currency_symbol?: string
 }
 
 // ============================================

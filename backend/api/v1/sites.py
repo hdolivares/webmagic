@@ -196,6 +196,8 @@ async def generate_manual_site(
         manual_input["one_time_price"] = request.one_time_price
     if request.monthly_price is not None:
         manual_input["monthly_price"] = request.monthly_price
+    if request.currency_symbol:
+        manual_input["currency_symbol"] = request.currency_symbol
 
     raw_data = {
         "manual_generation": True,
