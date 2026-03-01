@@ -12,6 +12,8 @@ from sqlalchemy import select, update
 from datetime import datetime
 import logging
 import asyncio
+import re
+import time
 
 from core.database import get_db_session_sync, CeleryAsyncSessionLocal
 from core.outreach_enums import OutreachChannel
@@ -411,6 +413,17 @@ def generate_site_for_business(self, business_id: str):
                     raise ValueError(
                         f"Generated HTML failed quality check: {html_len} bytes, "
                         "missing hero or nav content. Site will not be saved."
+                    )
+
+                # Stamp every img/*.jpg src with ?v=<timestamp> so Nginx/browser
+                # cache is bypassed after each generation — without this, the old
+                # cached images are served even though the files on disk are new.
+                if html_content:
+                    _v = int(time.time())
+                    html_content = re.sub(
+                        r'(src=["\'])img/([^"\'?]+\.jpg)(\?[^"\']*)?(["\'])',
+                        lambda m: f'{m.group(1)}img/{m.group(2)}?v={_v}{m.group(4)}',
+                        html_content,
                     )
 
                 site.html_content = html_content
