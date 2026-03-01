@@ -669,6 +669,70 @@ async def regenerate_site_images(
     }
 
 
+@router.post("/{site_id}/regenerate", response_model=SiteGenerationResult)
+async def regenerate_site(
+    site_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user),
+):
+    """
+    Regenerate a site from scratch.
+
+    Resets the existing GeneratedSite record (clears HTML/CSS/JS, sets status
+    back to "generating") and re-queues the Celery generation task for the
+    associated business.  Works regardless of the current site status — useful
+    when a site completed but the output is unsatisfactory.
+    """
+    from tasks.generation_sync import generate_site_for_business  # lazy import
+
+    result = await db.execute(select(GeneratedSite).where(GeneratedSite.id == site_id))
+    site = result.scalar_one_or_none()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    if not site.business_id:
+        raise HTTPException(status_code=400, detail="Site has no associated business — cannot regenerate")
+
+    # Fetch the business so we can reset its status too
+    biz_result = await db.execute(select(Business).where(Business.id == site.business_id))
+    business = biz_result.scalar_one_or_none()
+
+    # Reset site content and status
+    site.html_content = None
+    site.css_content = None
+    site.js_content = None
+    site.status = "generating"
+    site.error_message = None
+    site.error_category = None
+    site.deployed_at = None
+
+    # Reset business generation flags so the task doesn't skip the eligibility check
+    if business:
+        business.website_status = "queued"
+        business.generation_started_at = None
+        business.generation_completed_at = None
+
+    await db.commit()
+
+    # Re-queue the generation task
+    generate_site_for_business.delay(str(site.business_id))
+
+    logger.info(
+        "Site regeneration queued for site %s (business: %s — %s)",
+        site_id,
+        site.business_id,
+        business.name if business else "unknown",
+    )
+
+    return SiteGenerationResult(
+        site_id=site_id,
+        status="generating",
+        message=f"Site regeneration started for {business.name if business else str(site_id)}",
+        duration_ms=None,
+        summary=None,
+    )
+
+
 @router.post("/test-image-generation", response_model=ImageGenerationResponse)
 async def test_image_generation(
     request: ImageGenerationRequest,

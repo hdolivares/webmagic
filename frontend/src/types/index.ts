@@ -105,7 +105,7 @@ export interface GeneratedSite {
   brand_analysis?: Record<string, any>
   brand_concept?: Record<string, any>
   design_brief?: Record<string, any>
-  status: 'generating' | 'completed' | 'failed' | 'published' | 'draft'
+  status: 'generating' | 'completed' | 'failed' | 'published' | 'draft' | 'superseded'
   version?: number
   deployed_at?: string | null
   sold_at?: string | null
