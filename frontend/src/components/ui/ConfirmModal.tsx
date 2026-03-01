@@ -52,21 +52,18 @@ const VARIANT_CONFIG: Record<
 > = {
   danger: {
     icon: <AlertCircle className="w-6 h-6" />,
-    confirmClass:
-      'bg-error-500 hover:bg-error-600 text-white disabled:opacity-50',
-    iconClass: 'text-error-500 bg-error-50',
+    confirmClass: 'bg-error hover:bg-error-dark text-white disabled:opacity-50',
+    iconClass: 'text-error bg-error-light',
   },
   warning: {
     icon: <AlertTriangle className="w-6 h-6" />,
-    confirmClass:
-      'bg-warning-500 hover:bg-warning-600 text-white disabled:opacity-50',
-    iconClass: 'text-warning-600 bg-warning-50',
+    confirmClass: 'bg-warning hover:bg-warning-dark text-white disabled:opacity-50',
+    iconClass: 'text-warning-dark bg-warning-light',
   },
   default: {
     icon: <HelpCircle className="w-6 h-6" />,
-    confirmClass:
-      'bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-50',
-    iconClass: 'text-primary-500 bg-primary-50',
+    confirmClass: 'bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50',
+    iconClass: 'text-primary-600 bg-primary-100',
   },
 }
 
