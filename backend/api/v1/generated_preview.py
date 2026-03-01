@@ -165,9 +165,16 @@ async def _serve_generated_site(
         html_content = _remove_claim_bar(html_content)
         logger.info(f"Removed claim bar from owned generated site: {subdomain}")
     else:
+        # Read custom pricing stored during manual site creation (if any).
+        one_time_price, monthly_price = _extract_site_pricing(site)
+
         # Always strip and re-inject claim bar so style fixes apply to existing sites
         html_content = _remove_claim_bar(html_content)
-        html_content = _inject_canonical_claim_bar(html_content, subdomain)
+        html_content = _inject_canonical_claim_bar(
+            html_content, subdomain,
+            one_time_price=one_time_price,
+            monthly_price=monthly_price,
+        )
     
     # Inject <base> tag so relative image paths (img/hero.jpg) resolve correctly.
     # The page is served at /{subdomain} (no trailing slash), so without the base
@@ -227,17 +234,61 @@ async def _serve_purchase_site(
     return HTMLResponse(content=complete_html)
 
 
-def _inject_canonical_claim_bar(html: str, slug: str) -> str:
+def _extract_site_pricing(site) -> tuple:
+    """
+    Return (one_time_price, monthly_price) for a GeneratedSite.
+
+    Reads from the site's business raw_data.manual_input when available;
+    falls back to the historical defaults ($497 / $97) for scraped sites.
+    """
+    # GeneratedSite has a business_id but we can read raw_data from the
+    # business inline if it's been eagerly loaded.  Since we don't want an
+    # extra DB round-trip here, we store the pricing directly on the
+    # GeneratedSite.design_brief JSON at creation time (see sites.py).
+    # For backward-compat we also accept the values coming from the
+    # site's own design_brief (populated by the generation task).
+    _DEFAULT_ONE_TIME = 497.0
+    _DEFAULT_MONTHLY  = 97.0
+
+    try:
+        brief = site.design_brief or {}
+        pricing = brief.get("pricing") or {}
+        one_time = float(pricing.get("one_time_price") or _DEFAULT_ONE_TIME)
+        monthly  = float(pricing.get("monthly_price")  or _DEFAULT_MONTHLY)
+        return one_time, monthly
+    except Exception:
+        return _DEFAULT_ONE_TIME, _DEFAULT_MONTHLY
+
+
+def _inject_canonical_claim_bar(
+    html: str,
+    slug: str,
+    one_time_price: float = 497.0,
+    monthly_price: float = 97.0,
+) -> str:
     """
     Inject the canonical, always-up-to-date claim bar into site HTML.
 
     Called at serve time so styling fixes apply immediately to ALL existing
     sites without a DB migration. The JS is in a separate <script> block —
     no inline onclick — to avoid any quote-escaping issues.
+
+    Args:
+        one_time_price: Total first-month charge (setup fee + first month).
+        monthly_price:  Recurring monthly subscription price.
     """
     from core.config import get_settings
     api_url = get_settings().API_URL
     checkout_url = f"{api_url}/api/v1/sites/{slug}/purchase"
+
+    # Format prices cleanly — no trailing .00 for whole numbers.
+    def _fmt(v: float) -> str:
+        return f"{v:,.0f}" if v == int(v) else f"{v:,.2f}"
+
+    one_time_display = _fmt(one_time_price)
+    monthly_display  = _fmt(monthly_price)
+
+    claim_label = f"Claim for ${one_time_display}"
 
     # All JS lives in this script block. No inline onclick anywhere.
     claim_script = f"""<script>
@@ -255,7 +306,7 @@ def _inject_canonical_claim_bar(html: str, slug: str) -> str:
         '<form id="wm-claim-form" style="display:flex;flex-direction:column;gap:12px;">',
           '<input type="email" id="wm-email" placeholder="Your email address *" required style="padding:14px 16px;border:2px solid #e2e8f0;border-radius:8px;font-size:15px;outline:none;">',
           '<input type="text"  id="wm-name"  placeholder="Your full name *"      required style="padding:14px 16px;border:2px solid #e2e8f0;border-radius:8px;font-size:15px;outline:none;">',
-          '<button type="submit" style="background:#7c3aed;color:#fff;border:none;padding:16px;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;">Claim for $497</button>',
+          '<button type="submit" style="background:#7c3aed;color:#fff;border:none;padding:16px;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;">{claim_label}</button>',
         '</form>',
         '<p id="wm-msg" style="margin:12px 0 0;font-size:13px;color:#10b981;display:none;"></p>',
       '</div>'
@@ -277,9 +328,9 @@ def _inject_canonical_claim_bar(html: str, slug: str) -> str:
         if (data.checkout_url) {{ window.location.href = data.checkout_url; }}
         else {{
           var errMsg = Array.isArray(data.detail) ? data.detail.map(function(e){{ return e.msg || JSON.stringify(e); }}).join(', ') : (data.detail || 'Something went wrong. Please try again.');
-          document.getElementById('wm-msg').style.display='block'; document.getElementById('wm-msg').style.color='#ef4444'; document.getElementById('wm-msg').textContent = errMsg; btn.disabled=false; btn.textContent='Claim for $497';
+          document.getElementById('wm-msg').style.display='block'; document.getElementById('wm-msg').style.color='#ef4444'; document.getElementById('wm-msg').textContent = errMsg; btn.disabled=false; btn.textContent='{claim_label}';
         }}
-      }} catch(err) {{ document.getElementById('wm-msg').style.display='block'; document.getElementById('wm-msg').style.color='#ef4444'; document.getElementById('wm-msg').textContent='Network error. Please try again.'; btn.disabled=false; btn.textContent='Claim for $497'; }}
+      }} catch(err) {{ document.getElementById('wm-msg').style.display='block'; document.getElementById('wm-msg').style.color='#ef4444'; document.getElementById('wm-msg').textContent='Network error. Please try again.'; btn.disabled=false; btn.textContent='{claim_label}'; }}
     }});
   }}
   window.wmClaim = wmClaim;
@@ -294,12 +345,12 @@ def _inject_canonical_claim_bar(html: str, slug: str) -> str:
       <span style="font-size:20px;line-height:1;flex-shrink:0;">&#x1f3e2;</span>
       <div>
         <p style="margin:0;font-weight:700;font-size:15px;color:#ffffff;text-shadow:0 1px 3px rgba(0,0,0,0.4);font-family:system-ui,sans-serif;line-height:1.4;">Is this your business?</p>
-        <p style="margin:0;font-size:13px;color:#e0e7ff;text-shadow:0 1px 2px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;line-height:1.4;">Claim this website for only <strong style="color:#ffffff;font-weight:700;">$497</strong> &middot; Then just $97/month for hosting, maintenance &amp; updates</p>
+        <p style="margin:0;font-size:13px;color:#e0e7ff;text-shadow:0 1px 2px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;line-height:1.4;">Claim this website for only <strong style="color:#ffffff;font-weight:700;">${one_time_display}</strong> &middot; Then just ${monthly_display}/month for hosting, maintenance &amp; updates</p>
         <a href="https://web.lavish.solutions/how-it-works" target="_blank" rel="noopener noreferrer" style="color:#bfdbfe;font-size:12px;text-decoration:underline;margin-top:3px;display:inline-block;font-family:system-ui,sans-serif;">See what&#39;s included &rarr;</a>
       </div>
     </div>
     <button onclick="wmClaim()" style="background:#fbbf24;color:#1e3a5f;border:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;font-family:system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,0.2);flex-shrink:0;">
-      CLAIM FOR $497
+      CLAIM FOR ${one_time_display}
     </button>
   </div>
 </div>

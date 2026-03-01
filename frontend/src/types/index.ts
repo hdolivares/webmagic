@@ -147,6 +147,17 @@ export interface ManualGenerationRequest {
   branding_notes?: string
   /** Base64 data URIs of logo/brand images */
   branding_images?: string[]
+  /**
+   * Total first-month charge shown on the claim bar (setup fee + first month).
+   * E.g. 795 → customer pays $795 on day 1, which includes the first $monthly_price.
+   * Defaults to $497 when omitted.
+   */
+  one_time_price?: number
+  /**
+   * Recurring monthly subscription price shown on the claim bar.
+   * Defaults to $97 when omitted.
+   */
+  monthly_price?: number
 }
 
 // ============================================

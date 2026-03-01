@@ -121,6 +121,15 @@ function GenerationProgress({ currentStep }: GenerationProgressProps) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+// ─── Pricing helpers ──────────────────────────────────────────────────────────
+
+/** Format a number as a price string without trailing zeros. */
+function fmtPrice(value: number): string {
+  return value % 1 === 0
+    ? value.toLocaleString('en-US', { minimumFractionDigits: 0 })
+    : value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 export default function ManualSiteBuilderPage() {
   const navigate = useNavigate()
 
@@ -137,6 +146,10 @@ export default function ManualSiteBuilderPage() {
   const [address, setAddress] = useState('')
   const [city,    setCity]    = useState('')
   const [state,   setState]   = useState('')
+
+  // Pricing (optional — defaults applied on the backend)
+  const [oneTimePrice, setOneTimePrice] = useState<string>('')
+  const [monthlyPrice, setMonthlyPrice] = useState<string>('')
 
   // ── Generation state ─────────────────────────────────────────────────────────
   const [isGenerating, setIsGenerating]     = useState(false)
@@ -186,6 +199,9 @@ export default function ManualSiteBuilderPage() {
     setIsGenerating(true)
     setCurrentStep(0)
 
+    const parsedOneTime = oneTimePrice !== '' ? parseFloat(oneTimePrice) : undefined
+    const parsedMonthly = monthlyPrice !== '' ? parseFloat(monthlyPrice) : undefined
+
     const payload: ManualGenerationRequest = {
       description: description.trim(),
       website_type: websiteType,
@@ -197,6 +213,8 @@ export default function ManualSiteBuilderPage() {
       ...(state.trim()   && { state:   state.trim()   }),
       ...(brandingNotes.trim() && { branding_notes: brandingNotes.trim() }),
       ...(brandingImages.length && { branding_images: brandingImages }),
+      ...(parsedOneTime !== undefined && !isNaN(parsedOneTime) && { one_time_price: parsedOneTime }),
+      ...(parsedMonthly !== undefined && !isNaN(parsedMonthly) && { monthly_price: parsedMonthly }),
     }
 
     try {
@@ -468,6 +486,97 @@ export default function ManualSiteBuilderPage() {
                 <p className="manual-builder__hint">
                   Describe colors, vibe, or style — or leave blank and let the AI decide.
                   Claude will derive a complete color system from even a vague description.
+                </p>
+              </section>
+            </CardBody>
+          </Card>
+
+          {/* ── Section 5: Pricing ──────────────────────────────────────── */}
+          <Card>
+            <CardBody>
+              <section className="manual-builder__section">
+                <h2 className="manual-builder__section-title">
+                  <span className="manual-builder__step-badge">5</span>
+                  Pricing
+                  <span className="manual-builder__optional-badge">Optional</span>
+                </h2>
+
+                <div className="manual-builder__pricing-row">
+                  <div className="manual-builder__field">
+                    <label htmlFor="price-one-time" className="manual-builder__label">
+                      One-time claim price
+                    </label>
+                    <div className="manual-builder__price-input-wrap">
+                      <span className="manual-builder__price-symbol">$</span>
+                      <input
+                        id="price-one-time"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={oneTimePrice}
+                        onChange={(e) => setOneTimePrice(e.target.value)}
+                        placeholder="497"
+                        className="manual-builder__price-input"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="manual-builder__field">
+                    <label htmlFor="price-monthly" className="manual-builder__label">
+                      Monthly subscription
+                    </label>
+                    <div className="manual-builder__price-input-wrap">
+                      <span className="manual-builder__price-symbol">$</span>
+                      <input
+                        id="price-monthly"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={monthlyPrice}
+                        onChange={(e) => setMonthlyPrice(e.target.value)}
+                        placeholder="97"
+                        className="manual-builder__price-input"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live pricing breakdown */}
+                {(oneTimePrice !== '' || monthlyPrice !== '') && (() => {
+                  const total   = parseFloat(oneTimePrice)  || 0
+                  const monthly = parseFloat(monthlyPrice)  || 0
+                  const setup   = total - monthly
+                  return (
+                    <div className="manual-builder__pricing-breakdown">
+                      <div className="manual-builder__pricing-breakdown-row">
+                        <span>Setup fee (one-time)</span>
+                        <span className="manual-builder__pricing-breakdown-value">
+                          ${fmtPrice(Math.max(0, setup))}
+                        </span>
+                      </div>
+                      <div className="manual-builder__pricing-breakdown-row">
+                        <span>+ First month&apos;s subscription</span>
+                        <span className="manual-builder__pricing-breakdown-value">
+                          ${fmtPrice(monthly)}
+                        </span>
+                      </div>
+                      <div className="manual-builder__pricing-breakdown-row manual-builder__pricing-breakdown-row--total">
+                        <span>First charge (shown on claim bar)</span>
+                        <span className="manual-builder__pricing-breakdown-value">
+                          ${fmtPrice(total)}
+                        </span>
+                      </div>
+                      <p className="manual-builder__pricing-hint">
+                        After the first payment, the customer is billed ${fmtPrice(monthly)}/month.
+                      </p>
+                    </div>
+                  )
+                })()}
+
+                <p className="manual-builder__hint">
+                  Leave blank to use the default pricing ($497 one-time · $97/month).
+                  The one-time price is what the customer sees on the claim bar — it
+                  includes the setup fee plus the first month&apos;s subscription.
                 </p>
               </section>
             </CardBody>

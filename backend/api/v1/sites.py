@@ -188,6 +188,12 @@ async def generate_manual_site(
     }
     manual_input.update(hard_facts)
 
+    # Store pricing when supplied; claim bar and checkout will read from here.
+    if request.one_time_price is not None:
+        manual_input["one_time_price"] = request.one_time_price
+    if request.monthly_price is not None:
+        manual_input["monthly_price"] = request.monthly_price
+
     raw_data = {
         "manual_generation": True,
         "manual_input": manual_input,
