@@ -207,7 +207,14 @@ class SitePurchaseService:
         )
         logger.info(f"Pre-created subscription checkout: {subscription_checkout.id}")
 
-        # Step 1 — setup fee checkout; its success_url IS the subscription checkout URL
+        # Step 1 — setup fee checkout; its success_url IS the subscription checkout URL.
+        # The customer was shown a one-time price of (purchase_amount + monthly_amount)
+        # on the claim bar.  We honour that by splitting it into two charges:
+        #   Step 1 = setup portion  (purchase_amount)
+        #   Step 2 = first month    (monthly_amount, subscription)
+        # The description references the total one-time price so the customer isn't
+        # surprised when they see an amount that differs from the claim bar number.
+        _total_one_time = site.purchase_amount + site.monthly_amount
         setup_checkout = await self.recurrente.create_one_time_checkout(
             name=f"Premium Website Design & Launch – {display_name}",
             amount_cents=int(site.purchase_amount * 100),
@@ -215,8 +222,9 @@ class SitePurchaseService:
             description=(
                 f"Custom-designed, professionally built website for {display_name} — "
                 f"delivered and live the same day. Includes premium design, full development, "
-                f"and on-brand copywriting. Monthly care plan (${site.monthly_amount}/mo) "
-                f"activates in the next step."
+                f"and on-brand copywriting. "
+                f"This is the setup portion of your one-time payment of ${_total_one_time:,.0f}; "
+                f"your ${site.monthly_amount:,.0f}/mo hosting plan activates in the next step."
             ),
             success_url=subscription_checkout.checkout_url,  # Direct Recurrente → Recurrente
             cancel_url=site_cancel_url,
