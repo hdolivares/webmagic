@@ -424,6 +424,23 @@ def generate_site_for_business(self, business_id: str):
                         for img in generated_images
                         if isinstance(img, dict) and img.get("slot")
                     }
+                    # Short human-readable subject for each image slot — used by the
+                    # remap endpoint to fix existing sites without full regeneration.
+                    design_brief["image_subjects"] = {
+                        img["slot"]: img.get("subject")
+                        for img in generated_images
+                        if isinstance(img, dict) and img.get("slot") and img.get("subject")
+                    }
+                    # Version history — one entry per generation run.
+                    import time as _t
+                    _run_ts = int(_t.time())
+                    prev_versions = design_brief.get("image_versions") or {}
+                    for img in generated_images:
+                        if isinstance(img, dict) and img.get("slot") and img.get("version"):
+                            slot = img["slot"]
+                            entry = {"filename": img["version"], "timestamp": _run_ts}
+                            prev_versions.setdefault(slot, []).append(entry)
+                    design_brief["image_versions"] = prev_versions
 
                 # Carry forward custom pricing from manual_input so the claim bar
                 # can read it from design_brief without an extra Business query.

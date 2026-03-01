@@ -271,16 +271,20 @@ Layout requirements:
 2. HERO — full-width banner with "Shop Now" CTA button and a compelling headline about the shop.
 3. CATEGORIES — 3–6 visual category cards in a CSS grid, each with a category image placeholder, name, and "Browse →" link.
 4. FEATURED PRODUCTS — 4-product grid. Each product card must include:
-   - Product image: assign img/product-1.jpg, img/product-2.jpg, img/product-3.jpg, img/product-4.jpg
-     to the four cards in order. NEVER use the same image for more than one card.
-   - Product name (relevant to the business category)
-   - Short one-line description
+   - Product image from the pre-generated set (see IMAGE CONTEXT below for which file depicts what).
+     Use the 'depicts' description to choose which image to show in each card.
+     The product card name and description MUST match what the image actually shows.
+     Use img/product-1.jpg through img/product-4.jpg for these 4 cards.
+     NEVER use the same image for more than one card.
+   - Product name — MUST describe what is depicted in the card's image
+   - Short one-line description that matches the image content
    - Price (realistic placeholder like "$29.99" or "$49.00")
    - "Add to Cart" button (decorative — no real cart logic)
    - Optional "Wishlist ♡" icon link
    - Optional discount badge (e.g. "Nuevo", "Popular", "-20%")
 5. DEALS OF THE DAY — a highlighted banner with 2 deal product cards. Each deal card uses its own
-   product image: img/product-5.jpg and img/product-6.jpg. Show a discount badge and strikethrough price.
+   product image (img/product-5.jpg and img/product-6.jpg). The product name and description MUST
+   describe what is shown in those images. Show a discount badge and strikethrough price.
    BACKGROUND DESIGN: The deals section MUST use a visually rich background — NOT a flat solid color.
    Use a diagonal CSS gradient that goes from a deeper shade of the brand primary color to a lighter
    accent, combined with subtle light-circle radial highlights using a ::before pseudo-element.
@@ -306,6 +310,7 @@ Layout requirements:
    this background with a white/light card surface so they have clear contrast and readability.
 6. BESTSELLERS — horizontal scroll row of 4–6 compact product cards. Use img/product-7.jpg for the
    first bestseller card, then img/product-1.jpg through img/product-4.jpg for the remaining slots.
+   Each card's product name MUST match what is depicted in its image (see IMAGE CONTEXT below).
    Never repeat the same image in adjacent cards. Include name, price, and star rating (5 static stars).
 7. SOCIAL PROOF — 2-3 short customer quote cards (testimonials) and a trust badge row
    (e.g. "Free Shipping", "30-Day Returns", "Secure Checkout").
@@ -375,12 +380,24 @@ Do NOT use Tailwind or any CSS framework. All styles must be in the === CSS === 
         if product_images:
             lines += [
                 "",
-                "**PRODUCT IMAGES (ecommerce)** — one unique photo per product slot:",
+                "**PRODUCT IMAGES (ecommerce)** — each image depicts a specific item.",
+                "You MUST write the product name, description, and copy to match what is actually shown",
+                "in each image. Do NOT invent unrelated product names. The image subject IS the product.",
+                "",
             ]
             for img in product_images:
                 slot = img["slot"]   # e.g. "product-1"
                 path = img["filename"]  # e.g. "img/product-1.jpg"
-                lines.append(f"- `{path}` → use for **product card #{slot.split('-')[1]}**")
+                # Include the subject so the architect writes copy that matches the image
+                subject = img.get("subject", "").strip()
+                # Trim the full desc to a short, readable summary (first sentence)
+                short_subject = subject.split(".")[0].strip() if subject else ""
+                if short_subject:
+                    lines.append(
+                        f"- `{path}` (slot {slot}) — **depicts: {short_subject}**"
+                    )
+                else:
+                    lines.append(f"- `{path}` (slot {slot})")
 
         lines += [
             "",
@@ -395,12 +412,15 @@ Do NOT use Tailwind or any CSS framework. All styles must be in the === CSS === 
 
         if product_images:
             lines += [
-                "4. PRODUCT CARDS: EACH product card MUST use its own unique product image.",
-                "   Assign in order: first product card → img/product-1.jpg,",
-                "   second → img/product-2.jpg, third → img/product-3.jpg, etc.",
+                "4. PRODUCT CARDS — CRITICAL RULE:",
+                "   Each product card's name, description, and copy MUST match what is depicted in its image.",
+                "   Use the 'depicts' description above to determine what each product card is about.",
+                "   Assign images to cards such that card content aligns with the image subject.",
+                "   A product card showing a cat water fountain MUST be named as a water fountain.",
+                "   A product card showing a cat tree MUST be named as a cat tree. Never swap these.",
                 "   NEVER reuse the same image file across multiple product cards.",
-                "   If you have more product cards than product images, fall back to img/services.jpg",
-                "   only for any extras beyond product-7.",
+                "   If you need more cards than available product images, fall back to img/services.jpg",
+                "   only for extras beyond product-7.",
             ]
         else:
             lines.append("4. Service cards: no emojis as primary visuals — use CSS styling.")
