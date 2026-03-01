@@ -345,7 +345,7 @@ def _inject_canonical_claim_bar(
       <span style="font-size:20px;line-height:1;flex-shrink:0;">&#x1f3e2;</span>
       <div>
         <p style="margin:0;font-weight:700;font-size:15px;color:#ffffff;text-shadow:0 1px 3px rgba(0,0,0,0.4);font-family:system-ui,sans-serif;line-height:1.4;">Is this your business?</p>
-        <p style="margin:0;font-size:13px;color:#e0e7ff;text-shadow:0 1px 2px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;line-height:1.4;">Claim this website for only <strong style="color:#ffffff;font-weight:700;">${one_time_display}</strong> &middot; Then just ${monthly_display}/month for hosting, maintenance &amp; updates</p>
+        <p style="margin:0;font-size:13px;color:#e0e7ff;text-shadow:0 1px 2px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;line-height:1.4;">One-time payment of <strong style="color:#ffffff;font-weight:700;">${one_time_display}</strong> &middot; Then just ${monthly_display}/month for hosting, maintenance &amp; updates</p>
         <a href="https://web.lavish.solutions/how-it-works" target="_blank" rel="noopener noreferrer" style="color:#bfdbfe;font-size:12px;text-decoration:underline;margin-top:3px;display:inline-block;font-family:system-ui,sans-serif;">See what&#39;s included &rarr;</a>
       </div>
     </div>
