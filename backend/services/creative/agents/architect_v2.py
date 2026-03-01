@@ -72,6 +72,7 @@ class ArchitectAgentV2(BaseAgent):
                     subdomain=subdomain,
                     brand_colors=colors if isinstance(colors, dict) else {},
                     creative_dna=creative_dna,
+                    website_type=business_data.get("website_type", "informational"),
                 )
             except Exception as img_err:
                 # Image generation is best-effort — never block site creation
@@ -270,26 +271,58 @@ Layout requirements:
 2. HERO — full-width banner with "Shop Now" CTA button and a compelling headline about the shop.
 3. CATEGORIES — 3–6 visual category cards in a CSS grid, each with a category image placeholder, name, and "Browse →" link.
 4. FEATURED PRODUCTS — 4-product grid. Each product card must include:
-   - Product image (use img/services.jpg or a CSS placeholder if no image)
-   - Product name
+   - Product image: assign img/product-1.jpg, img/product-2.jpg, img/product-3.jpg, img/product-4.jpg
+     to the four cards in order. NEVER use the same image for more than one card.
+   - Product name (relevant to the business category)
    - Short one-line description
-   - Price (use a realistic placeholder like "$29.99" or "$49.00")
+   - Price (realistic placeholder like "$29.99" or "$49.00")
    - "Add to Cart" button (decorative — no real cart logic)
    - Optional "Wishlist ♡" icon link
-5. DEALS OF THE DAY — a highlighted banner or 2-product row with a countdown timer label (static text "Limited time offer").
-6. BESTSELLERS — horizontal scroll row of 4–6 compact product cards with name, price, and star rating (5 static stars).
-7. SOCIAL PROOF — 2-3 short customer quote cards (testimonials) and a trust badge row (e.g. "Free Shipping", "30-Day Returns", "Secure Checkout").
+   - Optional discount badge (e.g. "Nuevo", "Popular", "-20%")
+5. DEALS OF THE DAY — a highlighted banner with 2 deal product cards. Each deal card uses its own
+   product image: img/product-5.jpg and img/product-6.jpg. Show a discount badge and strikethrough price.
+   BACKGROUND DESIGN: The deals section MUST use a visually rich background — NOT a flat solid color.
+   Use a diagonal CSS gradient that goes from a deeper shade of the brand primary color to a lighter
+   accent, combined with subtle light-circle radial highlights using a ::before pseudo-element.
+   This creates depth and visual interest. Example pattern:
+   ```css
+   .deals {
+     background: linear-gradient(135deg, var(--deals-from, #b5179e) 0%, var(--deals-mid, #e91e8c) 50%, var(--deals-to, #f48fb1) 100%);
+     position: relative;
+     overflow: hidden;
+   }
+   .deals::before {
+     content: '';
+     position: absolute;
+     inset: 0;
+     background-image:
+       radial-gradient(ellipse at 12% 60%, rgba(255,255,255,0.18) 0%, transparent 45%),
+       radial-gradient(ellipse at 88% 25%, rgba(255,255,255,0.10) 0%, transparent 38%),
+       radial-gradient(ellipse at 50% 100%, rgba(0,0,0,0.08) 0%, transparent 40%);
+     pointer-events: none;
+   }
+   ```
+   Adapt the gradient colors to match the brand palette. The deal product cards should sit on top of
+   this background with a white/light card surface so they have clear contrast and readability.
+6. BESTSELLERS — horizontal scroll row of 4–6 compact product cards. Use img/product-7.jpg for the
+   first bestseller card, then img/product-1.jpg through img/product-4.jpg for the remaining slots.
+   Never repeat the same image in adjacent cards. Include name, price, and star rating (5 static stars).
+7. SOCIAL PROOF — 2-3 short customer quote cards (testimonials) and a trust badge row
+   (e.g. "Free Shipping", "30-Day Returns", "Secure Checkout").
 8. NEWSLETTER SIGNUP — centered email capture section: headline + email input + "Subscribe" button.
 9. FOOTER — multi-column with logo, shop links, social links, and copyright.
 
 CSS rules specific to ecommerce:
 - Product cards: use `display: grid` or `display: flex` for the product grid, with `gap: var(--spacing-lg)`.
-- Product images: `aspect-ratio: 1; object-fit: cover; border-radius: var(--border-radius);`.
+- Product images: `aspect-ratio: 1; object-fit: cover; border-radius: var(--border-radius);`
+- Product images MUST be `<img>` tags (not CSS backgrounds) so each card shows its own unique photo.
 - "Add to Cart" button: uses `--color-primary`, fully rounded (`border-radius: 2rem`).
 - Price: bold, `--color-primary` or a dedicated `--color-price` variable.
 - Strikethrough original price (if showing a deal): `text-decoration: line-through; color: var(--color-text-muted);`.
 - Cart icon in nav: decorative SVG or Unicode cart symbol with a small badge dot — no click handler needed.
 - Sticky nav: `position: sticky; top: 0; z-index: 100; background: var(--color-surface); box-shadow: var(--shadow-md);`.
+- Deals section deal cards: white card background with `border-radius: var(--radius-lg, 1rem)` so they
+  pop clearly against the gradient background. Add a subtle box-shadow for depth.
 
 Do NOT use Tailwind or any CSS framework. All styles must be in the === CSS === section using CSS variables.
 ---
@@ -303,7 +336,7 @@ Do NOT use Tailwind or any CSS framework. All styles must be in the === CSS === 
         If no images were generated, we still instruct the architect to avoid
         emoji-heavy service cards and use CSS styling instead.
         """
-        slot_labels = {
+        base_slot_labels = {
             "hero":     "hero banner",
             "about":    "about / team section",
             "services": "services / work section",
@@ -321,38 +354,60 @@ Do NOT use Tailwind or any CSS framework. All styles must be in the === CSS === 
 
         saved = [img for img in images if img.get("saved") and img.get("filename")]
 
+        base_images = [img for img in saved if not img["slot"].startswith("product-")]
+        product_images = [img for img in saved if img["slot"].startswith("product-")]
+
         lines = [
             "",
             "**AI-GENERATED IMAGES (Nano Banana / Gemini 2.5 Flash)**",
-            "The following photorealistic images have been pre-generated and are saved",
-            "at the paths shown. Use them in the HTML using their relative path as the `src`.",
+            "The following photorealistic images have been pre-generated and saved.",
+            "Use them in the HTML with their relative path as `src`.",
             "These are real JPEG files — use them to create a visually stunning, image-rich website.",
             "",
         ]
 
-        for img in saved:
+        for img in base_images:
             slot = img["slot"]
-            path = img["filename"]   # e.g. "img/hero.jpg"
-            label = slot_labels.get(slot, slot)
+            path = img["filename"]
+            label = base_slot_labels.get(slot, slot)
             lines.append(f"- **{slot.upper()} image** → `{path}` — place in the **{label}**")
+
+        if product_images:
+            lines += [
+                "",
+                "**PRODUCT IMAGES (ecommerce)** — one unique photo per product slot:",
+            ]
+            for img in product_images:
+                slot = img["slot"]   # e.g. "product-1"
+                path = img["filename"]  # e.g. "img/product-1.jpg"
+                lines.append(f"- `{path}` → use for **product card #{slot.split('-')[1]}**")
 
         lines += [
             "",
             "**IMAGE USAGE RULES:**",
-            "1. Hero section: use the hero image as a full-width background via",
-            "   `<img class=\"hero-img\" src=\"img/hero.jpg\" alt=\"...\" loading=\"eager\">` overlaid",
-            "   with a semi-transparent gradient overlay so text remains readable.",
-            "   OR use it as CSS `background-image: url('img/hero.jpg')` with `background-size: cover`.",
-            "2. About section: place the about image as a prominent visual element (right column",
-            "   on desktop, above content on mobile) — at least 40 % of the section width.",
-            "3. Services section: place the services image as an ambient background or a featured",
-            "   visual near the top of the section. Service CARDS themselves should be clean CSS",
-            "   cards — no emojis as primary visuals. A single tasteful Unicode symbol (≤1 per card)",
-            "   is acceptable ONLY if the card has no dedicated illustration.",
-            "4. Always include `alt` attributes that describe the image subject for accessibility.",
-            "5. Add `loading=\"lazy\"` to about and services images; `loading=\"eager\"` on the hero.",
-            "6. The images show attractive, photorealistic subjects — style them to be prominent and",
-            "   visually impactful, not small thumbnails.",
+            "1. Hero: use hero image full-width as `<img class=\"hero-img\" src=\"img/hero.jpg\"` overlaid",
+            "   with a semi-transparent gradient so text stays readable.",
+            "   OR use as CSS `background-image: url('img/hero.jpg')` with `background-size: cover`.",
+            "2. About: place the about image as a prominent visual (right column desktop / above mobile)",
+            "   — at least 40% of section width.",
+            "3. Services: use as ambient background or featured visual near section top.",
+        ]
+
+        if product_images:
+            lines += [
+                "4. PRODUCT CARDS: EACH product card MUST use its own unique product image.",
+                "   Assign in order: first product card → img/product-1.jpg,",
+                "   second → img/product-2.jpg, third → img/product-3.jpg, etc.",
+                "   NEVER reuse the same image file across multiple product cards.",
+                "   If you have more product cards than product images, fall back to img/services.jpg",
+                "   only for any extras beyond product-7.",
+            ]
+        else:
+            lines.append("4. Service cards: no emojis as primary visuals — use CSS styling.")
+
+        lines += [
+            "5. Always include descriptive `alt` text for accessibility.",
+            "6. Add `loading=\"lazy\"` to all images except the hero (`loading=\"eager\"`).",
         ]
 
         return "\n".join(lines) + "\n"

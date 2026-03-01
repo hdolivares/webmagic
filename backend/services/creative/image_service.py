@@ -1,6 +1,9 @@
 """
 Image Generation Service using Google Gemini (Nano Banana).
-Generates 3 high-quality contextual images per website using gemini-2.5-flash-image.
+Generates contextual images per website using gemini-2.5-flash-image.
+
+For informational sites: 3 images (hero, about, services).
+For ecommerce sites:     3 base images + up to 7 per-product images (product-1…product-7).
 
 Images are saved to disk and served via a dedicated FastAPI endpoint.
 """
@@ -305,6 +308,295 @@ def _resolve_category_key(category: str) -> str:
     return "default"
 
 
+# ── Ecommerce product image prompts ──────────────────────────────────────────
+# Keyed by ecommerce sub-category.  Each entry has exactly 7 product slots
+# (product-1 … product-7) with square 1:1 aspect ratio for product cards.
+
+_ECOMMERCE_PRODUCT_PROMPTS: Dict[str, List[Dict[str, str]]] = {
+    # ── Pet / cat products ────────────────────────────────────────────────────
+    "pet": [
+        {
+            "slot": "product-1",
+            "aspect": "1:1",
+            "desc": (
+                "A tall, modern multi-level cat tree tower with sisal rope scratching posts, "
+                "cozy hammock perches, dangling toy balls, and plush platforms in warm neutral tones. "
+                "Isolated on a clean white background. Studio product photography, sharp focus, "
+                "soft diffused lighting, no cats in frame."
+            ),
+        },
+        {
+            "slot": "product-2",
+            "aspect": "1:1",
+            "desc": (
+                "An ultra-plush round cloud-shaped cat bed in cream and blush pink faux fur, "
+                "perfectly clean and puffy, set on a minimalist white surface. "
+                "Overhead studio product shot, soft shadows, no cats."
+            ),
+        },
+        {
+            "slot": "product-3",
+            "aspect": "1:1",
+            "desc": (
+                "A set of two elevated ceramic cat bowls on a bamboo stand — clean white ceramic "
+                "with subtle pink accents, matching saucers. Studio product photography on white "
+                "background, top-angle view, premium tableware aesthetic."
+            ),
+        },
+        {
+            "slot": "product-4",
+            "aspect": "1:1",
+            "desc": (
+                "A cheerful colorful collection of cat toys spread on a white surface: feather "
+                "wands, crinkle balls, a catnip mouse, a jingle bell ring, and interactive puzzle "
+                "pieces. Flat-lay product photography, bright studio lighting, vibrant colors."
+            ),
+        },
+        {
+            "slot": "product-5",
+            "aspect": "1:1",
+            "desc": (
+                "A modern automatic cat water fountain in glossy white with a flowing waterfall "
+                "feature, LED ring, and charcoal filter visible. Isolated on a clean white "
+                "background. Sleek product photography, soft reflections."
+            ),
+        },
+        {
+            "slot": "product-6",
+            "aspect": "1:1",
+            "desc": (
+                "A stylish transparent bubble-window cat carrier backpack in blush pink and "
+                "light grey, standing upright on a white surface. The round porthole window "
+                "shows a plush interior. Studio product shot, clean modern design."
+            ),
+        },
+        {
+            "slot": "product-7",
+            "aspect": "1:1",
+            "desc": (
+                "A collection of cute cat accessories on a white surface: a personalized leather "
+                "collar with a heart-shaped tag, a matching leash, and a small bowtie. "
+                "Flat-lay product photography, elegant styling, pastel pink and gold tones."
+            ),
+        },
+    ],
+    # ── Fashion / apparel ─────────────────────────────────────────────────────
+    "fashion": [
+        {
+            "slot": "product-1",
+            "aspect": "1:1",
+            "desc": (
+                "A neatly folded premium quality women's dress in soft pastel color, "
+                "studio product photography on white background, clean minimal styling."
+            ),
+        },
+        {
+            "slot": "product-2",
+            "aspect": "1:1",
+            "desc": (
+                "A stylish handbag in structured leather with gold hardware, standing "
+                "upright on a white surface. Product photography, soft studio shadows."
+            ),
+        },
+        {
+            "slot": "product-3",
+            "aspect": "1:1",
+            "desc": (
+                "A pair of elegant high heels in nude tone, isolated on white. "
+                "Studio product photography from slight side angle, clean background."
+            ),
+        },
+        {
+            "slot": "product-4",
+            "aspect": "1:1",
+            "desc": (
+                "A cozy knit sweater in warm camel color, folded neatly. "
+                "Studio product shot, white background, soft lighting."
+            ),
+        },
+        {
+            "slot": "product-5",
+            "aspect": "1:1",
+            "desc": (
+                "A delicate gold necklace with a pendant on a clean white jewelry display card. "
+                "Macro product photography, soft focus background."
+            ),
+        },
+        {
+            "slot": "product-6",
+            "aspect": "1:1",
+            "desc": (
+                "A pair of fashionable sunglasses with tortoiseshell frames, product photography "
+                "on white background, slight reflections."
+            ),
+        },
+        {
+            "slot": "product-7",
+            "aspect": "1:1",
+            "desc": (
+                "A silk floral scarf neatly arranged, showing the pattern clearly. "
+                "Flat-lay product photography on white background."
+            ),
+        },
+    ],
+    # ── Food / bakery ─────────────────────────────────────────────────────────
+    "food": [
+        {
+            "slot": "product-1",
+            "aspect": "1:1",
+            "desc": (
+                "An artisan sourdough bread loaf with a golden crust, sliced on a wooden board, "
+                "studio food photography, warm lighting."
+            ),
+        },
+        {
+            "slot": "product-2",
+            "aspect": "1:1",
+            "desc": (
+                "Assorted premium pastries and macarons arranged beautifully on a white plate, "
+                "top-down food photography."
+            ),
+        },
+        {
+            "slot": "product-3",
+            "aspect": "1:1",
+            "desc": (
+                "A premium coffee gift set — whole beans in a kraft bag, an elegant mug — "
+                "flat-lay product photography on light background."
+            ),
+        },
+        {
+            "slot": "product-4",
+            "aspect": "1:1",
+            "desc": (
+                "A beautifully decorated celebration cake with fresh flowers, studio photography "
+                "on white background."
+            ),
+        },
+        {
+            "slot": "product-5",
+            "aspect": "1:1",
+            "desc": (
+                "Premium dark chocolate truffles in a luxury gift box, macro product photography, "
+                "soft lighting."
+            ),
+        },
+        {
+            "slot": "product-6",
+            "aspect": "1:1",
+            "desc": (
+                "A jar of artisan honey with a wooden honey dipper, golden tones, "
+                "minimalist product photography."
+            ),
+        },
+        {
+            "slot": "product-7",
+            "aspect": "1:1",
+            "desc": (
+                "A selection of gourmet spice blends in elegant small jars with handwritten labels, "
+                "flat-lay product photography."
+            ),
+        },
+    ],
+    # ── Default fallback for any ecommerce category ───────────────────────────
+    "default": [
+        {
+            "slot": "product-1",
+            "aspect": "1:1",
+            "desc": (
+                "A premium product with clean modern packaging on a white studio background. "
+                "Professional product photography, sharp focus, soft shadows."
+            ),
+        },
+        {
+            "slot": "product-2",
+            "aspect": "1:1",
+            "desc": (
+                "A stylish lifestyle product displayed elegantly on a light surface. "
+                "Studio product photography, minimal background, premium feel."
+            ),
+        },
+        {
+            "slot": "product-3",
+            "aspect": "1:1",
+            "desc": (
+                "A high-quality product in sleek design isolated on white. "
+                "Clean product photography, diffused studio lighting."
+            ),
+        },
+        {
+            "slot": "product-4",
+            "aspect": "1:1",
+            "desc": (
+                "A curated set of complementary products arranged neatly. "
+                "Flat-lay product photography on a neutral surface."
+            ),
+        },
+        {
+            "slot": "product-5",
+            "aspect": "1:1",
+            "desc": (
+                "An eye-catching product with vibrant design on white background. "
+                "Studio product shot, clean and modern."
+            ),
+        },
+        {
+            "slot": "product-6",
+            "aspect": "1:1",
+            "desc": (
+                "A deluxe boxed gift set with premium items neatly arranged. "
+                "Top-down product photography, elegant presentation."
+            ),
+        },
+        {
+            "slot": "product-7",
+            "aspect": "1:1",
+            "desc": (
+                "A bestselling product shown from its best angle on a pure white background. "
+                "Professional product photography, sharp details."
+            ),
+        },
+    ],
+}
+
+# Keywords to route ecommerce sites to the right product image set.
+_ECOMMERCE_CATEGORY_KEYWORDS: Dict[str, str] = {
+    "cat": "pet",
+    "gato": "pet",
+    "felina": "pet",
+    "felino": "pet",
+    "michi": "pet",
+    "pet": "pet",
+    "animal": "pet",
+    "mascotas": "pet",
+    "mascota": "pet",
+    "perro": "pet",
+    "dog": "pet",
+    "fashion": "fashion",
+    "cloth": "fashion",
+    "apparel": "fashion",
+    "ropa": "fashion",
+    "moda": "fashion",
+    "boutique": "fashion",
+    "bakery": "food",
+    "panadería": "food",
+    "pastelería": "food",
+    "café": "food",
+    "restaurant": "food",
+    "food": "food",
+    "comida": "food",
+}
+
+
+def _resolve_ecommerce_category_key(category: str) -> str:
+    """Map a business category string to an ecommerce product image bucket."""
+    lower = (category or "").lower()
+    for kw, bucket in _ECOMMERCE_CATEGORY_KEYWORDS.items():
+        if kw in lower:
+            return bucket
+    return "default"
+
+
 class ImageGenerationService:
     """
     Generates 3 contextual images per website using Gemini 2.5 Flash Image.
@@ -330,36 +622,56 @@ class ImageGenerationService:
         subdomain: str,
         brand_colors: Optional[Dict[str, str]] = None,
         creative_dna: Optional[Dict[str, Any]] = None,
+        website_type: str = "informational",
     ) -> List[Dict[str, Any]]:
         """
-        Generate 3 images for a site in parallel.
+        Generate contextual images for a site.
+
+        For informational sites: generates 3 images (hero, about, services).
+        For ecommerce sites:     generates 3 base images + 7 per-product images
+                                 (product-1 … product-7) in parallel.
 
         Returns a list of dicts:
         [
-          {"slot": "hero",     "filename": "img/hero.jpg",     "saved": True},
-          {"slot": "about",    "filename": "img/about.jpg",    "saved": True},
-          {"slot": "services", "filename": "img/services.jpg", "saved": True},
+          {"slot": "hero",      "filename": "img/hero.jpg",      "saved": True},
+          {"slot": "about",     "filename": "img/about.jpg",     "saved": True},
+          {"slot": "services",  "filename": "img/services.jpg",  "saved": True},
+          # ecommerce only:
+          {"slot": "product-1", "filename": "img/product-1.jpg", "saved": True},
+          ...
+          {"slot": "product-7", "filename": "img/product-7.jpg", "saved": True},
         ]
         Files are saved under SITES_BASE_PATH/{subdomain}/img/.
 
         Args:
-            creative_dna: Optional output from the Concept agent.  When provided,
-                the brand's unique positioning (visual_identity, value_proposition,
-                emotional_core, personality_traits) is injected into every prompt so
+            creative_dna: Optional output from the Concept agent. When provided,
+                the brand's unique positioning is injected into every prompt so
                 images reflect the specific brand angle rather than a generic template.
+            website_type: "informational" or "ecommerce". Ecommerce sites receive
+                7 additional per-product images beyond the standard 3.
         """
         if not self.api_key:
             logger.warning("[ImageGen] Skipping — no API key")
             return []
 
         bucket = _resolve_category_key(category)
-        prompt_specs = _CATEGORY_PROMPTS[bucket]
+        base_specs = _CATEGORY_PROMPTS[bucket]
+
+        # For ecommerce, append 7 product-specific image specs.
+        if website_type == "ecommerce":
+            ecommerce_bucket = _resolve_ecommerce_category_key(category)
+            product_specs = _ECOMMERCE_PRODUCT_PROMPTS[ecommerce_bucket]
+            all_specs = base_specs + product_specs
+        else:
+            all_specs = base_specs
+
         color_hint = self._color_hint(brand_colors)
         brand_hint = self._brand_hint(creative_dna)
 
         logger.info(
-            f"[ImageGen] Generating {len(prompt_specs)} images for '{business_name}' "
-            f"(category={category}, bucket={bucket}, brand_hint={bool(brand_hint)})"
+            f"[ImageGen] Generating {len(all_specs)} images for '{business_name}' "
+            f"(category={category}, bucket={bucket}, type={website_type}, "
+            f"brand_hint={bool(brand_hint)})"
         )
 
         tasks = [
@@ -370,13 +682,13 @@ class ImageGenerationService:
                 brand_hint=brand_hint,
                 subdomain=subdomain,
             )
-            for spec in prompt_specs
+            for spec in all_specs
         ]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         output = []
-        for spec, res in zip(prompt_specs, results):
+        for spec, res in zip(all_specs, results):
             if isinstance(res, Exception):
                 logger.error(f"[ImageGen] Failed {spec['slot']}: {res}")
                 output.append({"slot": spec["slot"], "filename": None, "saved": False, "full_prompt": None})
@@ -384,7 +696,7 @@ class ImageGenerationService:
                 output.append(res)
 
         saved = sum(1 for r in output if r.get("saved"))
-        logger.info(f"[ImageGen] {saved}/{len(prompt_specs)} images saved for {subdomain}")
+        logger.info(f"[ImageGen] {saved}/{len(all_specs)} images saved for {subdomain}")
         return output
 
     # ── Private helpers ───────────────────────────────────────────────────────
