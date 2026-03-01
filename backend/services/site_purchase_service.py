@@ -91,13 +91,32 @@ class SitePurchaseService:
             gen_site = gen_result.scalar_one_or_none()
             
             if gen_site:
+                # Resolve per-site pricing stored during manual site creation.
+                # Falls back to historical defaults ($497 total / $97 monthly).
+                _DEFAULT_ONE_TIME = 497.00
+                _DEFAULT_MONTHLY  = 97.00
+                _biz_pricing: dict = {}
+                if gen_site.business_id:
+                    _biz_r = await db.execute(
+                        select(Business).where(Business.id == gen_site.business_id)
+                    )
+                    _biz = _biz_r.scalar_one_or_none()
+                    if _biz:
+                        _biz_pricing = ((_biz.raw_data or {}).get("manual_input") or {})
+
+                _one_time = float(_biz_pricing.get("one_time_price") or _DEFAULT_ONE_TIME)
+                _monthly  = float(_biz_pricing.get("monthly_price")  or _DEFAULT_MONTHLY)
+                # purchase_amount is the setup fee (one-time portion only);
+                # the payment processor charges setup + first month together.
+                _setup = _one_time - _monthly
+
                 # Create a site record for this generated site
                 site = Site(
                     slug=slug,
                     business_id=gen_site.business_id,
                     status="preview",
-                    purchase_amount=400.00,   # $400 setup + $97/mo = $497 first month
-                    monthly_amount=97.00,
+                    purchase_amount=_setup,
+                    monthly_amount=_monthly,
                     site_title=f"Professional Website - {slug}",
                     site_description="AI-generated professional website"
                 )

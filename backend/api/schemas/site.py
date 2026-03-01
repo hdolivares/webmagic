@@ -56,6 +56,25 @@ class ManualGenerationRequest(BaseModel):
         description="Base64 data URIs of logo, brand photos, or any visual references",
     )
 
+    # Pricing — controls the claim bar shown on the generated site.
+    # one_time_price is the TOTAL first-month charge (setup fee + first month's
+    # subscription combined). The setup fee stored in the payment system is
+    # computed as: one_time_price - monthly_price.
+    one_time_price: Optional[float] = Field(
+        None,
+        ge=0,
+        description=(
+            "Total one-time claim price shown on the site "
+            "(setup fee + first month). E.g. 795 means the customer pays $795 "
+            "upfront, which includes the first month's subscription."
+        ),
+    )
+    monthly_price: Optional[float] = Field(
+        None,
+        ge=0,
+        description="Monthly subscription price shown on the site. E.g. 30.",
+    )
+
 
 class SiteResponse(BaseModel):
     """Site response schema."""

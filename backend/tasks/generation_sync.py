@@ -424,6 +424,20 @@ def generate_site_for_business(self, business_id: str):
                         for img in generated_images
                         if isinstance(img, dict) and img.get("slot")
                     }
+
+                # Carry forward custom pricing from manual_input so the claim bar
+                # can read it from design_brief without an extra Business query.
+                _manual_in = (business.raw_data or {}).get("manual_input") or {}
+                _one_time = _manual_in.get("one_time_price")
+                _monthly  = _manual_in.get("monthly_price")
+                if _one_time is not None or _monthly is not None:
+                    design_brief["pricing"] = {
+                        k: v for k, v in {
+                            "one_time_price": _one_time,
+                            "monthly_price":  _monthly,
+                        }.items() if v is not None
+                    }
+
                 site.design_brief = design_brief
                 site.status = "completed"
                 site.generation_completed_at = datetime.utcnow()
