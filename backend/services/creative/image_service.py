@@ -721,17 +721,41 @@ class ImageGenerationService:
             "Ultra-realistic, high-fidelity, premium quality."
         )
 
+        subject = spec["desc"]  # human-readable description of what the image shows
+
         png_bytes = await self._call_gemini(full_prompt, aspect)
         if not png_bytes:
-            return {"slot": slot, "filename": None, "saved": False, "full_prompt": full_prompt}
+            return {
+                "slot": slot,
+                "filename": None,
+                "saved": False,
+                "full_prompt": full_prompt,
+                "subject": subject,
+            }
 
         jpeg_bytes = self._compress_to_jpeg(png_bytes)
         filename = f"img/{slot}.jpg"
+
+        # ── Save canonical file (overwrites previous generation) ──────────────
         await self._save(jpeg_bytes, subdomain, f"{slot}.jpg")
 
+        # ── Save versioned copy so previous generations can be recovered ──────
+        import time as _time
+        version_stamp = int(_time.time())
+        versioned_name = f"{slot}_v{version_stamp}.jpg"
+        await self._save(jpeg_bytes, subdomain, versioned_name)
+
         size_kb = len(jpeg_bytes) / 1024
-        logger.info(f"[ImageGen] {slot}: {size_kb:.0f} KB saved → {filename}")
-        return {"slot": slot, "filename": filename, "saved": True, "full_prompt": full_prompt}
+        logger.info(f"[ImageGen] {slot}: {size_kb:.0f} KB → {filename} + versions/{versioned_name}")
+
+        return {
+            "slot": slot,
+            "filename": filename,
+            "saved": True,
+            "full_prompt": full_prompt,
+            "subject": subject,
+            "version": f"img/{versioned_name}",
+        }
 
     async def _call_gemini(self, prompt: str, aspect_ratio: str) -> Optional[bytes]:
         url = f"{self.BASE_URL}/models/{self.MODEL}:generateContent"

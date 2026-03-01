@@ -22,6 +22,11 @@ import {
   Minimize2,
   XCircle,
   Download,
+  Shuffle,
+  History,
+  ChevronDown,
+  ChevronUp,
+  Check,
 } from 'lucide-react'
 import { api } from '@/services/api'
 import { Badge, Button, Card, CardBody, ConfirmModal } from '@/components/ui'
@@ -63,6 +68,7 @@ export const GeneratedSiteDetailPage = () => {
   const [iframeFullscreen, setIframeFullscreen] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<ConfirmAction | null>(null)
+  const [showVersionBrowser, setShowVersionBrowser] = useState(false)
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['generated-site-detail', siteId] })
@@ -137,11 +143,49 @@ export const GeneratedSiteDetailPage = () => {
     },
   })
 
+  const remapImagesMutation = useMutation({
+    mutationFn: () => api.remapProductImages(siteId!),
+    onSuccess: (data) => {
+      invalidate()
+      setPendingAction(null)
+      if (data.success) {
+        alert(`✅ ${data.message}`)
+      } else {
+        alert(`ℹ️ ${data.message}`)
+      }
+    },
+    onError: (err: any) => {
+      setPendingAction(null)
+      alert(`❌ Remap failed: ${err?.response?.data?.detail ?? err?.message}`)
+    },
+  })
+
+  const activateVersionMutation = useMutation({
+    mutationFn: ({ slot, versionFilename }: { slot: string; versionFilename: string }) =>
+      api.activateImageVersion(siteId!, slot, versionFilename),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['image-versions', siteId] })
+      invalidate()
+      alert(`✅ ${data.message}`)
+    },
+    onError: (err: any) => {
+      alert(`❌ Failed: ${err?.response?.data?.detail ?? err?.message}`)
+    },
+  })
+
+  const imageVersionsQuery = useQuery({
+    queryKey: ['image-versions', siteId],
+    queryFn: () => api.getImageVersions(siteId!),
+    enabled: showVersionBrowser && !!siteId,
+  })
+
   const isAnyMutationPending =
     regenerateMutation.isPending ||
     regenImagesMutation.isPending ||
     markHasWebsiteMutation.isPending ||
-    markUnreachableMutation.isPending
+    markUnreachableMutation.isPending ||
+    remapImagesMutation.isPending ||
+    activateVersionMutation.isPending
 
   const { data: site, isLoading, error } = useQuery({
     queryKey: ['generated-site-detail', siteId],
@@ -463,6 +507,81 @@ export const GeneratedSiteDetailPage = () => {
                         <ImagePlus className={`w-4 h-4 ${regenImagesMutation.isPending ? 'animate-spin' : ''}`} />
                         {regenImagesMutation.isPending ? 'Generating…' : 'Regenerate Images'}
                       </Button>
+                    )}
+
+                    {/* Remap product images — fix mismatch without regenerating */}
+                    {(site.status === 'completed' || site.status === 'published') && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="w-full flex items-center justify-center gap-2 text-indigo-700 hover:bg-indigo-50"
+                        onClick={() =>
+                          setPendingAction({
+                            title: 'Remap Product Images?',
+                            message:
+                              'This uses AI to match each product image to the correct product card based on what each image depicts. It fixes mismatches without regenerating the whole site.',
+                            confirmLabel: 'Yes, Remap Images',
+                            variant: 'default',
+                            onConfirm: () => remapImagesMutation.mutate(),
+                          })
+                        }
+                        disabled={remapImagesMutation.isPending}
+                      >
+                        <Shuffle className={`w-4 h-4 ${remapImagesMutation.isPending ? 'animate-spin' : ''}`} />
+                        {remapImagesMutation.isPending ? 'Remapping…' : 'Remap Product Images'}
+                      </Button>
+                    )}
+
+                    {/* Image version browser */}
+                    {(site.status === 'completed' || site.status === 'published') && (
+                      <div>
+                        <button
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-md border border-border text-xs text-text-secondary hover:bg-surface-elevated transition-colors"
+                          onClick={() => setShowVersionBrowser(v => !v)}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <History className="w-3.5 h-3.5" />
+                            Image Version History
+                          </span>
+                          {showVersionBrowser ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        </button>
+
+                        {showVersionBrowser && (
+                          <div className="mt-2 border border-border rounded-md overflow-hidden">
+                            {imageVersionsQuery.isLoading && (
+                              <p className="p-3 text-xs text-text-secondary">Loading versions…</p>
+                            )}
+                            {imageVersionsQuery.data && Object.keys(imageVersionsQuery.data.slots).length === 0 && (
+                              <p className="p-3 text-xs text-text-secondary">No version history yet. Versions are saved each time images are generated.</p>
+                            )}
+                            {imageVersionsQuery.data && Object.entries(imageVersionsQuery.data.slots).map(([slot, info]) => (
+                              <div key={slot} className="border-b border-border last:border-0 p-2">
+                                <p className="text-xs font-semibold text-text-primary mb-0.5">{slot}</p>
+                                {info.subject && (
+                                  <p className="text-xs text-text-secondary mb-1 line-clamp-2">{info.subject.split('.')[0]}</p>
+                                )}
+                                <div className="space-y-1">
+                                  {info.versions.map((v) => (
+                                    <div key={v.filename} className="flex items-center justify-between gap-2">
+                                      <span className="text-xs text-text-secondary font-mono truncate">
+                                        {new Date(v.timestamp * 1000).toLocaleString()}
+                                      </span>
+                                      <button
+                                        className="flex-shrink-0 flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors disabled:opacity-50"
+                                        onClick={() => activateVersionMutation.mutate({ slot, versionFilename: v.filename })}
+                                        disabled={activateVersionMutation.isPending}
+                                      >
+                                        <Check className="w-3 h-3" />
+                                        Use
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}

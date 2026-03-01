@@ -506,6 +506,29 @@ class ApiClient {
     return response.data
   }
 
+  async remapProductImages(siteId: string): Promise<{ success: boolean; message: string; mapping: Record<string, string> }> {
+    const response = await this.client.post(`/sites/${siteId}/remap-product-images`)
+    return response.data
+  }
+
+  async getImageVersions(siteId: string): Promise<{
+    subdomain: string
+    slots: Record<string, {
+      subject: string | null
+      versions: Array<{ filename: string; timestamp: number }>
+    }>
+  }> {
+    const response = await this.client.get(`/sites/${siteId}/image-versions`)
+    return response.data
+  }
+
+  async activateImageVersion(siteId: string, slot: string, versionFilename: string): Promise<{ success: boolean; message: string; slot: string; canonical: string }> {
+    const response = await this.client.post(`/sites/${siteId}/activate-image-version`, null, {
+      params: { slot, version_filename: versionFilename },
+    })
+    return response.data
+  }
+
   // ============================================
   // PROMPT SETTINGS METHODS
   // ============================================

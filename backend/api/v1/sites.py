@@ -12,10 +12,13 @@ from sqlalchemy import select
 from typing import Optional
 from uuid import UUID
 import io
+import json
 import logging
 import re
+import time
 
 from core.database import get_db
+from core.config import get_settings as _get_settings
 from api.deps import get_current_user
 from api.schemas.site import (
     SiteGenerateRequest,
@@ -558,8 +561,6 @@ async def regenerate_site_images(
     even though the file on disk has been replaced.  Only the 3 src attributes change —
     no other HTML is touched.
     """
-    import re
-    import time
     from sqlalchemy import select
     from models.site import GeneratedSite
     from models.business import Business
@@ -623,23 +624,44 @@ async def regenerate_site_images(
 
     # ── Save prompts + cache-bust HTML ──────────────────────────────────────
     if saved:
-        # 1. Persist the exact prompts used so they can be reviewed/improved.
+        # 1. Persist prompts, subjects, and version history for each regenerated slot.
+        updated_brief = dict(site.design_brief or {})
         new_prompts = {
             r["slot"]: r.get("full_prompt")
             for r in image_results
             if isinstance(r, dict) and r.get("slot") and r.get("full_prompt")
         }
-        if new_prompts and site.design_brief is not None:
-            updated_brief = dict(site.design_brief)
+        if new_prompts:
             updated_brief["image_prompts"] = {
                 **(updated_brief.get("image_prompts") or {}),
                 **new_prompts,
             }
-            site.design_brief = updated_brief
-            logger.info(
-                f"[RegenImages] Saved prompts for slots {list(new_prompts.keys())} "
-                f"into design_brief for site {site_id}"
-            )
+
+        new_subjects = {
+            r["slot"]: r.get("subject")
+            for r in image_results
+            if isinstance(r, dict) and r.get("slot") and r.get("subject")
+        }
+        if new_subjects:
+            updated_brief["image_subjects"] = {
+                **(updated_brief.get("image_subjects") or {}),
+                **new_subjects,
+            }
+
+        # Append versioned filenames for history tracking
+        _run_ts = int(time.time())
+        prev_versions = updated_brief.get("image_versions") or {}
+        for r in image_results:
+            if isinstance(r, dict) and r.get("slot") and r.get("version"):
+                entry = {"filename": r["version"], "timestamp": _run_ts}
+                prev_versions.setdefault(r["slot"], []).append(entry)
+        updated_brief["image_versions"] = prev_versions
+
+        site.design_brief = updated_brief
+        logger.info(
+            f"[RegenImages] Updated design_brief for site {site_id} "
+            f"(slots: {list(new_prompts.keys())})"
+        )
 
         # 2. Append ?v=<timestamp> cache-busters to img src attributes in the
         #    stored HTML so browsers bypass Nginx's 30-day .jpg cache.
@@ -666,6 +688,255 @@ async def regenerate_site_images(
         "slots": {r["slot"]: r.get("filename") for r in image_results if r.get("saved")},
         "failed_slots": failed,
         "message": f"Regenerated {len(saved)}/{len(image_results)} images for {business_name}",
+    }
+
+
+@router.post("/{site_id}/remap-product-images")
+async def remap_product_images(
+    site_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user),
+):
+    """
+    Fix image-to-product mismatches on an existing generated site without full regeneration.
+
+    Reads the stored image subjects from design_brief (set during generation) and the
+    product card HTML, then uses Claude to determine the optimal image ↔ product-name
+    mapping and updates the src attributes in the stored HTML.
+
+    This is a targeted fix that costs a few hundred tokens instead of the full pipeline.
+    """
+    import anthropic
+
+    result = await db.execute(select(GeneratedSite).where(GeneratedSite.id == site_id))
+    site = result.scalar_one_or_none()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    if not site.html_content:
+        raise HTTPException(status_code=400, detail="Site has no HTML content")
+
+    brief = site.design_brief or {}
+
+    # Build image subject map — prefer stored subjects, fall back to parsing full_prompt
+    image_subjects: dict = brief.get("image_subjects") or {}
+    if not image_subjects:
+        for slot, full_prompt in (brief.get("image_prompts") or {}).items():
+            if full_prompt:
+                # full_prompt starts with desc, ends with "For a business called '...'"
+                subject = full_prompt.split("For a business called")[0].strip()
+                if subject:
+                    image_subjects[slot] = subject
+
+    if not image_subjects:
+        raise HTTPException(
+            status_code=400,
+            detail="No image subject data found in design_brief — regenerate images first"
+        )
+
+    # Extract all `img/product-N.jpg` occurrences with their surrounding context
+    product_src_pattern = re.compile(
+        r'src=["\']img/(product-\d+)\.jpg(?:\?[^"\']*)?["\']'
+    )
+    slots_in_html = product_src_pattern.findall(site.html_content)
+    if not slots_in_html:
+        raise HTTPException(status_code=400, detail="No product image src attributes found in HTML")
+
+    # Build context for Claude: what does each image file show, and what slot is currently there
+    image_index = "\n".join(
+        f"  {slot}: \"{subject}\""
+        for slot, subject in sorted(image_subjects.items())
+    )
+
+    # Ask Claude to produce the correct mapping: each product card slot → image slot
+    prompt = f"""You are fixing an ecommerce website where product images were assigned in the wrong order.
+
+The website has these product image files. Each file depicts a specific item:
+{image_index}
+
+The HTML currently places product images using `src="img/product-N.jpg"` attributes.
+There are {len(set(slots_in_html))} unique product slots used in the HTML: {sorted(set(slots_in_html))}
+
+Your job: produce a JSON object that maps each CURRENT slot in the HTML to the slot it SHOULD be
+(i.e. which image file best fits each position based on what the image depicts).
+The goal is that product cards with names like "cat tree" or "scratching post" get the image
+that shows a cat tree, not a water fountain.
+
+Here is a snippet of the HTML product section to help you understand the current product names:
+{site.html_content[site.html_content.lower().find('featured') if 'featured' in site.html_content.lower() else 0:][:3000]}
+
+Return ONLY a valid JSON object in this exact format — no explanation:
+{{
+  "product-1": "product-X",
+  "product-2": "product-Y",
+  ...
+}}
+where the keys are the current slots used in HTML and the values are the correct image slots to use.
+Every slot that appears in the HTML must be present as a key. Values must be valid slot names from
+the image index above."""
+
+    client = anthropic.Anthropic()
+    response = client.messages.create(
+        model="claude-haiku-4-5",
+        max_tokens=512,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    raw = response.content[0].text.strip()
+
+    # Parse the JSON mapping
+    try:
+        # Strip markdown fences if present
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        mapping: dict = json.loads(raw)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Claude returned invalid JSON: {e}. Raw: {raw[:200]}"
+        )
+
+    # Validate: all mapped-to slots must exist as image files on disk
+    from pathlib import Path as _Path
+    img_dir = _Path(_get_settings().SITES_BASE_PATH) / site.subdomain / "img"
+
+    valid_mapping = {
+        current: target
+        for current, target in mapping.items()
+        if current != target  # skip no-ops
+        and (img_dir / f"{target}.jpg").exists()
+    }
+
+    if not valid_mapping:
+        return {
+            "success": False,
+            "message": "Claude determined that no remapping is necessary (images already correctly assigned)",
+            "mapping": mapping,
+        }
+
+    # Apply the mapping: replace src="img/product-N.jpg" occurrences in HTML
+    # Use a two-pass approach with a sentinel to avoid double-replacement
+    updated_html = site.html_content
+    version = int(time.time())
+    sentinel_map = {}
+    for current_slot, target_slot in valid_mapping.items():
+        sentinel = f"__REMAP_{current_slot.upper()}__"
+        sentinel_map[sentinel] = f"img/{target_slot}.jpg?v={version}"
+        updated_html = re.sub(
+            rf'(src=["\'])img/{re.escape(current_slot)}\.jpg(?:\?[^"\']*)?(["\'])',
+            rf'\g<1>{sentinel}\g<2>',
+            updated_html,
+        )
+    for sentinel, replacement in sentinel_map.items():
+        updated_html = updated_html.replace(sentinel, replacement)
+
+    site.html_content = updated_html
+    await db.commit()
+
+    logger.info(
+        "[RemapImages] Applied %d remappings for site %s: %s",
+        len(valid_mapping), site_id, valid_mapping,
+    )
+
+    return {
+        "success": True,
+        "message": f"Remapped {len(valid_mapping)} product image(s)",
+        "mapping": valid_mapping,
+    }
+
+
+@router.get("/{site_id}/image-versions")
+async def get_image_versions(
+    site_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user),
+):
+    """
+    Return the version history for all image slots on a site.
+    Version entries are stored in design_brief.image_versions, created each time
+    images are generated or regenerated.
+    """
+    result = await db.execute(select(GeneratedSite).where(GeneratedSite.id == site_id))
+    site = result.scalar_one_or_none()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    brief = site.design_brief or {}
+    versions = brief.get("image_versions") or {}
+    subjects = brief.get("image_subjects") or {}
+
+    return {
+        "subdomain": site.subdomain,
+        "slots": {
+            slot: {
+                "subject": subjects.get(slot),
+                "versions": sorted(entries, key=lambda x: x.get("timestamp", 0), reverse=True),
+            }
+            for slot, entries in versions.items()
+        },
+    }
+
+
+@router.post("/{site_id}/activate-image-version")
+async def activate_image_version(
+    site_id: UUID,
+    slot: str = Query(..., description="Image slot, e.g. 'product-1' or 'hero'"),
+    version_filename: str = Query(..., description="Versioned filename, e.g. 'img/product-1_v1709000000.jpg'"),
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user),
+):
+    """
+    Make a previously-generated image version the active (canonical) image for a slot.
+
+    Copies the versioned file to the canonical filename (e.g. product-1.jpg) and
+    appends a cache-buster to the HTML src so browsers fetch the new version.
+    """
+    import shutil as _shutil
+    from pathlib import Path as _Path2
+
+    result = await db.execute(select(GeneratedSite).where(GeneratedSite.id == site_id))
+    site = result.scalar_one_or_none()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    img_dir = _Path2(_get_settings().SITES_BASE_PATH) / site.subdomain / "img"
+
+    # Resolve source path — version_filename is relative like "img/product-1_v123.jpg"
+    versioned_name = version_filename.lstrip("img/").lstrip("/")
+    src_path = img_dir / versioned_name
+    if not src_path.exists():
+        raise HTTPException(status_code=404, detail=f"Versioned file not found: {versioned_name}")
+
+    canonical_name = f"{slot}.jpg"
+    dest_path = img_dir / canonical_name
+
+    # Copy versioned → canonical
+    _shutil.copy2(str(src_path), str(dest_path))
+
+    # Update HTML src with cache-buster
+    version_stamp = int(time.time())
+    if site.html_content:
+        updated_html = re.sub(
+            rf'(src=["\'])img/{re.escape(slot)}\.jpg(?:\?[^"\']*)?(["\'])',
+            rf'\g<1>img/{slot}.jpg?v={version_stamp}\g<2>',
+            site.html_content,
+        )
+        if updated_html != site.html_content:
+            site.html_content = updated_html
+
+    await db.commit()
+
+    logger.info(
+        "[ActivateVersion] Site %s slot '%s': activated %s",
+        site_id, slot, versioned_name,
+    )
+
+    return {
+        "success": True,
+        "message": f"Activated {versioned_name} as the active image for slot '{slot}'",
+        "slot": slot,
+        "canonical": f"img/{canonical_name}",
+        "version_stamp": version_stamp,
     }
 
 
