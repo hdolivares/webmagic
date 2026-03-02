@@ -135,32 +135,53 @@ def discover_missing_websites_v2(self, business_id: str) -> Dict[str, Any]:
             # we should validate that URL directly instead of running a new search.
             raw_data_url = _extract_website_from_raw_data(business.raw_data)
             if raw_data_url:
-                logger.info(
-                    f"✅ Found URL in Outscraper raw_data for {business.name}: {raw_data_url} "
-                    f"— skipping ScrapingDog, queuing for direct validation"
-                )
-                business.website_url = raw_data_url
-                business.website_metadata = metadata_service.record_discovery_attempt(
-                    business.website_metadata,
-                    method="outscraper",
-                    found_url=True,
-                    url_found=raw_data_url,
-                    valid=False,  # Not yet validated by Playwright+LLM
-                    notes=f"Recovered URL from Outscraper raw_data: {raw_data_url}"
-                )
-                business.website_validation_status = ValidationState.NEEDS_DISCOVERY.value
-                db.commit()
-
-                # Queue for full Playwright + LLM validation
-                from tasks.validation_tasks_enhanced import validate_business_website_v2
-                validation_task = validate_business_website_v2.delay(str(business.id))
-                logger.info(f"Queued validation for raw_data URL (task: {validation_task.id})")
-                return {
-                    "business_id": business_id,
-                    "status": "raw_data_url_found",
-                    "url": raw_data_url,
-                    "validation_task_id": validation_task.id
+                # LOOP GUARD: skip URLs already confirmed dead or invalid.
+                # Without this, the pipeline loops forever:
+                #   raw_data URL → validation fails (dead domain) → re-queues discovery
+                #   → discovery finds same raw_data URL → re-queues validation → repeat.
+                meta = business.website_metadata or {}
+                previously_failed_urls = {
+                    entry.get("url")
+                    for entry in meta.get("validation_history", [])
+                    if entry.get("url") and (
+                        entry.get("action") == "dead_domain_cleared"
+                        or entry.get("verdict") == "invalid"
+                    )
                 }
+                if raw_data_url in previously_failed_urls:
+                    logger.warning(
+                        f"⚠️ raw_data URL {raw_data_url!r} was previously confirmed "
+                        f"dead/invalid for {business.name} — skipping raw_data shortcut, "
+                        f"falling through to ScrapingDog"
+                    )
+                    # raw_data_url intentionally not used; falls through to ScrapingDog below
+                else:
+                    logger.info(
+                        f"✅ Found URL in Outscraper raw_data for {business.name}: {raw_data_url} "
+                        f"— skipping ScrapingDog, queuing for direct validation"
+                    )
+                    business.website_url = raw_data_url
+                    business.website_metadata = metadata_service.record_discovery_attempt(
+                        business.website_metadata,
+                        method="outscraper",
+                        found_url=True,
+                        url_found=raw_data_url,
+                        valid=False,  # Not yet validated by Playwright+LLM
+                        notes=f"Recovered URL from Outscraper raw_data: {raw_data_url}"
+                    )
+                    business.website_validation_status = ValidationState.NEEDS_DISCOVERY.value
+                    db.commit()
+
+                    # Queue for full Playwright + LLM validation
+                    from tasks.validation_tasks_enhanced import validate_business_website_v2
+                    validation_task = validate_business_website_v2.delay(str(business.id))
+                    logger.info(f"Queued validation for raw_data URL (task: {validation_task.id})")
+                    return {
+                        "business_id": business_id,
+                        "status": "raw_data_url_found",
+                        "url": raw_data_url,
+                        "validation_task_id": validation_task.id
+                    }
 
             # ================================================================
             # CLOSED BUSINESS GUARD — stop here, don't spend ScrapingDog

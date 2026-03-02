@@ -623,6 +623,12 @@ def _handle_technical_failure(
         import copy
         meta = copy.deepcopy(business.website_metadata or {})
         history = meta.get("validation_history", [])
+
+        # Count prior dead-domain re-queue cycles before appending this one
+        dead_domain_requeue_count = sum(
+            1 for e in history if e.get("action") == "dead_domain_cleared"
+        )
+
         history.append({
             "timestamp": datetime.utcnow().isoformat(),
             "action": "dead_domain_cleared",
@@ -631,8 +637,35 @@ def _handle_technical_failure(
             "notes": "DNS lookup returned NXDOMAIN — domain is unregistered or dead. Re-queuing ScrapingDog.",
         })
         meta["validation_history"] = history
+        business.website_metadata = meta
 
-        # Reset scrapingdog attempt flag so it can run again
+        # Safety valve: stop cycling after too many dead-domain re-queues.
+        # The discovery_tasks loop guard (raw_data URL check) handles most cases,
+        # but this catches any other path that could cause repeated cycling.
+        MAX_DEAD_DOMAIN_REQUEUES = 3
+        if dead_domain_requeue_count >= MAX_DEAD_DOMAIN_REQUEUES:
+            logger.warning(
+                f"🛑 Max dead-domain requeues ({MAX_DEAD_DOMAIN_REQUEUES}) reached for "
+                f"{business.name} ({url}). Marking as confirmed_no_website."
+            )
+            business.website_url = None
+            business.website_validation_status = ValidationState.CONFIRMED_NO_WEBSITE.value
+            business.website_validation_result = {
+                "verdict": "confirmed_no_website",
+                "reason": "max_dead_domain_requeues_reached",
+                "url": url,
+                "requeue_count": dead_domain_requeue_count,
+            }
+            business.website_validated_at = datetime.utcnow()
+            db.commit()
+            return {
+                "business_id": str(business.id),
+                "status": "confirmed_no_website",
+                "reason": "max_dead_domain_requeues_reached",
+                "url": url,
+            }
+
+        # Reset scrapingdog attempt flag so it can run again with a fresh search
         attempts = meta.get("discovery_attempts", {})
         attempts["scrapingdog"] = {}
         meta["discovery_attempts"] = attempts
