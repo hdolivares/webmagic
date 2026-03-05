@@ -501,6 +501,14 @@ class ApiClient {
     return response.data
   }
 
+  async regenerateHeroImage(
+    siteId: string,
+    payload?: { hero_guidance?: string }
+  ): Promise<{ success: boolean; message: string; saved: boolean; slot: string }> {
+    const response = await this.client.post(`/sites/${siteId}/regenerate-hero-image`, payload ?? {})
+    return response.data
+  }
+
   async regenerateSite(siteId: string): Promise<{ site_id: string; status: string; message: string }> {
     const response = await this.client.post(`/sites/${siteId}/regenerate`)
     return response.data

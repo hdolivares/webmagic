@@ -150,6 +150,14 @@ class SiteGenerationResult(BaseModel):
     summary: Optional[Dict[str, Any]]
 
 
+class RegenerateHeroImageRequest(BaseModel):
+    """Request body for regenerating only the hero image with optional guidance."""
+    hero_guidance: Optional[str] = Field(
+        None,
+        description="User's description of the hero image. If provided, an LLM merges it with site branding.",
+    )
+
+
 class SiteUpdate(BaseModel):
     """Site update schema."""
     status: Optional[str] = Field(None, pattern="^(draft|preview|live|archived)$")

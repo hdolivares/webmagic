@@ -188,6 +188,8 @@ export const GeneratedSiteDetailPage = () => {
   const [pendingAction, setPendingAction] = useState<ConfirmAction | null>(null)
   const [showVersionBrowser, setShowVersionBrowser] = useState(false)
   const [showEditPromptsModal, setShowEditPromptsModal] = useState(false)
+  const [showRegenHeroModal, setShowRegenHeroModal] = useState(false)
+  const [heroGuidanceInput, setHeroGuidanceInput] = useState('')
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['generated-site-detail', siteId] })
@@ -263,6 +265,24 @@ export const GeneratedSiteDetailPage = () => {
     },
   })
 
+  const regenHeroMutation = useMutation({
+    mutationFn: (payload?: { hero_guidance?: string }) => api.regenerateHeroImage(siteId!, payload),
+    onSuccess: (data) => {
+      invalidate()
+      queryClient.invalidateQueries({ queryKey: ['image-versions', siteId] })
+      setShowRegenHeroModal(false)
+      setHeroGuidanceInput('')
+      if (data.saved) {
+        alert(`✅ ${data.message}`)
+      } else {
+        alert(`⚠️ ${data.message}`)
+      }
+    },
+    onError: (err: any) => {
+      alert(`❌ Hero image regeneration failed: ${err?.response?.data?.detail ?? err?.message}`)
+    },
+  })
+
   const remapImagesMutation = useMutation({
     mutationFn: () => api.remapProductImages(siteId!),
     onSuccess: (data) => {
@@ -313,6 +333,7 @@ export const GeneratedSiteDetailPage = () => {
   const isAnyMutationPending =
     regenerateMutation.isPending ||
     regenImagesMutation.isPending ||
+    regenHeroMutation.isPending ||
     regenerateWithPromptsMutation.isPending ||
     markHasWebsiteMutation.isPending ||
     markUnreachableMutation.isPending ||
@@ -675,6 +696,20 @@ export const GeneratedSiteDetailPage = () => {
                       </Button>
                     )}
 
+                    {/* Regenerate hero only — with optional guidance */}
+                    {(site.status === 'completed' || site.status === 'published') && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="w-full flex items-center justify-center gap-2 text-teal-700 hover:bg-teal-50"
+                        onClick={() => setShowRegenHeroModal(true)}
+                        disabled={regenHeroMutation.isPending}
+                      >
+                        <ImagePlus className={`w-4 h-4 ${regenHeroMutation.isPending ? 'animate-spin' : ''}`} />
+                        {regenHeroMutation.isPending ? 'Generating…' : 'Regenerate Hero Image'}
+                      </Button>
+                    )}
+
                     {/* Remap product images — fix mismatch without regenerating */}
                     {(site.status === 'completed' || site.status === 'published') && (
                       <Button
@@ -813,6 +848,48 @@ export const GeneratedSiteDetailPage = () => {
           isLoading={isAnyMutationPending}
           onCancel={() => setPendingAction(null)}
         />
+      )}
+
+      {/* Regenerate hero image modal */}
+      {showRegenHeroModal && (
+        <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/50 p-4" onClick={() => setShowRegenHeroModal(false)}>
+          <div className="bg-surface border border-border rounded-xl shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-border">
+              <h3 className="text-lg font-semibold text-text-primary">Regenerate Hero Image</h3>
+            </div>
+            <form
+              className="p-4 space-y-4"
+              onSubmit={e => {
+                e.preventDefault()
+                regenHeroMutation.mutate(heroGuidanceInput.trim() ? { hero_guidance: heroGuidanceInput.trim() } : undefined)
+              }}
+            >
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-1">
+                  Describe the hero image you&apos;d like (optional)
+                </label>
+                <textarea
+                  value={heroGuidanceInput}
+                  onChange={e => setHeroGuidanceInput(e.target.value)}
+                  placeholder="e.g. A cozy interior with warm lighting and plants"
+                  className="w-full h-24 px-3 py-2 rounded-md border border-border bg-surface text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  disabled={regenHeroMutation.isPending}
+                />
+                <p className="mt-1 text-xs text-text-secondary">
+                  Leave blank to use the default. Your description will be combined with the site&apos;s branding for a cohesive look.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={() => setShowRegenHeroModal(false)} disabled={regenHeroMutation.isPending}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={regenHeroMutation.isPending}>
+                  {regenHeroMutation.isPending ? 'Generating…' : 'Regenerate Hero Image'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* Edit prompts modal (manual sites) */}
