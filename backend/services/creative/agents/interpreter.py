@@ -35,7 +35,11 @@ Respond with a single valid JSON object. No markdown, no explanation, JSON only.
 """
 
 
-def _build_user_prompt(description: str, hard_facts: Dict[str, Any]) -> str:
+def _build_user_prompt(
+    description: str,
+    hard_facts: Dict[str, Any],
+    language: Optional[str] = None,
+) -> str:
     facts_lines = "\n".join(
         f"  {key}: {value}"
         for key, value in hard_facts.items()
@@ -46,9 +50,12 @@ def _build_user_prompt(description: str, hard_facts: Dict[str, Any]) -> str:
         if facts_lines
         else ""
     )
+    lang_section = ""
+    if language and language.lower() not in ("en", "english"):
+        lang_section = f"LANGUAGE: Generate all text content (tagline, about, services, etc.) in {language}.\n\n"
 
     return f"""\
-{facts_section}FREE-FORM DESCRIPTION:
+{facts_section}{lang_section}FREE-FORM DESCRIPTION:
 {description}
 
 Based on the above, produce a JSON profile with exactly these fields:
@@ -91,6 +98,7 @@ class BusinessInterpreterAgent(BaseAgent):
         self,
         description: str,
         hard_facts: Optional[Dict[str, Any]] = None,
+        language: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Interpret a free-form description into a structured business profile.
@@ -100,18 +108,20 @@ class BusinessInterpreterAgent(BaseAgent):
             hard_facts: Optional dict with explicitly confirmed fields
                         (name, phone, email, address, city, state). These
                         are used verbatim and never overridden by inference.
+            language: Optional target language for generated content (e.g. 'Spanish').
 
         Returns:
             Structured `interpreted_profile` dict ready for `business_data`.
         """
         hard_facts = {k: v for k, v in (hard_facts or {}).items() if v}
         logger.info(
-            "[interpreter] Interpreting description (%d chars) with %d hard facts",
+            "[interpreter] Interpreting description (%d chars) with %d hard facts, language=%s",
             len(description),
             len(hard_facts),
+            language or "en",
         )
 
-        user_prompt = _build_user_prompt(description, hard_facts)
+        user_prompt = _build_user_prompt(description, hard_facts, language)
 
         try:
             profile = await self.generate_json(_SYSTEM_PROMPT, user_prompt)

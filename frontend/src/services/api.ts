@@ -506,6 +506,14 @@ class ApiClient {
     return response.data
   }
 
+  async regenerateSiteWithPrompts(
+    siteId: string,
+    payload: import('@/types').ManualGenerationRequest
+  ): Promise<{ site_id: string; status: string; message: string }> {
+    const response = await this.client.post(`/sites/${siteId}/regenerate-with-prompts`, payload)
+    return response.data
+  }
+
   async remapProductImages(siteId: string): Promise<{ success: boolean; message: string; mapping: Record<string, string> }> {
     const response = await this.client.post(`/sites/${siteId}/remap-product-images`)
     return response.data

@@ -206,8 +206,13 @@ document.addEventListener('DOMContentLoaded', () => {
         # STEP 6b: Inject ecommerce layout instructions when requested
         website_type = business_data.get("website_type", "informational")
         if website_type == "ecommerce":
-            currency_symbol = business_data.get("currency_symbol") or "$"
-            user_prompt += self._build_ecommerce_instructions(currency_symbol=currency_symbol)
+            website_currency = business_data.get("website_currency") or "$"
+            user_prompt += self._build_ecommerce_instructions(website_currency=website_currency)
+
+        # STEP 6c: Inject language instruction when specified
+        language = business_data.get("language")
+        if language and str(language).lower() not in ("en", "english"):
+            user_prompt += f"\n**LANGUAGE**: Generate ALL website copy (headings, paragraphs, buttons, nav, footer) in {language}. Use `<html lang=\"XX\">` where XX is the ISO 639-1 code (e.g. 'es' for Spanish, 'fr' for French).\n"
 
         # STEP 7: Generate code using text (not JSON)
         raw_output = await self.generate(system_prompt, user_prompt, max_tokens=64000)
@@ -225,6 +230,10 @@ document.addEventListener('DOMContentLoaded', () => {
         website["html"] = self._inject_claim_bar(website.get("html", ""), slug)
         website["css"] = self._add_claim_bar_css(website.get("css", ""))
         website["js"] = self._add_claim_bar_js(website.get("js", ""), slug)
+        if website_type == "ecommerce":
+            from services.creative.cart_injection import inject_ecommerce_cart_js
+            website_currency = business_data.get("website_currency") or "$"
+            website["js"] = inject_ecommerce_cart_js(website.get("js", ""), currency_symbol=website_currency)
         
         # STEP 11: Extract generation context for edit pipeline
         website["generation_context"] = self._extract_generation_context(
@@ -250,15 +259,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     # ── Ecommerce layout instructions ─────────────────────────────────────────
 
-    def _build_ecommerce_instructions(self, currency_symbol: str = "$") -> str:
+    def _build_ecommerce_instructions(self, website_currency: str = "$") -> str:
         """
         Return a prompt block that instructs the architect to produce an
-        ecommerce-style layout instead of the default informational layout.
-
-        The ecommerce site is a visually complete static HTML page — no real
-        cart, checkout, or payment backend is included.
+        ecommerce-style layout. Product prices use website_currency (separate
+        from claim bar currency). Cart modal is injected separately.
         """
-        _CUR = currency_symbol  # short alias for the template replacement below
+        _CUR = website_currency  # currency for product prices only
         _template = """
 
 ---
@@ -269,7 +276,7 @@ Use this exact section order in the METADATA "sections" array:
 ["nav", "hero", "categories", "featured-products", "deals", "bestsellers", "social-proof", "newsletter", "footer"]
 
 Layout requirements:
-1. NAV — sticky header with logo, category links, a cart icon (decorative, no JS logic), and search bar (cosmetic only).
+1. NAV — sticky header with logo, category links, a cart icon button with id="nav-cart-btn", and search bar (cosmetic only).
 2. HERO — full-width banner with "Shop Now" CTA button and a compelling headline about the shop.
 3. CATEGORIES — 3–6 visual category cards in a CSS grid, each with a category image placeholder, name, and "Browse →" link.
 4. FEATURED PRODUCTS — 4-product grid. Each product card must include:
@@ -280,8 +287,10 @@ Layout requirements:
      NEVER use the same image for more than one card.
    - Product name — MUST describe what is depicted in the card's image
    - Short one-line description that matches the image content
-   - Price (realistic placeholder like "__CUR__29.99" or "__CUR__49.00" — always use __CUR__ as the currency prefix)
-   - "Add to Cart" button (decorative — no real cart logic)
+   - Price (realistic placeholder like "__CUR__29.99" or "__CUR__49.00" — always use __CUR__ for product currency)
+   - "Add to Cart" button with class="add-to-cart-btn" AND data-product-id, data-product-name, data-product-price attributes. Example:
+     <button class="add-to-cart-btn" data-product-id="product-1" data-product-name="Product Name" data-product-price="29.99">Add to Cart</button>
+     EVERY Add to Cart button (featured products, deals, bestsellers) MUST have unique data-product-id, exact product name in data-product-name, and numeric price in data-product-price.
    - Optional "Wishlist ♡" icon link
    - Optional discount badge (e.g. "Nuevo", "Popular", "-20%")
 5. DEALS OF THE DAY — a highlighted banner with 2 deal product cards. Each deal card uses its own
@@ -326,7 +335,7 @@ CSS rules specific to ecommerce:
 - "Add to Cart" button: uses `--color-primary`, fully rounded (`border-radius: 2rem`).
 - Price: bold, `--color-primary` or a dedicated `--color-price` variable.
 - Strikethrough original price (if showing a deal): `text-decoration: line-through; color: var(--color-text-muted);`.
-- Cart icon in nav: decorative SVG or Unicode cart symbol with a small badge dot — no click handler needed.
+- Cart icon in nav: SVG or Unicode cart symbol. Must be inside a clickable element with id="nav-cart-btn" (a or button). A small badge/dot for item count will be injected by script.
 - Sticky nav: `position: sticky; top: 0; z-index: 100; background: var(--color-surface); box-shadow: var(--shadow-md);`.
 - Deals section deal cards: white card background with `border-radius: var(--radius-lg, 1rem)` so they
   pop clearly against the gradient background. Add a subtle box-shadow for depth.

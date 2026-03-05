@@ -184,6 +184,10 @@ async def generate_manual_site(
         "branding_notes": request.branding_notes,
         "branding_images": request.branding_images or [],
     }
+    if request.language:
+        manual_input["language"] = request.language
+    if request.website_currency:
+        manual_input["website_currency"] = request.website_currency
     hard_facts = {
         k: getattr(request, k)
         for k in ("name", "phone", "email", "address", "city", "state")
@@ -367,6 +371,11 @@ async def get_site(
         "js_content": site.js_content,
         "design_brief": site.design_brief,
         "assets_urls": site.assets_urls or [],
+        "manual_input": (
+            site.business.raw_data.get("manual_input")
+            if site.business and (site.business.raw_data or {}).get("manual_generation")
+            else None
+        ),
         "business": {
             "id": str(site.business.id),
             "name": site.business.name,
@@ -1001,6 +1010,97 @@ async def regenerate_site(
         site_id=site_id,
         status="generating",
         message=f"Site regeneration started for {business.name if business else str(site_id)}",
+        duration_ms=None,
+        summary=None,
+    )
+
+
+@router.post("/{site_id}/regenerate-with-prompts", response_model=SiteGenerationResult)
+async def regenerate_site_with_prompts(
+    site_id: UUID,
+    request: ManualGenerationRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user),
+):
+    """
+    Regenerate a site using updated manual form data.
+
+    Updates business.raw_data.manual_input with the provided prompts, then
+    re-queues the generation task. Use when you want to edit the prompts
+    before regenerating.
+    """
+    from tasks.generation_sync import generate_site_for_business  # lazy import
+
+    result = await db.execute(select(GeneratedSite).where(GeneratedSite.id == site_id))
+    site = result.scalar_one_or_none()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    if not site.business_id:
+        raise HTTPException(status_code=400, detail="Site has no associated business")
+
+    biz_result = await db.execute(select(Business).where(Business.id == site.business_id))
+    business = biz_result.scalar_one_or_none()
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    raw_data = dict(business.raw_data or {})
+    if not raw_data.get("manual_generation"):
+        raise HTTPException(
+            status_code=400,
+            detail="This site was not created via manual builder — use /regenerate instead",
+        )
+
+    manual_input = {
+        "description": request.description,
+        "website_type": request.website_type,
+        "branding_notes": request.branding_notes,
+        "branding_images": request.branding_images or [],
+    }
+    if request.language:
+        manual_input["language"] = request.language
+    if request.website_currency:
+        manual_input["website_currency"] = request.website_currency
+    hard_facts = {
+        k: getattr(request, k)
+        for k in ("name", "phone", "email", "address", "city", "state")
+        if getattr(request, k)
+    }
+    manual_input.update(hard_facts)
+    if request.one_time_price is not None:
+        manual_input["one_time_price"] = request.one_time_price
+    if request.monthly_price is not None:
+        manual_input["monthly_price"] = request.monthly_price
+    if request.currency_symbol:
+        manual_input["currency_symbol"] = request.currency_symbol
+
+    raw_data["manual_input"] = manual_input
+    business.raw_data = raw_data
+
+    site.html_content = None
+    site.css_content = None
+    site.js_content = None
+    site.status = "generating"
+    site.error_message = None
+    site.error_category = None
+    site.deployed_at = None
+    business.website_status = "queued"
+    business.generation_started_at = None
+    business.generation_completed_at = None
+
+    await db.commit()
+    generate_site_for_business.delay(str(site.business_id))
+
+    logger.info(
+        "Regenerate-with-prompts queued for site %s (business: %s)",
+        site_id,
+        business.id,
+    )
+
+    return SiteGenerationResult(
+        site_id=site_id,
+        status="generating",
+        message=f"Regeneration started with updated prompts for '{business.name}'",
         duration_ms=None,
         summary=None,
     )

@@ -135,7 +135,9 @@ export default function ManualSiteBuilderPage() {
 
   // ── Form state ──────────────────────────────────────────────────────────────
   const [description, setDescription] = useState('')
+  const [language, setLanguage] = useState('en')
   const [websiteType, setWebsiteType]  = useState<'informational' | 'ecommerce'>('informational')
+  const [websiteCurrency, setWebsiteCurrency] = useState('$')
   const [brandingNotes, setBrandingNotes] = useState('')
   const [brandingImages, setBrandingImages] = useState<string[]>([])
 
@@ -206,6 +208,8 @@ export default function ManualSiteBuilderPage() {
     const payload: ManualGenerationRequest = {
       description: description.trim(),
       website_type: websiteType,
+      ...(language && language !== 'en' && { language }),
+      ...(websiteType === 'ecommerce' && websiteCurrency.trim() && { website_currency: websiteCurrency.trim() }),
       ...(name.trim()    && { name:    name.trim()    }),
       ...(phone.trim()   && { phone:   phone.trim()   }),
       ...(email.trim()   && { email:   email.trim()   }),
@@ -309,6 +313,23 @@ export default function ManualSiteBuilderPage() {
                   }
                   className="manual-builder__textarea"
                 />
+                <label htmlFor="language" className="manual-builder__label mt-md">
+                  Website language
+                </label>
+                <select
+                  id="language"
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className="manual-builder__input"
+                  style={{ maxWidth: '14rem' }}
+                >
+                  <option value="en">English</option>
+                  <option value="es">Spanish</option>
+                  <option value="fr">French</option>
+                  <option value="de">German</option>
+                  <option value="pt">Portuguese</option>
+                  <option value="it">Italian</option>
+                </select>
                 <p className="manual-builder__hint">
                   The more you share, the better. Claude will understand it, fill in the gaps,
                   and build the full picture.
@@ -416,6 +437,31 @@ export default function ManualSiteBuilderPage() {
                   Website type
                 </h2>
                 <WebsiteTypeSelector value={websiteType} onChange={setWebsiteType} />
+                {websiteType === 'ecommerce' && (
+                  <div className="manual-builder__field mt-md">
+                    <label htmlFor="website-currency" className="manual-builder__label">
+                      Product currency
+                    </label>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <input
+                        id="website-currency"
+                        type="text"
+                        maxLength={8}
+                        value={websiteCurrency}
+                        onChange={(e) => setWebsiteCurrency(e.target.value)}
+                        placeholder="$"
+                        className="manual-builder__price-input"
+                        style={{ maxWidth: '6rem' }}
+                      />
+                      <span className="manual-builder__pricing-hint" style={{ margin: 0 }}>
+                        Currency for product prices (e.g. <code>$</code> <code>€</code> <code>£</code> <code>Q</code>)
+                      </span>
+                    </div>
+                    <p className="manual-builder__hint" style={{ marginTop: '0.25rem' }}>
+                      Separate from claim bar currency below.
+                    </p>
+                  </div>
+                )}
               </section>
             </CardBody>
           </Card>
@@ -503,10 +549,10 @@ export default function ManualSiteBuilderPage() {
                   <span className="manual-builder__optional-badge">Optional</span>
                 </h2>
 
-                {/* Currency symbol row */}
+                {/* Currency symbol row — for claim bar only */}
                 <div className="manual-builder__field" style={{ marginBottom: '1rem' }}>
                   <label htmlFor="currency-symbol" className="manual-builder__label">
-                    Currency symbol
+                    Claim bar currency
                   </label>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     <input
