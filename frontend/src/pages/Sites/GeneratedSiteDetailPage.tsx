@@ -31,6 +31,7 @@ import {
 import { api } from '@/services/api'
 import { Badge, Button, Card, CardBody, ConfirmModal } from '@/components/ui'
 import type { ConfirmAction } from '@/components/ui'
+import type { ManualGenerationRequest } from '@/types'
 
 // Detect closed/temporarily-closed status from the business record.
 // Falls back to raw_data for records where the model column isn't yet populated.
@@ -43,6 +44,123 @@ function getClosedStatus(business: any): 'temporarily_closed' | 'permanently_clo
   if (status === 'CLOSED_TEMPORARILY') return 'temporarily_closed'
   if (status === 'CLOSED_PERMANENTLY') return 'permanently_closed'
   return null
+}
+
+function EditPromptsModal({
+  manualInput,
+  onClose,
+  onSubmit,
+  isSubmitting,
+}: {
+  manualInput: ManualGenerationRequest
+  onClose: () => void
+  onSubmit: (payload: ManualGenerationRequest) => void
+  isSubmitting: boolean
+}) {
+  const [description, setDescription] = useState(manualInput.description || '')
+  const [websiteType, setWebsiteType] = useState<'informational' | 'ecommerce'>((manualInput.website_type as any) || 'informational')
+  const [language, setLanguage] = useState(manualInput.language || 'en')
+  const [websiteCurrency, setWebsiteCurrency] = useState(manualInput.website_currency || '$')
+  const [name, setName] = useState(manualInput.name || '')
+  const [phone, setPhone] = useState(manualInput.phone || '')
+  const [email, setEmail] = useState(manualInput.email || '')
+  const [address, setAddress] = useState(manualInput.address || '')
+  const [city, setCity] = useState(manualInput.city || '')
+  const [state, setState] = useState(manualInput.state || '')
+  const [currencySymbol, setCurrencySymbol] = useState(manualInput.currency_symbol || '$')
+  const [oneTimePrice, setOneTimePrice] = useState(String(manualInput.one_time_price ?? ''))
+  const [monthlyPrice, setMonthlyPrice] = useState(String(manualInput.monthly_price ?? ''))
+  const [brandingNotes, setBrandingNotes] = useState(manualInput.branding_notes || '')
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const payload: ManualGenerationRequest = {
+      description: description.trim(),
+      website_type: websiteType,
+      ...(language && language !== 'en' && { language }),
+      ...(websiteType === 'ecommerce' && websiteCurrency.trim() && { website_currency: websiteCurrency.trim() }),
+      ...(name.trim() && { name: name.trim() }),
+      ...(phone.trim() && { phone: phone.trim() }),
+      ...(email.trim() && { email: email.trim() }),
+      ...(address.trim() && { address: address.trim() }),
+      ...(city.trim() && { city: city.trim() }),
+      ...(state.trim() && { state: state.trim() }),
+      ...(brandingNotes.trim() && { branding_notes: brandingNotes.trim() }),
+      ...(manualInput.branding_images?.length && { branding_images: manualInput.branding_images }),
+      ...(oneTimePrice !== '' && !isNaN(parseFloat(oneTimePrice)) && { one_time_price: parseFloat(oneTimePrice) }),
+      ...(monthlyPrice !== '' && !isNaN(parseFloat(monthlyPrice)) && { monthly_price: parseFloat(monthlyPrice) }),
+      ...(currencySymbol.trim() && { currency_symbol: currencySymbol.trim() }),
+    }
+    onSubmit(payload)
+  }
+
+  return (
+    <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="bg-surface border border-border rounded-xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="p-4 border-b border-border flex justify-between items-center">
+          <h3 className="font-semibold text-text-primary">Edit Prompts & Regenerate</h3>
+          <button type="button" onClick={onClose} className="text-text-secondary hover:text-text-primary text-xl">&times;</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-4 space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">Description *</label>
+            <textarea value={description} onChange={e => setDescription(e.target.value)} required rows={4} className="w-full px-3 py-2 text-sm border border-border rounded-md" />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1">Website type</label>
+              <select value={websiteType} onChange={e => setWebsiteType(e.target.value as any)} className="w-full px-3 py-2 text-sm border border-border rounded-md">
+                <option value="informational">Informational</option>
+                <option value="ecommerce">E-commerce</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1">Language</label>
+              <select value={language} onChange={e => setLanguage(e.target.value)} className="w-full px-3 py-2 text-sm border border-border rounded-md">
+                <option value="en">English</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="pt">Portuguese</option>
+                <option value="it">Italian</option>
+              </select>
+            </div>
+          </div>
+          {websiteType === 'ecommerce' && (
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1">Product currency</label>
+              <input type="text" value={websiteCurrency} onChange={e => setWebsiteCurrency(e.target.value)} maxLength={8} className="w-full px-3 py-2 text-sm border border-border rounded-md max-w-[6rem]" placeholder="$" />
+            </div>
+          )}
+          <div className="grid grid-cols-3 gap-2">
+            <div><label className="block text-xs font-medium text-text-secondary mb-1">Name</label><input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 text-sm border border-border rounded-md" /></div>
+            <div><label className="block text-xs font-medium text-text-secondary mb-1">Phone</label><input type="text" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2 text-sm border border-border rounded-md" /></div>
+            <div><label className="block text-xs font-medium text-text-secondary mb-1">Email</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-3 py-2 text-sm border border-border rounded-md" /></div>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2"><label className="block text-xs font-medium text-text-secondary mb-1">Address</label><input type="text" value={address} onChange={e => setAddress(e.target.value)} className="w-full px-3 py-2 text-sm border border-border rounded-md" /></div>
+            <div><label className="block text-xs font-medium text-text-secondary mb-1">City</label><input type="text" value={city} onChange={e => setCity(e.target.value)} className="w-full px-3 py-2 text-sm border border-border rounded-md" /></div>
+            <div><label className="block text-xs font-medium text-text-secondary mb-1">State</label><input type="text" value={state} onChange={e => setState(e.target.value)} className="w-full px-3 py-2 text-sm border border-border rounded-md" /></div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">Branding notes</label>
+            <textarea value={brandingNotes} onChange={e => setBrandingNotes(e.target.value)} rows={2} className="w-full px-3 py-2 text-sm border border-border rounded-md" />
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            <div><label className="block text-xs font-medium text-text-secondary mb-1">Claim bar currency</label><input type="text" value={currencySymbol} onChange={e => setCurrencySymbol(e.target.value)} maxLength={8} className="w-full px-3 py-2 text-sm border border-border rounded-md" placeholder="$" /></div>
+            <div><label className="block text-xs font-medium text-text-secondary mb-1">One-time price</label><input type="number" value={oneTimePrice} onChange={e => setOneTimePrice(e.target.value)} min={0} className="w-full px-3 py-2 text-sm border border-border rounded-md" placeholder="497" /></div>
+            <div><label className="block text-xs font-medium text-text-secondary mb-1">Monthly price</label><input type="number" value={monthlyPrice} onChange={e => setMonthlyPrice(e.target.value)} min={0} className="w-full px-3 py-2 text-sm border border-border rounded-md" placeholder="97" /></div>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
+            <Button type="submit" variant="primary" disabled={isSubmitting || !description.trim()}>
+              {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Regenerate with These Prompts'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
 }
 
 function ClosedBadge({ business }: { business: any }) {
@@ -69,6 +187,7 @@ export const GeneratedSiteDetailPage = () => {
   const [exportError, setExportError] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<ConfirmAction | null>(null)
   const [showVersionBrowser, setShowVersionBrowser] = useState(false)
+  const [showEditPromptsModal, setShowEditPromptsModal] = useState(false)
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['generated-site-detail', siteId] })
@@ -97,6 +216,7 @@ export const GeneratedSiteDetailPage = () => {
     onSuccess: () => {
       invalidate()
       setPendingAction(null)
+      setShowEditPromptsModal(false)
     },
     onError: (err: any) => {
       setPendingAction(null)
@@ -160,6 +280,17 @@ export const GeneratedSiteDetailPage = () => {
     },
   })
 
+  const regenerateWithPromptsMutation = useMutation({
+    mutationFn: (payload: ManualGenerationRequest) => api.regenerateSiteWithPrompts(siteId!, payload),
+    onSuccess: () => {
+      invalidate()
+      setShowEditPromptsModal(false)
+    },
+    onError: (err: any) => {
+      alert(`Regeneration failed: ${err?.response?.data?.detail ?? err?.message}`)
+    },
+  })
+
   const activateVersionMutation = useMutation({
     mutationFn: ({ slot, versionFilename }: { slot: string; versionFilename: string }) =>
       api.activateImageVersion(siteId!, slot, versionFilename),
@@ -182,6 +313,7 @@ export const GeneratedSiteDetailPage = () => {
   const isAnyMutationPending =
     regenerateMutation.isPending ||
     regenImagesMutation.isPending ||
+    regenerateWithPromptsMutation.isPending ||
     markHasWebsiteMutation.isPending ||
     markUnreachableMutation.isPending ||
     remapImagesMutation.isPending ||
@@ -411,6 +543,40 @@ export const GeneratedSiteDetailPage = () => {
                       Google Business Profile
                     </a>
                   )}
+                </CardBody>
+              </Card>
+            )}
+
+            {/* Generation Prompts (manual sites only) */}
+            {site.manual_input && (
+              <Card>
+                <CardBody className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-sm uppercase tracking-wide text-text-secondary">
+                      Generation Prompts
+                    </h3>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setShowEditPromptsModal(true)}
+                      disabled={regenerateWithPromptsMutation.isPending || site.status === 'generating'}
+                    >
+                      {regenerateWithPromptsMutation.isPending ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        'Edit & Regenerate'
+                      )}
+                    </Button>
+                  </div>
+                  <div className="text-xs space-y-1 max-h-32 overflow-y-auto">
+                    <p><span className="text-text-secondary">Description:</span> {site.manual_input.description?.slice(0, 150)}{site.manual_input.description && site.manual_input.description.length > 150 ? '…' : ''}</p>
+                    <p><span className="text-text-secondary">Type:</span> {site.manual_input.website_type}</p>
+                    {site.manual_input.language && <p><span className="text-text-secondary">Language:</span> {site.manual_input.language}</p>}
+                    {site.manual_input.website_currency && <p><span className="text-text-secondary">Product currency:</span> {site.manual_input.website_currency}</p>}
+                    {(site.manual_input.name || site.manual_input.currency_symbol) && (
+                      <p><span className="text-text-secondary">Details:</span> {[site.manual_input.name, site.manual_input.currency_symbol && `Claim bar: ${site.manual_input.currency_symbol}`].filter(Boolean).join(' · ')}</p>
+                    )}
+                  </div>
                 </CardBody>
               </Card>
             )}
@@ -646,6 +812,16 @@ export const GeneratedSiteDetailPage = () => {
           {...pendingAction}
           isLoading={isAnyMutationPending}
           onCancel={() => setPendingAction(null)}
+        />
+      )}
+
+      {/* Edit prompts modal (manual sites) */}
+      {showEditPromptsModal && site?.manual_input && (
+        <EditPromptsModal
+          manualInput={site.manual_input}
+          onClose={() => setShowEditPromptsModal(false)}
+          onSubmit={(payload) => regenerateWithPromptsMutation.mutate(payload)}
+          isSubmitting={regenerateWithPromptsMutation.isPending}
         />
       )}
     </div>

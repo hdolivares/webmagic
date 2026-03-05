@@ -385,6 +385,12 @@ def generate_site_for_business(self, business_id: str):
                     currency_symbol = manual_input.get("currency_symbol")
                     if currency_symbol:
                         business_data["currency_symbol"] = currency_symbol
+                    language = manual_input.get("language")
+                    if language:
+                        business_data["language"] = language
+                    if manual_input.get("website_type") == "ecommerce":
+                        website_currency = manual_input.get("website_currency") or "$"
+                        business_data["website_currency"] = website_currency
 
                     logger.info(
                         "[Gen] Manual mode for %s — website_type=%s, branding=%s, currency=%s",

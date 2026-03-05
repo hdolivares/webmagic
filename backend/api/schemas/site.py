@@ -45,6 +45,16 @@ class ManualGenerationRequest(BaseModel):
         default="informational",
         description="Layout style — informational or ecommerce",
     )
+    language: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="Language for website content (e.g. 'en', 'es', 'fr'). Defaults to English.",
+    )
+    website_currency: Optional[str] = Field(
+        None,
+        max_length=8,
+        description="Currency for product prices on e-commerce sites (e.g. '$', '€'). Separate from claim bar currency.",
+    )
 
     # Branding signals (all optional, any combination works)
     branding_notes: Optional[str] = Field(
@@ -78,8 +88,8 @@ class ManualGenerationRequest(BaseModel):
         None,
         max_length=8,
         description=(
-            "Currency symbol or prefix used for all prices on the site. "
-            "Defaults to '$'. Use 'Q' for Guatemalan Quetzal, '€' for Euro, etc."
+            "Currency symbol for the claim bar (one-time and monthly pricing). "
+            "Separate from website_currency (product prices). Defaults to '$'."
         ),
     )
 
@@ -116,6 +126,10 @@ class SiteDetailResponse(SiteResponse):
     js_content: Optional[str] = None
     design_brief: Optional[Dict[str, Any]] = None
     assets_urls: List[str] = []
+    manual_input: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Original form data used for manual generation (when applicable)",
+    )
 
 
 class SiteListResponse(BaseModel):

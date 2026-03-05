@@ -124,6 +124,8 @@ export interface GeneratedSite {
   created_at: string
   updated_at: string
   business?: GeneratedSiteBusiness | null
+  /** Original form data for manual-generation sites (for viewing/editing) */
+  manual_input?: ManualGenerationRequest | null
 }
 
 export interface GenerateSiteRequest {
@@ -143,6 +145,10 @@ export interface ManualGenerationRequest {
   state?: string
   /** Layout style */
   website_type?: 'informational' | 'ecommerce'
+  /** Language for website content (e.g. 'en', 'Spanish') */
+  language?: string
+  /** Currency for product prices on e-commerce sites only. Separate from claim bar. */
+  website_currency?: string
   /** Free-text color/style description */
   branding_notes?: string
   /** Base64 data URIs of logo/brand images */
@@ -159,8 +165,8 @@ export interface ManualGenerationRequest {
    */
   monthly_price?: number
   /**
-   * Currency symbol/prefix used for all product prices (default "$").
-   * E.g. "Q" for Guatemalan Quetzal → prices display as "Q 249.99".
+   * Currency symbol for the claim bar (one-time and monthly pricing).
+   * Separate from website_currency (product prices).
    */
   currency_symbol?: string
 }

@@ -124,6 +124,7 @@ class CreativeOrchestrator:
                 interpreted = await interpreter.interpret(
                     description=business_data.get("raw_description", ""),
                     hard_facts=hard_facts,
+                    language=business_data.get("language"),
                 )
 
                 # Merge interpreted fields into business_data so every downstream
