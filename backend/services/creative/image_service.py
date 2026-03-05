@@ -739,6 +739,55 @@ class ImageGenerationService:
         logger.info(f"[ImageGen] {saved}/{len(all_specs)} images saved for {subdomain}")
         return output
 
+    async def generate_hero_image_only(
+        self,
+        business_name: str,
+        category: str,
+        subdomain: str,
+        brand_colors: Optional[Dict[str, str]] = None,
+        creative_dna: Optional[Dict[str, Any]] = None,
+        hero_prompt_override: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Generate only the hero image for a site.
+
+        When hero_prompt_override is provided, it is used as the base description
+        instead of the category's default hero prompt. Brand and color hints are
+        still applied to ensure cohesion.
+
+        Returns a single result dict matching the format of one element from
+        generate_images_for_site.
+        """
+        if not self.api_key:
+            logger.warning("[ImageGen] Skipping — no API key")
+            return {"slot": "hero", "filename": None, "saved": False, "full_prompt": None, "subject": None}
+
+        bucket = _resolve_category_key(category)
+        base_specs = _CATEGORY_PROMPTS[bucket]
+        hero_spec = next((s for s in base_specs if s["slot"] == "hero"), base_specs[0])
+
+        spec = {
+            "slot": "hero",
+            "aspect": hero_spec["aspect"],
+            "desc": (hero_prompt_override or "").strip() or hero_spec["desc"],
+        }
+
+        color_hint = self._color_hint(brand_colors)
+        brand_hint = self._brand_hint(creative_dna)
+
+        logger.info(
+            f"[ImageGen] Generating hero only for '{business_name}' "
+            f"(category={category}, bucket={bucket}, custom_prompt={bool(hero_prompt_override)})"
+        )
+
+        return await self._generate_and_save(
+            spec=spec,
+            business_name=business_name,
+            color_hint=color_hint,
+            brand_hint=brand_hint,
+            subdomain=subdomain,
+        )
+
     # ── Private helpers ───────────────────────────────────────────────────────
 
     async def _generate_and_save(

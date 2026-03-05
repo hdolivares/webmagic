@@ -5,7 +5,7 @@ Updated: January 22, 2026
 - Integrated CRM services for automated lifecycle tracking
 - Ensures all site generations have associated business records
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -23,6 +23,7 @@ from api.deps import get_current_user
 from api.schemas.site import (
     SiteGenerateRequest,
     ManualGenerationRequest,
+    RegenerateHeroImageRequest,
     SiteResponse,
     SiteDetailResponse,
     SiteListResponse,
@@ -699,6 +700,135 @@ async def regenerate_site_images(
         "slots": {r["slot"]: r.get("filename") for r in image_results if r.get("saved")},
         "failed_slots": failed,
         "message": f"Regenerated {len(saved)}/{len(image_results)} images for {business_name}",
+    }
+
+
+@router.post("/{site_id}/regenerate-hero-image")
+async def regenerate_hero_image(
+    site_id: UUID,
+    request: Optional[RegenerateHeroImageRequest] = Body(default=None),
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user),
+):
+    """
+    Regenerate only the hero image for an existing site.
+
+    Optionally accepts hero_guidance: a user description of the desired hero image.
+    When provided, an LLM merges it with the site's branding (colors, vibe, industry)
+    to produce an enhanced prompt. Otherwise uses the default category-based hero prompt.
+    """
+    from models.site import GeneratedSite
+    from models.business import Business
+    from services.creative.image_service import ImageGenerationService
+    from services.creative.hero_prompt_enhancer import enhance_hero_prompt_with_branding
+
+    result = await db.execute(select(GeneratedSite).where(GeneratedSite.id == site_id))
+    site = result.scalar_one_or_none()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    if not site.subdomain:
+        raise HTTPException(status_code=400, detail="Site has no subdomain — cannot save images")
+
+    business = None
+    if site.business_id:
+        biz_result = await db.execute(select(Business).where(Business.id == site.business_id))
+        business = biz_result.scalar_one_or_none()
+
+    business_name = business.name if business else "Business"
+    category = (business.category or business.subcategory or "") if business else ""
+
+    brief = site.design_brief or {}
+    colors = brief.get("colors") or {}
+    brand_colors = {
+        "primary": colors.get("primary", ""),
+        "secondary": colors.get("secondary", ""),
+    }
+    vibe = brief.get("vibe", "")
+    industry_persona = brief.get("industry_persona", "")
+    creative_dna = {}
+    if vibe:
+        creative_dna["visual_identity"] = vibe
+    if industry_persona:
+        creative_dna["value_proposition"] = industry_persona
+
+    req = request or RegenerateHeroImageRequest()
+    hero_prompt_override = None
+    if req.hero_guidance and req.hero_guidance.strip():
+        try:
+            hero_prompt_override = await enhance_hero_prompt_with_branding(
+                hero_guidance=req.hero_guidance.strip(),
+                business_name=business_name,
+                category=category,
+                design_brief=brief,
+            )
+        except Exception as e:
+            logger.error(f"Hero prompt enhancement failed for site {site_id}: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to enhance hero prompt: {str(e)}",
+            )
+
+    image_service = ImageGenerationService()
+    if not image_service.api_key:
+        raise HTTPException(status_code=503, detail="Gemini API key not configured")
+
+    try:
+        hero_result = await image_service.generate_hero_image_only(
+            business_name=business_name,
+            category=category,
+            subdomain=site.subdomain,
+            brand_colors=brand_colors or None,
+            creative_dna=creative_dna or None,
+            hero_prompt_override=hero_prompt_override,
+        )
+    except Exception as e:
+        logger.error(f"Hero image regeneration failed for site {site_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Image generation failed: {str(e)}")
+
+    saved = hero_result.get("saved", False)
+
+    if saved:
+        updated_brief = dict(site.design_brief or {})
+        if hero_result.get("full_prompt"):
+            updated_brief["image_prompts"] = {
+                **(updated_brief.get("image_prompts") or {}),
+                "hero": hero_result["full_prompt"],
+            }
+        if hero_result.get("subject"):
+            updated_brief["image_subjects"] = {
+                **(updated_brief.get("image_subjects") or {}),
+                "hero": hero_result["subject"],
+            }
+        if hero_result.get("version"):
+            prev_versions = updated_brief.get("image_versions") or {}
+            entry = {"filename": hero_result["version"], "timestamp": int(time.time())}
+            prev_versions.setdefault("hero", []).append(entry)
+            updated_brief["image_versions"] = prev_versions
+
+        site.design_brief = updated_brief
+
+        if site.html_content:
+            version = int(time.time())
+            updated_html = re.sub(
+                r'(src="img/hero\.jpg)(?:\?v=\d+)?(")',
+                lambda m: f'{m.group(1)}?v={version}{m.group(2)}',
+                site.html_content,
+            )
+            if updated_html != site.html_content:
+                site.html_content = updated_html
+                logger.info(
+                    f"[RegenHero] Updated hero img src cache-buster to v={version} "
+                    f"for site {site_id} ({site.subdomain})"
+                )
+
+        await db.commit()
+
+    return {
+        "success": saved,
+        "saved": saved,
+        "slot": "hero",
+        "message": f"Hero image {'regenerated' if saved else 'generation failed'} for {business_name}",
     }
 
 
