@@ -111,6 +111,12 @@ class Settings(BaseSettings):
     ABANDONED_CART_WINDOW_MINUTES: int = 15  # Treat checkout as abandoned after this many minutes
     ABANDONED_CART_COUPON_VALIDITY_HOURS: int = 24  # Recurrente coupon expiry for recovery emails
 
+    # Bandwidth monitoring (vnstat snapshot)
+    # Path to JSON file written by cron: vnstat -i eth0 --json > VNSTAT_SNAPSHOT_PATH
+    VNSTAT_SNAPSHOT_PATH: str = "/var/log/webmagic/vnstat_snapshot.json"
+    # Consider snapshot stale after this many seconds (default 1 hour)
+    VNSTAT_STALE_SECONDS: int = 3600
+
     class Config:
         env_file = ".env"
         case_sensitive = True

@@ -1,14 +1,18 @@
 """
 System Settings API - Configure AI models, providers, and other system settings.
 """
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 
 from api.deps import get_db, get_current_user
+from core.config import get_settings
 from models.user import AdminUser
 from services.system_settings_service import SystemSettingsService, MESSAGING_DEFAULT_TEMPLATES
+from services.bandwidth_snapshot import get_bandwidth_snapshot
 
 router = APIRouter(prefix="/system", tags=["System Settings"])
 
@@ -240,4 +244,63 @@ async def update_notification_settings(
     return NotificationSettingsResponse(
         support_admin_email=request.support_admin_email,
         config_default=app_settings.SUPPORT_ADMIN_EMAIL,
+    )
+
+
+# ── Bandwidth monitoring (vnstat snapshot) ─────────────────────────────────────
+
+class DailyTraffic(BaseModel):
+    """Traffic totals for a single day."""
+    date: str
+    rx_bytes: int = 0
+    tx_bytes: int = 0
+
+
+class TrafficTotals(BaseModel):
+    """Received and transmitted byte totals."""
+    rx_bytes: int = 0
+    tx_bytes: int = 0
+
+
+class BandwidthResponse(BaseModel):
+    """
+    Bandwidth snapshot for the admin UI.
+    When available is False, reason indicates why (file_missing, file_too_old, parse_error).
+    Optional fields are null when monitoring is not available.
+    """
+    available: bool
+    reason: Optional[str] = None
+    updated_at: Optional[str] = None
+    interface: Optional[str] = None
+    daily: Optional[List[DailyTraffic]] = None
+    monthly: Optional[TrafficTotals] = None
+    total: Optional[TrafficTotals] = None
+
+
+@router.get("/bandwidth", response_model=BandwidthResponse)
+async def get_bandwidth(
+    current_user: AdminUser = Depends(get_current_user),
+):
+    """
+    Get bandwidth (in/out) from vnstat snapshot file for the admin UI.
+    Read-only; requires admin auth. Snapshot is written by cron (e.g. vnstat -i eth0 --json).
+    When available is False, the UI can show a message based on reason (file_missing, file_too_old, parse_error).
+    """
+    settings = get_settings()
+    path = Path(settings.VNSTAT_SNAPSHOT_PATH)
+    stale_seconds = settings.VNSTAT_STALE_SECONDS
+    raw = get_bandwidth_snapshot(path, stale_seconds)
+    # Map to response model
+    if not raw.get("available"):
+        return BandwidthResponse(
+            available=False,
+            reason=raw.get("reason"),
+        )
+    return BandwidthResponse(
+        available=True,
+        updated_at=raw.get("updated_at"),
+        interface=raw.get("interface"),
+        daily=[DailyTraffic(**d) for d in (raw.get("daily") or [])],
+        monthly=TrafficTotals(**(raw["monthly"] or {})) if raw.get("monthly") else None,
+        total=TrafficTotals(**(raw["total"] or {})) if raw.get("total") else None,
     )
