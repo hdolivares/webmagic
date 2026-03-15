@@ -60,12 +60,7 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour="*/6"),
     },
 
-    # ── Pre-generation: Phone validation (outreach_channel) every hour ────────
-    # Sets sms | email | call_later for triple-validated businesses so generation queue excludes call_later
-    "run-phone-validation-job": {
-        "task": "tasks.phone_validation_tasks.run_phone_validation_job",
-        "schedule": crontab(minute=15),  # :15 past so outreach_channel is set before next generate-sites
-    },
+    # Phone validation now runs once when a scrape completes (scraping_tasks), not on a schedule.
 
     # ── Stage 2: Generate sites for qualified leads every 10 minutes ─────────
     # Re-enabled: website detection pipeline is stable (ScrapingDog + LLM country check)
