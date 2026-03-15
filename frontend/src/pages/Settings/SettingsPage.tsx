@@ -8,7 +8,7 @@
  */
 import { useState } from 'react'
 import { Card } from '@/components/ui'
-import { User, Key, Bot, MessageSquare, Link2, Bell, Zap } from 'lucide-react'
+import { User, Key, Bot, MessageSquare, Link2, Bell, Zap, Activity } from 'lucide-react'
 import { AccountSettings } from './AccountSettings'
 import { AISettingsTab } from './AISettingsTab'
 import { PromptsSettings } from './PromptsSettings'
@@ -16,8 +16,9 @@ import { MessagingSettings } from './MessagingSettings'
 import { ShortenerSettings } from './ShortenerSettings'
 import { NotificationSettings } from './NotificationSettings'
 import { AutopilotSettings } from './AutopilotSettings'
+import { BandwidthSettings } from './BandwidthSettings'
 
-type SettingsTab = 'account' | 'ai' | 'prompts' | 'messaging' | 'shortener' | 'notifications' | 'autopilot'
+type SettingsTab = 'account' | 'ai' | 'prompts' | 'messaging' | 'shortener' | 'notifications' | 'autopilot' | 'bandwidth'
 
 export const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('account')
@@ -65,6 +66,12 @@ export const SettingsPage = () => {
       icon: Bell,
       description: 'Configure support ticket email alerts',
     },
+    {
+      id: 'bandwidth' as SettingsTab,
+      label: 'Bandwidth',
+      icon: Activity,
+      description: 'View server traffic (in/out) from vnstat',
+    },
   ]
 
   return (
@@ -105,6 +112,7 @@ export const SettingsPage = () => {
         {activeTab === 'prompts' && <PromptsSettings />}
         {activeTab === 'shortener' && <ShortenerSettings />}
         {activeTab === 'notifications' && <NotificationSettings />}
+        {activeTab === 'bandwidth' && <BandwidthSettings />}
       </div>
     </div>
   )

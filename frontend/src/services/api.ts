@@ -866,6 +866,23 @@ class ApiClient {
     return response.data
   }
 
+  /**
+   * Bandwidth (vnstat snapshot) for admin Settings > Bandwidth.
+   * When available is false, reason indicates why (file_missing, file_too_old, parse_error).
+   */
+  async getBandwidth(): Promise<{
+    available: boolean
+    reason?: string
+    updated_at?: string
+    interface?: string
+    daily?: Array<{ date: string; rx_bytes: number; tx_bytes: number }>
+    monthly?: { rx_bytes: number; tx_bytes: number }
+    total?: { rx_bytes: number; tx_bytes: number }
+  }> {
+    const response = await this.client.get('/system/bandwidth')
+    return response.data
+  }
+
   // ============================================
   // EDIT REQUESTS METHODS (Phase 4)
   // ============================================
