@@ -189,6 +189,13 @@ def scrape_zone_async(
         except Exception as e:
             logger.error(f"⚠️ Failed to log analytics: {e}", exc_info=True)
             # Don't fail the task if analytics fail
+
+        # Run phone validation once for newly scraped (triple-verified) businesses
+        try:
+            from tasks.phone_validation_tasks import run_phone_validation_job
+            run_phone_validation_job.delay(limit=100)
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to enqueue phone validation after scrape: {e}")
         
         logger.info(f"🎉 Scrape task completed successfully: {session_id}")
         
