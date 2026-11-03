@@ -623,7 +623,7 @@ async def test_llm_discovery():
     # Test with a known business
     result = await service.discover_website(
         business_name="Mr. Rooter Plumbing of Seattle",
-        phone="(206) 866-2836",
+        phone="(206) 555-0187",
         address="2000 S 116th St",
         city="Seattle",
         state="WA"

@@ -20,6 +20,7 @@ Date: February 2026
 from __future__ import annotations
 
 import logging
+from urllib.parse import urlencode
 from typing import Any, Dict, Optional
 
 import httpx
@@ -131,6 +132,10 @@ class LabsMobileSMSProvider:
         }
 
         if status_callback:
+            webhook_token = get_settings().LABSMOBILE_WEBHOOK_TOKEN
+            if webhook_token:
+                separator = "&" if "?" in status_callback else "?"
+                status_callback = f"{status_callback}{separator}{urlencode({'token': webhook_token})}"
             payload["ackurl"] = status_callback
 
         logger.info("Sending SMS via LabsMobile to %s (%d chars)", to_phone, len(body))

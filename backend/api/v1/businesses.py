@@ -516,7 +516,7 @@ async def bulk_update_status(
 @router.post("/bulk/export")
 async def bulk_export(
     business_ids: Optional[List[UUID]] = None,
-    format: str = Query("csv", regex="^(csv|json)$"),
+    format: str = Query("csv", pattern="^(csv|json)$"),
     db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_user)
 ):

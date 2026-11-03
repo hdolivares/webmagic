@@ -9,17 +9,27 @@ from datetime import datetime
 from typing import Literal
 from pydantic import BaseModel
 from core.database import get_db
-from core.security import verify_password, create_access_token
+from core.rate_limit import rate_limit
+from core.security import verify_password, create_access_token, hash_password
 from core.customer_security import create_customer_access_token, ACCESS_TOKEN_EXPIRE_HOURS
 from api.schemas.auth import LoginRequest, LoginResponse, UserResponse
 from api.deps import get_current_user
 from models.user import AdminUser
 from models.site_models import CustomerUser
 import logging
+import secrets
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
+
+INVALID_CREDENTIALS = "Invalid email or password."
+_DUMMY_HASH = hash_password(secrets.token_urlsafe(16))
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 
 # ============================================
@@ -35,17 +45,13 @@ class UnifiedLoginResponse(BaseModel):
     email_verified: bool = True  # Always true for admins, checked for customers
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login", dependencies=[Depends(rate_limit(10, 60))], response_model=LoginResponse)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Login endpoint - returns JWT token.
-    
-    Default credentials (from seed data):
-    - Email: admin@webmagic.com
-    - Password: ***REMOVED***
     """
     # Validate email format
     email = form_data.username.strip().lower()
@@ -56,17 +62,12 @@ async def login(
     )
     user = result.scalar_one_or_none()
     
-    if not user:
+    # Verify password (hash a dummy when the user is missing so both paths take equal time)
+    password_ok = verify_password(form_data.password, user.password_hash if user else _DUMMY_HASH)
+    if not user or not password_ok:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No account found with this email address. Please check your email and try again.",
-        )
-    
-    # Verify password
-    if not verify_password(form_data.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect password. Please try again.",
+            detail=INVALID_CREDENTIALS,
         )
     
     # Check if user is active
@@ -99,7 +100,7 @@ async def login(
     )
 
 
-@router.post("/unified-login", response_model=UnifiedLoginResponse)
+@router.post("/unified-login", dependencies=[Depends(rate_limit(10, 60))], response_model=UnifiedLoginResponse)
 async def unified_login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db)
@@ -127,7 +128,7 @@ async def unified_login(
         if not verify_password(password, admin_user.password_hash):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect password. Please try again.",
+                detail=INVALID_CREDENTIALS,
             )
         
         # Check if user is active
@@ -177,7 +178,7 @@ async def unified_login(
         if not verify_password(password, customer_user.password_hash):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect password. Please try again.",
+                detail=INVALID_CREDENTIALS,
             )
         
         # Check if user is active
@@ -217,9 +218,10 @@ async def unified_login(
         )
     
     # No user found with this email
+    verify_password(password, _DUMMY_HASH)
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="No account found with this email address. Please check your email and try again.",
+        detail=INVALID_CREDENTIALS,
     )
 
 
@@ -252,8 +254,7 @@ async def logout():
 
 @router.post("/change-password")
 async def change_password(
-    current_password: str,
-    new_password: str,
+    body: ChangePasswordRequest,
     current_user: AdminUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -261,8 +262,9 @@ async def change_password(
     Change password for currently logged-in user.
     Requires valid JWT token and current password verification.
     """
-    from core.security import hash_password
-    
+    current_password = body.current_password
+    new_password = body.new_password
+
     # Verify current password
     if not verify_password(current_password, current_user.password_hash):
         raise HTTPException(

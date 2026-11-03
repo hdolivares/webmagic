@@ -159,14 +159,14 @@ export const MessagingSettings: React.FC = () => {
         <div className="messaging-settings__intro">
           <h2 className="messaging-settings__title">Send a test SMS</h2>
           <p className="messaging-settings__description">
-            Verify that Telnyx is correctly configured and messages are delivered before running campaigns.
+            Verify that your SMS provider is correctly configured and messages are delivered before running campaigns.
           </p>
         </div>
 
         <div className="messaging-settings__test-info">
           <div className="messaging-settings__test-info-row">
             <span className="messaging-settings__test-info-label">Sending from</span>
-            <code className="messaging-settings__test-info-value">+1 (415) 555-0100</code>
+            <code className="messaging-settings__test-info-value">{import.meta.env.VITE_SMS_SENDER_NUMBER ?? 'Configured provider number'}</code>
           </div>
           <div className="messaging-settings__test-info-row">
             <span className="messaging-settings__test-info-label">Supported countries</span>

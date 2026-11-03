@@ -10,6 +10,8 @@ Date: January 21, 2026
 """
 from typing import Dict, Any, Optional
 
+from core.config import get_settings
+
 
 class EmailTemplates:
     """Email template renderer with inline CSS."""
@@ -469,7 +471,7 @@ class EmailTemplates:
                     <tr>
                         <td style="background-color: {self.bg_light}; padding: 30px 40px; text-align: center; border-top: 1px solid #e5e7eb;">
                             <p style="margin: 0 0 10px; color: {self.text_light}; font-size: 14px;">
-                                Need help? Contact us at support@webmagic.com
+                                Need help? Contact us at {get_settings().EMAIL_FROM}
                             </p>
                             <p style="margin: 0; color: {self.text_light}; font-size: 14px;">
                                 &copy; 2026 WebMagic. All rights reserved.

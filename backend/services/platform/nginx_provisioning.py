@@ -22,9 +22,12 @@ Flow triggered by DomainService.remove_domain():
   2. nginx -t → reload
 """
 import asyncio
+import re
 import logging
 import os
 from pathlib import Path
+
+from core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +39,11 @@ NGINX_ENABLED = "/etc/nginx/sites-enabled"
 LETSENCRYPT_LIVE = "/etc/letsencrypt/live"
 
 # Read from environment so this works across deployments without code changes.
-CERTBOT_EMAIL = os.getenv("CERTBOT_EMAIL", "admin@lavish.solutions")
+CERTBOT_EMAIL = os.getenv("CERTBOT_EMAIL") or get_settings().SUPPORT_ADMIN_EMAIL
 
 # Public IP of this server — used both for Nginx provisioning checks and for
 # the A-record validation step in DomainService. Keep in sync via env var.
-SERVER_IP = os.getenv("SERVER_IP", "203.0.113.10")
+SERVER_IP = os.getenv("SERVER_IP", "")
 
 # ── Nginx vhost templates ─────────────────────────────────────────────────────
 
@@ -141,6 +144,10 @@ class NginxProvisioningService:
         """
         bare = _bare_domain(domain)
         result: dict = {"success": False, "ssl_issued": False, "error": None}
+        if not _is_safe_hostname(bare) or not _SLUG_RE.fullmatch(slug):
+            result["error"] = "Refusing to provision an invalid domain or slug"
+            logger.error(f"{result['error']}: {domain!r} / {slug!r}")
+            return result
 
         config_path = Path(NGINX_AVAILABLE) / bare
         link_path = Path(NGINX_ENABLED) / bare
@@ -167,7 +174,7 @@ class NginxProvisioningService:
                 config_path.unlink(missing_ok=True)
                 return result
 
-        ok, output = await _run("nginx -t")
+        ok, output = await _run("nginx", "-t")
         if not ok:
             result["error"] = f"Nginx config test failed:\n{output}"
             logger.error(result["error"])
@@ -175,7 +182,7 @@ class NginxProvisioningService:
             config_path.unlink(missing_ok=True)
             return result
 
-        await _run("systemctl reload nginx")
+        await _run("systemctl", "reload", "nginx")
         result["success"] = True
         logger.info(f"[Provision] HTTP vhost live for {bare} → {slug}")
 
@@ -183,12 +190,11 @@ class NginxProvisioningService:
         # --certonly means certbot ONLY fetches the cert files; it does NOT
         # modify any Nginx configuration file.
         # --force-renewal clears any stale ACME authorization from a prior run.
-        certbot_cmd = (
-            f"certbot certonly --nginx --non-interactive --agree-tos "
-            f"--force-renewal --cert-name {bare} "
-            f"--email {CERTBOT_EMAIL} -d {bare} -d www.{bare}"
+        ssl_ok, ssl_output = await _run(
+            "certbot", "certonly", "--nginx", "--non-interactive", "--agree-tos",
+            "--force-renewal", "--cert-name", bare,
+            "--email", CERTBOT_EMAIL, "-d", bare, "-d", f"www.{bare}",
         )
-        ssl_ok, ssl_output = await _run(certbot_cmd)
 
         if ssl_ok:
             # ── Phase 3: Overwrite vhost with complete HTTPS template ─────────
@@ -200,9 +206,9 @@ class NginxProvisioningService:
             )
             try:
                 config_path.write_text(https_config)
-                ok2, output2 = await _run("nginx -t")
+                ok2, output2 = await _run("nginx", "-t")
                 if ok2:
-                    await _run("systemctl reload nginx")
+                    await _run("systemctl", "reload", "nginx")
                     result["ssl_issued"] = True
                     logger.info(f"[Provision] HTTPS vhost live for {bare}")
                 else:
@@ -225,15 +231,18 @@ class NginxProvisioningService:
             domain: The domain being disconnected (bare or www-prefixed).
         """
         bare = _bare_domain(domain)
+        if not _is_safe_hostname(bare):
+            logger.error(f"[Deprovision] Refusing invalid domain: {domain!r}")
+            return
         config_path = Path(NGINX_AVAILABLE) / bare
         link_path = Path(NGINX_ENABLED) / bare
 
         link_path.unlink(missing_ok=True)
         config_path.unlink(missing_ok=True)
 
-        ok, output = await _run("nginx -t")
+        ok, output = await _run("nginx", "-t")
         if ok:
-            await _run("systemctl reload nginx")
+            await _run("systemctl", "reload", "nginx")
             logger.info(f"[Deprovision] Nginx vhost removed for {bare}")
         else:
             logger.error(f"[Deprovision] Nginx config error after removing {bare}:\n{output}")
@@ -246,10 +255,19 @@ def _bare_domain(domain: str) -> str:
     return domain.removeprefix("www.")
 
 
-async def _run(cmd: str) -> tuple[bool, str]:
-    """Run a shell command asynchronously. Returns (success, combined_output)."""
-    proc = await asyncio.create_subprocess_shell(
-        cmd,
+_HOSTNAME_RE = re.compile(r"(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}")
+_SLUG_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,99}")
+
+
+def _is_safe_hostname(domain: str) -> bool:
+    """Re-validate the domain here, since it becomes a file name and a CLI argument."""
+    return bool(_HOSTNAME_RE.fullmatch(domain))
+
+
+async def _run(*args: str) -> tuple[bool, str]:
+    """Run a command without a shell. Returns (success, combined_output)."""
+    proc = await asyncio.create_subprocess_exec(
+        *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
     )

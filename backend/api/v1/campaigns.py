@@ -6,9 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from uuid import UUID
 import logging
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
+from core.config import get_settings
 from core.database import get_db
 from api.deps import get_current_user
 from api.schemas.campaign import (
@@ -298,7 +300,7 @@ async def get_ready_businesses(
             call_later += 1
 
         recommended_channel = "email" if has_email else ("call_later" if is_call_later else "sms")
-        site_url = f"https://sites.lavish.solutions/{site.subdomain}"
+        site_url = f"{get_settings().SITES_BASE_URL}/{site.subdomain}"
 
         campaign_info = last_campaign.get(str(business.id))
         if campaign_info:
@@ -481,6 +483,14 @@ async def track_email_open(
     return Response(content=pixel, media_type="image/png")
 
 
+def _is_allowed_redirect(url: str) -> bool:
+    """Allow redirects only to the sites/frontend hosts configured for this deployment."""
+    settings = get_settings()
+    parsed = urlparse(url)
+    allowed_hosts = {urlparse(settings.SITES_BASE_URL).netloc, urlparse(settings.FRONTEND_URL).netloc}
+    return parsed.scheme in ("http", "https") and parsed.netloc in allowed_hosts
+
+
 @router.get("/track/click/{campaign_id}")
 async def track_email_click(
     campaign_id: UUID,
@@ -492,8 +502,8 @@ async def track_email_click(
     tracker = EmailTracker(db)
     await tracker.record_click(campaign_id, link_id=link_id)
     
-    # Redirect to destination
-    if redirect_url:
+    # Redirect to destination, but only to our own hosts (no open redirect)
+    if redirect_url and _is_allowed_redirect(redirect_url):
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=redirect_url)
     
@@ -549,7 +559,7 @@ async def preview_sms_message(
     
     if not url_to_use:
         # Fallback: If site was generated before migration, use full URL
-        url_to_use = f"https://sites.lavish.solutions/{site.subdomain}"
+        url_to_use = f"{get_settings().SITES_BASE_URL}/{site.subdomain}"
         logger.warning(
             f"Site {site.id} has no short_url (legacy site?). "
             f"Using full URL: {url_to_use}"

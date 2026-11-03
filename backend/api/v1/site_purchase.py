@@ -29,6 +29,8 @@ from api.schemas.customer_auth import (
     ErrorResponse
 )
 from models.site_models import CustomerUser, Site
+from models.user import AdminUser
+from api.deps import get_current_user
 from services.site_purchase_service import get_site_purchase_service
 from services.site_service import get_site_service
 from services.customer_site_service import CustomerSiteService
@@ -131,7 +133,7 @@ async def create_purchase_checkout(
     Create a checkout session for purchasing a site.
     
     **Flow:**
-    1. Customer views preview site at `sites.lavish.solutions/{slug}`
+    1. Customer views preview site at `sites.example.com/{slug}`
     2. Customer clicks "Purchase This Site"
     3. Frontend calls this endpoint with customer email
     4. Recurrente checkout URL returned
@@ -436,8 +438,8 @@ async def get_site_versions(
 async def list_deployed_sites(
     skip: int = 0,
     limit: int = 50,
-    db: AsyncSession = Depends(get_db)
-    # TODO: Add admin authentication dependency
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user),
 ):
     """
     List all deployed sites.
@@ -503,8 +505,8 @@ async def list_deployed_sites(
     description="Get purchase statistics for admin dashboard (requires admin auth)."
 )
 async def get_purchase_statistics(
-    db: AsyncSession = Depends(get_db)
-    # TODO: Add admin authentication dependency
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user),
 ):
     """
     Get purchase statistics.

@@ -29,6 +29,7 @@ import {
   Zap,
 } from 'lucide-react'
 import './HowItWorksPage.css'
+import { CONTACT_EMAIL } from '@/config'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -306,7 +307,7 @@ export default function HowItWorksPage() {
   const handleClaimClick = () => {
     // Navigate to the site preview / purchase flow — users arrive from the claim bar
     // which already has their slug. From here they can go to a general contact page.
-    window.location.href = 'mailto:hello@lavish.solutions?subject=I want to claim my website'
+    window.location.href = `mailto:${CONTACT_EMAIL}?subject=I want to claim my website`
   }
 
   return (
@@ -505,7 +506,7 @@ export default function HowItWorksPage() {
             Claim Your Site Now
             <ArrowRight size={18} />
           </button>
-          <p className="hiw-cta-note">Questions? Email us at <a href="mailto:hello@lavish.solutions">hello@lavish.solutions</a></p>
+          <p className="hiw-cta-note">Questions? Email us at <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a></p>
         </div>
       </section>
     </div>

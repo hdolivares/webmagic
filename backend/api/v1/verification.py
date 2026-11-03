@@ -21,6 +21,7 @@ from sqlalchemy import case, desc, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user
+from core.config import get_settings
 from core.database import get_db
 from core.validation_enums import ValidationState
 from models.business import Business
@@ -221,7 +222,7 @@ async def get_verification_queue(
 
         site = site_map.get(business.id)
         subdomain = site.subdomain if site else None
-        generated_url = f"https://sites.lavish.solutions/{subdomain}" if subdomain else None
+        generated_url = f"{get_settings().SITES_BASE_URL}/{subdomain}" if subdomain else None
 
         outscraper_website = None
         raw = business.raw_data or {}

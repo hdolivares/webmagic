@@ -70,8 +70,9 @@ class GeneratedSite(BaseModel):
         """Get full URL for the site (path-based routing)."""
         if self.custom_domain:
             return f"https://{self.custom_domain}"
-        # Use path-based routing on sites.lavish.solutions
-        return f"https://sites.lavish.solutions/{self.subdomain}"
+        # Use path-based routing on SITES_BASE_URL
+        from core.config import get_settings
+        return f"{get_settings().SITES_BASE_URL}/{self.subdomain}"
     
     @property
     def is_live(self) -> bool:

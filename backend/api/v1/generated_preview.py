@@ -39,9 +39,10 @@ async def serve_site_image(subdomain: str, filename: str) -> FileResponse:
     if not safe_name or safe_name != filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
 
-    img_path = Path(_settings.SITES_BASE_PATH) / subdomain / "img" / safe_name
+    base_path = Path(_settings.SITES_BASE_PATH).resolve()
+    img_path = (base_path / subdomain / "img" / safe_name).resolve()
 
-    if not img_path.exists():
+    if not img_path.is_relative_to(base_path) or not img_path.is_file():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Image not found: {subdomain}/img/{safe_name}",
@@ -63,7 +64,7 @@ async def serve_site_image(subdomain: str, filename: str) -> FileResponse:
     **PUBLIC ENDPOINT** - Serves the HTML content of a generated site.
     
     This endpoint is called when accessing:
-    `https://sites.lavish.solutions/{subdomain}`
+    `https://sites.example.com/{subdomain}`
     
     Returns the full HTML content with inline CSS and JavaScript.
     """
@@ -346,7 +347,7 @@ def _inject_canonical_claim_bar(
       <div>
         <p style="margin:0;font-weight:700;font-size:15px;color:#ffffff;text-shadow:0 1px 3px rgba(0,0,0,0.4);font-family:system-ui,sans-serif;line-height:1.4;">Is this your business?</p>
         <p style="margin:0;font-size:13px;color:#e0e7ff;text-shadow:0 1px 2px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;line-height:1.4;">One-time payment of <strong style="color:#ffffff;font-weight:700;">${one_time_display}</strong> &middot; Then just ${monthly_display}/month for hosting, maintenance &amp; updates</p>
-        <a href="https://web.lavish.solutions/how-it-works" target="_blank" rel="noopener noreferrer" style="color:#bfdbfe;font-size:12px;text-decoration:underline;margin-top:3px;display:inline-block;font-family:system-ui,sans-serif;">See what&#39;s included &rarr;</a>
+        <a href="{_settings.FRONTEND_URL}/how-it-works" target="_blank" rel="noopener noreferrer" style="color:#bfdbfe;font-size:12px;text-decoration:underline;margin-top:3px;display:inline-block;font-family:system-ui,sans-serif;">See what&#39;s included &rarr;</a>
       </div>
     </div>
     <button onclick="wmClaim()" style="background:#fbbf24;color:#1e3a5f;border:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;font-family:system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,0.2);flex-shrink:0;">

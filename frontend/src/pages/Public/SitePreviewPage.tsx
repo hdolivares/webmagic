@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ExternalLink, Check, Sparkles, Zap, Shield, ArrowRight } from 'lucide-react'
+import { SITES_BASE_URL } from '@/config'
 
 interface SitePreview {
   id: string
@@ -55,7 +56,7 @@ export default function SitePreviewPage() {
         const data = await response.json()
         setSite({
           ...data,
-          preview_url: `https://sites.lavish.solutions/${slug}`
+          preview_url: `${SITES_BASE_URL}/${slug}`
         })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load site')

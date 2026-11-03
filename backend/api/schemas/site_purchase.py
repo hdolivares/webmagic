@@ -39,8 +39,8 @@ class PurchaseCheckoutRequest(BaseModel):
             "example": {
                 "customer_email": "john@example.com",
                 "customer_name": "John Doe",
-                "success_url": "https://sites.lavish.solutions/purchase-success",
-                "cancel_url": "https://sites.lavish.solutions/purchase-cancelled"
+                "success_url": "https://sites.example.com/purchase-success",
+                "cancel_url": "https://sites.example.com/purchase-cancelled"
             }
         }
 
@@ -89,7 +89,7 @@ class SiteResponse(BaseModel):
                 "slug": "la-plumbing-pros",
                 "site_title": "LA Plumbing Pros",
                 "site_description": "Professional plumbing services in Los Angeles",
-                "site_url": "https://sites.lavish.solutions/la-plumbing-pros",
+                "site_url": "https://sites.example.com/la-plumbing-pros",
                 "status": "active",
                 "purchased_at": "2026-01-15T10:00:00",
                 "purchase_amount": 495.00,

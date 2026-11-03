@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { CheckCircle, Mail, Lock, ExternalLink, ArrowRight } from 'lucide-react'
+import { CONTACT_EMAIL, PORTAL_URL, SITES_BASE_URL } from '@/config'
 
 export default function PurchaseSuccessPage() {
   const [searchParams] = useSearchParams()
@@ -40,7 +41,7 @@ export default function PurchaseSuccessPage() {
                 {slug}
               </p>
               <a
-                href={`https://sites.lavish.solutions/${slug}`}
+                href={`${SITES_BASE_URL}/${slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center space-x-2 text-primary-600 hover:text-primary-700 mt-3 text-sm"
@@ -103,7 +104,7 @@ export default function PurchaseSuccessPage() {
           {/* CTA */}
           <div className="space-y-4">
             <button
-              onClick={() => window.location.href = 'https://web.lavish.solutions/customer/login'}
+              onClick={() => window.location.href = `${PORTAL_URL}/customer/login`}
               className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-4 px-6 rounded-xl transition-all flex items-center justify-center space-x-2"
             >
               <span>Go to Customer Dashboard</span>
@@ -119,8 +120,8 @@ export default function PurchaseSuccessPage() {
           <div className="mt-8 pt-8 border-t border-border-default">
             <p className="text-sm text-text-secondary">
               Need help? Contact us at{' '}
-              <a href="mailto:support@lavish.solutions" className="text-primary-600 hover:text-primary-700">
-                support@lavish.solutions
+              <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary-600 hover:text-primary-700">
+                {CONTACT_EMAIL}
               </a>
             </p>
           </div>

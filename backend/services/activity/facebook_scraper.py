@@ -245,7 +245,7 @@ class FacebookActivityScraper:
         """
         Extract the first phone number found in the page's inline JSON.
 
-        Returns the raw string as Facebook provides it (e.g. "+1 (281) 391-2001")
+        Returns the raw string as Facebook provides it (e.g. "+1 (281) 555-0142")
         without normalisation so the caller can decide how to store it.
         """
         for pattern in _PHONE_PATTERNS:

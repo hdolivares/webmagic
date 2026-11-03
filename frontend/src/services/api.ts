@@ -232,11 +232,9 @@ class ApiClient {
   }
 
   async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
-    const response = await this.client.post('/auth/change-password', null, {
-      params: {
-        current_password: currentPassword,
-        new_password: newPassword,
-      },
+    const response = await this.client.post('/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
     })
     return response.data
   }

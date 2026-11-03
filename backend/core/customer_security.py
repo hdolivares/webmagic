@@ -17,7 +17,8 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import logging
 
-from jose import JWTError, jwt
+import jwt
+from jwt import PyJWTError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -113,7 +114,7 @@ def verify_customer_token(token: str) -> Dict[str, Any]:
         
         return payload
     
-    except JWTError as e:
+    except PyJWTError as e:
         logger.warning(f"JWT verification failed: {e}")
         raise UnauthorizedError("Could not validate credentials")
 
@@ -334,6 +335,6 @@ def verify_refresh_token(token: str) -> Dict[str, Any]:
         
         return payload
     
-    except JWTError as e:
+    except PyJWTError as e:
         logger.warning(f"Refresh token verification failed: {e}")
         raise UnauthorizedError("Invalid refresh token")

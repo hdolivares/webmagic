@@ -32,6 +32,7 @@ import { api } from '@/services/api'
 import { Badge, Button, Card, CardBody, ConfirmModal } from '@/components/ui'
 import type { ConfirmAction } from '@/components/ui'
 import type { ManualGenerationRequest } from '@/types'
+import { SITES_BASE_URL } from '@/config'
 
 // Detect closed/temporarily-closed status from the business record.
 // Falls back to raw_data for records where the model column isn't yet populated.
@@ -347,7 +348,7 @@ export const GeneratedSiteDetailPage = () => {
   })
   const business = site?.business
   const liveUrl = site?.subdomain
-    ? `https://sites.lavish.solutions/${site.subdomain}`
+    ? `${SITES_BASE_URL}/${site.subdomain}`
     : null
 
   const getStatusBadge = (status: string) => {

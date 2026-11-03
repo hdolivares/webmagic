@@ -10,6 +10,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../services/api'
+import { PORTAL_URL, SITES_HOST } from '../../config'
 import './MySitesPage.css'
 
 interface Site {
@@ -146,7 +147,7 @@ const MySitesPage: React.FC = () => {
           <p>You haven't purchased any websites yet.</p>
           <button
             className="btn btn-primary"
-            onClick={() => window.location.href = 'https://web.lavish.solutions'}
+            onClick={() => window.location.href = PORTAL_URL}
           >
             Browse Available Sites
           </button>
@@ -204,7 +205,7 @@ const MySitesPage: React.FC = () => {
                   <polyline points="15 3 21 3 21 9"/>
                   <line x1="10" y1="14" x2="21" y2="3"/>
                 </svg>
-                {site.custom_domain || `sites.lavish.solutions/${site.slug}`}
+                {site.custom_domain || `${SITES_HOST}/${site.slug}`}
               </a>
             </div>
 

@@ -230,7 +230,7 @@ export function DomainSetup({ siteId, onComplete, onCancel }: DomainSetupProps) 
     </div>
   )
 
-  const SERVER_IP = '203.0.113.10'
+  const SERVER_IP = import.meta.env.VITE_SERVER_IP ?? '<your server IP>'
 
   const renderDnsField = (label: string, value: string, copyable = true) => (
     <div className="dns-field">

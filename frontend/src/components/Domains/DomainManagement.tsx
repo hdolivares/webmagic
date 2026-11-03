@@ -9,10 +9,11 @@
  */
 import { useState, useEffect } from 'react'
 import { api } from '@/services/api'
+import { PORTAL_URL } from '@/config'
 import './DomainManagement.css'
 
-// Must match SERVER_IP in backend/services/platform/nginx_provisioning.py
-const SERVER_IP = '203.0.113.10'
+// Must match SERVER_IP in the backend .env
+const SERVER_IP = import.meta.env.VITE_SERVER_IP ?? '<your server IP>'
 
 interface DomainManagementProps {
   siteId: string
@@ -504,12 +505,12 @@ export function DomainManagement({ siteId, onDisconnected }: DomainManagementPro
           <div className="url-item">
             <div className="url-label">Default URL</div>
             <a
-              href={`https://web.lavish.solutions/${siteId}`}
+              href={`${PORTAL_URL}/${siteId}`}
               target="_blank"
               rel="noopener noreferrer"
               className="url-link secondary"
             >
-              https://web.lavish.solutions/{siteId.substring(0, 8)}…
+              {PORTAL_URL}/{siteId.substring(0, 8)}…
               <svg className="external-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>

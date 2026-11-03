@@ -11,6 +11,7 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from core.config import get_settings
 from models.business import Business
 from models.site import GeneratedSite
 from services.shortener.short_link_service_v2 import ShortLinkServiceV2
@@ -22,7 +23,7 @@ SITE_STATUS_GENERATING = "generating"
 SITE_STATUS_COMPLETED = "completed"
 SITE_STATUS_FAILED = "failed"
 LINK_TYPE_SITE_PREVIEW = "site_preview"
-SITE_BASE_URL = "https://sites.lavish.solutions"
+SITE_BASE_URL = get_settings().SITES_BASE_URL.rstrip("/")
 
 
 def build_site_subdomain(business_name: str, city: str, business_id: str) -> str:

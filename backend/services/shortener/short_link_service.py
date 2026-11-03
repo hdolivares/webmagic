@@ -31,7 +31,7 @@ class ShortLinkService:
 
         short_url = await ShortLinkService.create_short_link(
             db,
-            destination_url="https://sites.lavish.solutions/my-business-123",
+            destination_url="https://sites.example.com/my-business-123",
             link_type="site_preview",
             site_id=some_uuid,
         )

@@ -166,14 +166,14 @@ class ContentAnalyzer:
         Extract phone numbers from tel: href links and data-* attributes.
 
         Many small-business sites render click-to-call buttons as:
-            <a href="tel:+12063600078">Call Us</a>
+            <a href="tel:+12065550178">Call Us</a>
         or store the number in a data attribute:
-            <div data-phone="(206) 360-0078">
+            <div data-phone="(206) 555-0178">
         These never appear in document.body.innerText, causing our regex
         extraction to miss them entirely.
 
         We also check aria-label attributes for patterns like
-        'aria-label="Call (206) 360-0078"'.
+        'aria-label="Call (206) 555-0178"'.
         """
         try:
             raw_numbers: List[str] = await page.evaluate("""
@@ -215,7 +215,7 @@ class ContentAnalyzer:
         for raw in raw_numbers:
             cleaned = re.sub(r'[^\d+\-.()\s]', '', raw).strip()
             if cleaned:
-                # A bare digits-only string from tel: (e.g. "+12063600078") — keep as-is
+                # A bare digits-only string from tel: (e.g. "+12065550178") — keep as-is
                 # if it matches a phone length, otherwise run patterns
                 if re.fullmatch(r'\+?1?\d{10}', cleaned.replace('-', '').replace(' ', '').replace('.', '').replace('(', '').replace(')', '')):
                     found.append(cleaned)

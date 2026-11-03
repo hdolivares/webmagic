@@ -17,6 +17,7 @@ from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
 from models.site_models import CustomerUser, Site, CustomerSiteOwnership
+from core.config import get_settings
 from core.exceptions import NotFoundError, ValidationError, ForbiddenError
 
 logger = logging.getLogger(__name__)
@@ -285,7 +286,7 @@ class CustomerSiteService:
                 site_data.update({
                     "slug": site.slug,
                     "site_title": site.site_title,
-                    "site_url": f"https://sites.lavish.solutions/{site.slug}",  # TODO: Use site_service
+                    "site_url": f"{get_settings().SITES_BASE_URL}/{site.slug}",  # TODO: Use site_service
                     "status": site.status,
                     "subscription_status": site.subscription_status,
                     "purchased_at": site.purchased_at.isoformat() if site.purchased_at else None,

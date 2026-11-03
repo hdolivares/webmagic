@@ -32,8 +32,15 @@ from core.exceptions import (
     ForbiddenError
 )
 from services.platform.nginx_provisioning import NginxProvisioningService, SERVER_IP
+from core.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+
+def _verify_cname_target(token: str) -> str:
+    """CNAME target used for dns_cname domain verification (shown to users and checked)."""
+    sites_host = get_settings().SITES_DOMAIN.split(":")[0]
+    return f"verify-{token[:16]}.{sites_host}"
 
 
 class DomainService:
@@ -349,13 +356,13 @@ class DomainService:
             return {
                 "record_type": "CNAME",
                 "host": domain,
-                "value": f"verify-{token[:16]}.sites.lavish.solutions",
+                "value": _verify_cname_target(token),
                 "ttl": 3600,
                 "instructions": (
                     f"Add a CNAME record to your DNS:\n\n"
                     f"Host/Name: {domain}\n"
                     f"Type: CNAME\n"
-                    f"Value: verify-{token[:16]}.sites.lavish.solutions\n"
+                    f"Value: {_verify_cname_target(token)}\n"
                     f"TTL: 3600 (1 hour)\n\n"
                     f"After adding the record, click 'Verify Domain'. "
                     f"DNS propagation can take up to 24 hours."
@@ -537,7 +544,7 @@ class DomainService:
                     "hint": str(exc),
                 }
         else:  # dns_cname
-            expected_cname = f"verify-{token[:16]}.sites.lavish.solutions"
+            expected_cname = _verify_cname_target(token)
             try:
                 answers = resolver.resolve(domain, "CNAME")
                 for rdata in answers:

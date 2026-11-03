@@ -1,7 +1,7 @@
 """
 API endpoints for payments, customers, and subscriptions.
 """
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
@@ -17,13 +17,10 @@ from api.schemas.payment import (
     PaymentListOut,
     CheckoutCreate,
     CheckoutOut,
-    WebhookEvent
 )
 from services.payments.customer_service import CustomerService
 from services.payments.subscription_service import SubscriptionService
 from services.payments.checkout_service import CheckoutService
-from services.payments.webhook_handler import WebhookHandler
-from services.payments.recurrente_client import RecurrenteClient
 from models.user import AdminUser
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -61,48 +58,6 @@ async def get_checkout_status(
     service = CheckoutService(db)
     result = await service.get_checkout_status(checkout_id)
     return result
-
-
-# Webhook endpoint (public, verified by signature)
-
-@router.post("/webhooks/recurrente", status_code=status.HTTP_200_OK)
-async def recurrente_webhook(
-    request: Request,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Receive Recurrente webhook events.
-    Public endpoint - signature verification handled internally.
-    """
-    # Get raw body and signature
-    body = await request.body()
-    signature = request.headers.get("X-Recurrente-Signature", "")
-    
-    # Verify signature
-    recurrente = RecurrenteClient()
-    if not recurrente.verify_webhook_signature(body.decode(), signature):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid webhook signature"
-        )
-    
-    # Parse event
-    import json
-    event_data = json.loads(body)
-    event_type = event_data.get("event")
-    payload = event_data.get("data", {})
-    
-    # Handle webhook
-    handler = WebhookHandler(db)
-    success = await handler.handle_webhook(event_type, payload)
-    
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Webhook handling failed"
-        )
-    
-    return {"status": "success"}
 
 
 # Customer endpoints (admin only)

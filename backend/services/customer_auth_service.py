@@ -7,6 +7,7 @@ and password reset for the customer portal.
 Author: WebMagic Team
 Date: January 21, 2026
 """
+import hashlib
 import secrets
 import logging
 from datetime import datetime, timedelta
@@ -56,6 +57,11 @@ class CustomerAuthService:
         """
         return pwd_context.verify(plain_password, hashed_password)
     
+    @staticmethod
+    def hash_token(token: str) -> str:
+        """Return the SHA-256 hex digest used to store single-use tokens."""
+        return hashlib.sha256(token.encode()).hexdigest()
+
     @staticmethod
     def generate_token(length: int = 32) -> str:
         """
@@ -253,16 +259,16 @@ class CustomerAuthService:
     async def request_password_reset(
         db: AsyncSession,
         email: str
-    ) -> CustomerUser:
+    ) -> Tuple[CustomerUser, str]:
         """
         Request a password reset (generates token).
-        
+
         Args:
             db: Database session
             email: Customer email
-        
+
         Returns:
-            CustomerUser instance with reset token
+            Tuple of (CustomerUser, raw reset token to email to the user)
         
         Raises:
             NotFoundError: If user doesn't exist
@@ -277,15 +283,17 @@ class CustomerAuthService:
             logger.warning(f"Password reset requested for non-existent email: {email}")
             raise NotFoundError("If the email exists, a reset link will be sent")
         
-        # Generate reset token (expires in 1 hour)
-        user.password_reset_token = CustomerAuthService.generate_token()
+        # Generate reset token (expires in 1 hour). Only its hash is stored,
+        # so a database leak doesn't hand out working reset links.
+        raw_token = CustomerAuthService.generate_token()
+        user.password_reset_token = CustomerAuthService.hash_token(raw_token)
         user.password_reset_expires = datetime.utcnow() + timedelta(hours=1)
         
         await db.commit()
         await db.refresh(user)
         
         logger.info(f"Password reset requested for: {email}")
-        return user
+        return user, raw_token
     
     @staticmethod
     async def reset_password(
@@ -310,7 +318,7 @@ class CustomerAuthService:
         """
         result = await db.execute(
             select(CustomerUser).where(
-                CustomerUser.password_reset_token == token
+                CustomerUser.password_reset_token == CustomerAuthService.hash_token(token)
             )
         )
         user = result.scalar_one_or_none()

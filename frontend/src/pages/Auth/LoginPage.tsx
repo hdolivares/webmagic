@@ -82,7 +82,7 @@ export const LoginPage = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input"
-              placeholder="admin@webmagic.com"
+              placeholder="you@example.com"
               required
             />
           </div>

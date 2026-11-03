@@ -57,48 +57,18 @@ async def recurrente_webhook(
     - subscription.cancelled - Subscription cancelled
     - subscription.payment_failed - Recurring payment failed
     
-    Security: Verifies webhook signature using HMAC-SHA256.
+    Security: Verifies the Svix HMAC-SHA256 signature; unsigned requests are rejected.
     """
     # Get raw body for signature verification
     raw_body = await request.body()
     body_str = raw_body.decode('utf-8')
     
-    # Enhanced debugging - log everything
-    logger.info("=" * 80)
-    logger.info("WEBHOOK RECEIVED FROM RECURRENTE")
-    logger.info(f"All headers: {dict(request.headers)}")
-    logger.info(f"Body length: {len(body_str)} bytes")
-    logger.info(f"Body preview: {body_str[:500]}")
-    
-    # Get signature from header (try multiple possible header names)
-    signature = (
-        request.headers.get('X-Recurrente-Signature') or 
-        request.headers.get('x-recurrente-signature') or
-        request.headers.get('Recurrente-Signature') or
-        request.headers.get('X-Webhook-Signature') or
-        ''
-    )
-    
-    logger.info(f"Signature found: '{signature}'")
-    logger.info(f"Webhook secret configured: {bool(settings.RECURRENTE_WEBHOOK_SECRET)}")
-    logger.info("=" * 80)
-    
-    # Verify signature (skip if no secret configured or no signature sent)
-    recurrente = RecurrenteClient()
-    
-    if settings.RECURRENTE_WEBHOOK_SECRET and signature:
-        if not recurrente.verify_webhook_signature(body_str, signature):
-            logger.error(f"❌ SIGNATURE MISMATCH! Got: '{signature[:20]}...'")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid signature"
-            )
-        else:
-            logger.info("✅ Webhook signature verified successfully")
-    else:
-        logger.warning("⚠️ Webhook signature verification skipped (no secret or no signature)")
-    
-    
+    if not RecurrenteClient().verify_webhook_signature(body_str, request.headers):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid signature"
+        )
+
     # Parse webhook data
     try:
         webhook_data = json.loads(body_str)
@@ -108,10 +78,6 @@ async def recurrente_webhook(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid JSON"
         )
-    
-    # Log full payload for debugging
-    logger.info(f"📦 Full webhook payload: {json.dumps(webhook_data, indent=2)}")
-    logger.info(f"📦 Webhook keys: {list(webhook_data.keys())}")
     
     # Recurrente uses 'event_type' field (not 'event')
     event_type = webhook_data.get('event_type')

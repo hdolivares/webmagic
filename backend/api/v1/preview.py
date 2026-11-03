@@ -236,8 +236,10 @@ async def view_raw_preview(
     """
     try:
         # Get version
-        version_query = select(SiteVersion).where(
-            SiteVersion.id == version_id
+        version_query = (
+            select(SiteVersion)
+            .join(Site, Site.id == SiteVersion.site_id)
+            .where(SiteVersion.id == version_id, Site.slug == site_slug)
         )
         result = await db.execute(version_query)
         version = result.scalar_one_or_none()

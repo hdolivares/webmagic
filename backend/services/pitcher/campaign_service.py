@@ -246,7 +246,7 @@ class CampaignService:
         Return the short URL for a site.
 
         Always prefers the pre-generated short link (lvsh.cc/…).
-        Falls back to the canonical sites.lavish.solutions URL only for sites
+        Falls back to the canonical SITES_BASE_URL URL only for sites
         that pre-date the shortener migration — this path should never be hit
         in production once all sites are backfilled.
         """
@@ -263,7 +263,7 @@ class CampaignService:
 
         # Safety fallback — builds the long URL from subdomain if short_url is missing
         logger.warning(f"Site {site_id} has no short_url — using long URL fallback")
-        return f"https://sites.lavish.solutions/{site.subdomain}"
+        return f"{settings.SITES_BASE_URL}/{site.subdomain}"
     
     def _select_channel(self, requested_channel: str, business: Business) -> str:
         """

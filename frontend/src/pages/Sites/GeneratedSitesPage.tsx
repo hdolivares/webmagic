@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
 import { Card, CardHeader, CardBody, CardTitle, Badge, Button, ConfirmModal } from '@/components/ui'
 import type { ConfirmAction } from '@/components/ui'
+import { SITES_BASE_URL } from '@/config'
 import { Wand2, Search, ExternalLink, Eye, Calendar, TrendingUp, ChevronDown, ChevronUp, ExternalLink as LinkIcon, Play, AlertCircle, RefreshCw, ShieldCheck, Globe, PhoneOff, ImagePlus, CreditCard, Database, Clock, Zap, HelpCircle, XCircle } from 'lucide-react'
 
 // Statuses that mean the business passed the full triple-check validation (no website found)
@@ -680,7 +681,7 @@ export const GeneratedSitesPage = () => {
                           <span className="truncate">{business.website_url.replace(/^https?:\/\/(www\.)?/, '')}</span>
                         </a>
                         <a
-                          href={`https://sites.lavish.solutions/${site.subdomain}`}
+                          href={`${SITES_BASE_URL}/${site.subdomain}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 hover:underline truncate"
@@ -769,7 +770,7 @@ export const GeneratedSitesPage = () => {
                           variant={isSuperseded ? 'secondary' : 'primary'}
                           size="sm"
                           className="flex-1 flex items-center justify-center gap-1 text-xs"
-                          onClick={() => window.open(site.short_url || `https://sites.lavish.solutions/${site.subdomain}`, '_blank')}
+                          onClick={() => window.open(site.short_url || `${SITES_BASE_URL}/${site.subdomain}`, '_blank')}
                           title="Open our generated site in a new tab"
                         >
                           <ExternalLink className="w-3 h-3" />

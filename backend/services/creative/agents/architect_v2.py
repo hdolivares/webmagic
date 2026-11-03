@@ -952,6 +952,7 @@ h1 {{ margin: 0 0 0.5rem; font-family: var(--font-heading); font-size: 2.5rem; c
         
         # Build the official claim bar HTML
         api_url = get_settings().API_URL
+        frontend_url = get_settings().FRONTEND_URL
         checkout_url = f"{api_url}/api/v1/sites/{slug}/purchase"
         
         claim_bar_html = f'''
@@ -963,7 +964,7 @@ h1 {{ margin: 0 0 0.5rem; font-family: var(--font-heading); font-size: 2.5rem; c
             <div style="all: unset; display: block;">
                 <p style="all: unset; display: block; margin: 0; font-weight: 700; font-size: 15px; color: #ffffff !important; text-shadow: 0 1px 3px rgba(0,0,0,0.4); font-family: system-ui, sans-serif; line-height: 1.4;">Is this your business?</p>
                 <p style="all: unset; display: block; margin: 0; font-size: 13px; color: #e0e7ff !important; text-shadow: 0 1px 2px rgba(0,0,0,0.3); font-family: system-ui, sans-serif; line-height: 1.4;">Claim this website for only <strong style="color: #ffffff !important; font-weight: 700;">$497</strong> · Then just $97/month for hosting, maintenance &amp; updates</p>
-                <a href="https://web.lavish.solutions/how-it-works" target="_blank" rel="noopener noreferrer" style="all: unset; display: inline-block; color: #bfdbfe !important; font-size: 12px; text-decoration: underline; margin-top: 3px; font-family: system-ui, sans-serif; cursor: pointer;">See what&#39;s included →</a>
+                <a href="{frontend_url}/how-it-works" target="_blank" rel="noopener noreferrer" style="all: unset; display: inline-block; color: #bfdbfe !important; font-size: 12px; text-decoration: underline; margin-top: 3px; font-family: system-ui, sans-serif; cursor: pointer;">See what&#39;s included →</a>
             </div>
         </div>
         <button id="webmagic-claim-btn" style="all: unset; display: inline-block; background: #fbbf24; color: #1e3a5f !important; border: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px; font-family: system-ui, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">

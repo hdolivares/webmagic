@@ -71,4 +71,4 @@ api_router.include_router(verification.router)  # Human verification queue
 
 # NOTE: generated_preview.router removed from API router - it has a catch-all /{subdomain}
 # route that was causing 502 errors by matching all /api/v1/* paths.
-# TODO: Register generated_preview separately if needed for sites.lavish.solutions subdomain
+# TODO: Register generated_preview separately if needed for the sites domain (SITES_BASE_URL)

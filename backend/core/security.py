@@ -4,7 +4,8 @@ Security utilities: password hashing, JWT tokens, API key validation.
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from passlib.context import CryptContext
-from jose import jwt, JWTError
+import jwt
+from jwt import PyJWTError
 import secrets
 from .config import get_settings
 
@@ -47,7 +48,7 @@ def create_access_token(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
     
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "type": "admin"})
     
     encoded_jwt = jwt.encode(
         to_encode,
@@ -75,7 +76,7 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
             algorithms=["HS256"]
         )
         return payload
-    except JWTError:
+    except PyJWTError:
         return None
 
 

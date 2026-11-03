@@ -4,11 +4,14 @@ Handles authentication, requests, and error handling.
 
 API Documentation: https://docs.recurrente.com
 """
-from typing import Dict, Any, Optional, List, Literal
+from typing import Dict, Any, Optional, List, Literal, Mapping
 import httpx
 import logging
+import base64
+import binascii
 import hashlib
 import hmac
+import time
 
 from core.config import get_settings
 from core.exceptions import ExternalAPIException
@@ -515,33 +518,56 @@ class RecurrenteClient:
     def verify_webhook_signature(
         self,
         payload: str,
-        signature: str
+        headers: Mapping[str, str],
+        tolerance_seconds: int = 300,
     ) -> bool:
         """
-        Verify webhook signature.
-        
+        Verify a Recurrente webhook signature. Fails closed.
+
+        Recurrente delivers webhooks through Svix: the signed content is
+        ``{svix-id}.{svix-timestamp}.{body}``, HMAC-SHA256'd with the base64
+        secret that follows the ``whsec_`` prefix. The ``svix-signature``
+        header holds one or more space-separated ``v1,<base64 sig>`` entries.
+
         Args:
-            payload: Raw webhook payload (JSON string)
-            signature: Signature from X-Recurrente-Signature header
-            
+            payload: Raw webhook body (JSON string)
+            headers: Request headers (case-insensitive mapping)
+            tolerance_seconds: Max allowed clock skew, to block replays
+
         Returns:
-            True if signature is valid
+            True only if a signature matches
         """
         if not self.webhook_secret:
-            logger.warning("Webhook secret not configured, skipping verification")
-            return True
-        
-        # Compute HMAC signature
-        computed_signature = hmac.new(
-            self.webhook_secret.encode(),
-            payload.encode(),
-            hashlib.sha256
-        ).hexdigest()
-        
-        # Compare signatures
-        is_valid = hmac.compare_digest(computed_signature, signature)
-        
-        if not is_valid:
-            logger.warning(f"Invalid webhook signature: {signature}")
-        
-        return is_valid
+            logger.error("RECURRENTE_WEBHOOK_SECRET is not configured; rejecting webhook")
+            return False
+
+        msg_id = headers.get("svix-id") or headers.get("webhook-id")
+        timestamp = headers.get("svix-timestamp") or headers.get("webhook-timestamp")
+        signature_header = headers.get("svix-signature") or headers.get("webhook-signature")
+        if not (msg_id and timestamp and signature_header):
+            return False
+
+        try:
+            if abs(time.time() - int(timestamp)) > tolerance_seconds:
+                logger.warning("Rejecting webhook with stale timestamp")
+                return False
+            secret = self.webhook_secret
+            if secret.startswith("whsec_"):
+                secret = secret[len("whsec_"):]
+            key = base64.b64decode(secret)
+        except (ValueError, binascii.Error):
+            logger.error("Invalid webhook timestamp or secret format")
+            return False
+
+        signed_content = f"{msg_id}.{timestamp}.{payload}".encode()
+        expected = base64.b64encode(
+            hmac.new(key, signed_content, hashlib.sha256).digest()
+        ).decode()
+
+        for entry in signature_header.split():
+            _, _, candidate = entry.partition(",")
+            if candidate and hmac.compare_digest(candidate, expected):
+                return True
+
+        logger.warning("Invalid webhook signature")
+        return False

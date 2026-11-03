@@ -14,6 +14,7 @@ import logging
 import re
 from typing import Dict, Any, Optional
 from urllib.parse import urlparse
+import ipaddress
 import socket
 
 logger = logging.getLogger(__name__)
@@ -270,6 +271,15 @@ class URLPrescreener:
             logger.warning(f"Error parsing URL for shortener check: {url} - {e}")
             return {"is_valid": True, "reason": None}
     
+    @staticmethod
+    def _resolves_to_internal_address(host: str) -> bool:
+        """True if any address the host resolves to is not publicly routable."""
+        try:
+            infos = socket.getaddrinfo(host, None)
+        except (socket.gaierror, UnicodeError):
+            return False  # Unresolvable hosts fail later in the pipeline
+        return any(not ipaddress.ip_address(info[4][0]).is_global for info in infos)
+
     def _check_ip_or_localhost(self, url: str) -> Dict[str, Any]:
         """Check if URL uses IP address or localhost."""
         try:
@@ -293,6 +303,13 @@ class URLPrescreener:
             except socket.error:
                 # Not an IP address, that's good
                 pass
+
+            # Block hostnames that resolve to private/internal addresses (SSRF)
+            if self._resolves_to_internal_address(host):
+                return {
+                    "is_valid": False,
+                    "reason": "Domain resolves to a private or internal address"
+                }
             
             return {"is_valid": True, "reason": None}
             

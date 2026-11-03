@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_db, get_current_active_user
+from core.config import get_settings
 from api.schemas.domain import (
     DomainConnectRequest,
     DomainConnectResponse,
@@ -158,7 +159,7 @@ async def verify_domain(
     
     **Checks:**
     - TXT record: _webmagic-verify.{domain}
-    - CNAME record: {domain} → verify-{token}.sites.lavish.solutions
+    - CNAME record: {domain} → verify-{token}.<SITES_DOMAIN>
     
     **Returns:**
     - Verification status
@@ -313,7 +314,7 @@ async def disconnect_domain(
     - Remove Nginx configuration (TODO)
     
     **Note:** Site will still be accessible at default URL:
-    `https://sites.lavish.solutions/{slug}`
+    `https://sites.example.com/{slug}`
     """
     try:
         domain_service = get_domain_service()
@@ -338,7 +339,7 @@ async def disconnect_domain(
         response = DomainDisconnectResponse(
             success=True,
             message=f"Domain {domain} has been disconnected successfully.",
-            default_url=f"https://sites.lavish.solutions/site-{str(site_id)[:8]}"
+            default_url=f"{get_settings().SITES_BASE_URL}/site-{str(site_id)[:8]}"
         )
         
         logger.info(

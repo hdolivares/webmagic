@@ -32,6 +32,7 @@ import {
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardBody, Badge, Button } from '@/components/ui'
 import { api } from '@/services/api'
+import { SITES_BASE_URL } from '@/config'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -613,7 +614,7 @@ export default function AdminTicketDetailPage() {
                   <p className="text-text-primary font-medium">{ticket.site_title}</p>
                   {ticket.site_slug && (
                     <a
-                      href={`https://sites.lavish.solutions/${ticket.site_slug}`}
+                      href={`${SITES_BASE_URL}/${ticket.site_slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-primary-600 hover:underline"

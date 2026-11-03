@@ -30,7 +30,7 @@ async def get_current_user(
     
     # Verify token
     payload = verify_token(token)
-    if payload is None:
+    if payload is None or payload.get("type") != "admin":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",

@@ -23,6 +23,8 @@ from api.schemas.subscription import (
 )
 from api.schemas.customer_auth import MessageResponse, ErrorResponse
 from models.site_models import CustomerUser
+from models.user import AdminUser
+from api.deps import get_current_user
 from services.subscription_service import get_subscription_service
 from services.emails.email_service import get_email_service
 
@@ -324,8 +326,8 @@ async def reactivate_subscription(
     description="Get subscription statistics for admin dashboard."
 )
 async def get_subscription_statistics(
-    db: AsyncSession = Depends(get_db)
-    # TODO: Add admin authentication
+    db: AsyncSession = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_user),
 ):
     """
     Get subscription statistics.

@@ -161,7 +161,7 @@ export const ShortenerSettings: React.FC = () => {
               className="shortener-settings__input"
               value={local.domain}
               onChange={e => handleChange('domain', e.target.value.trim())}
-              placeholder="e.g., wm.gt or go.lavish.solutions"
+              placeholder="e.g., go.example.com"
             />
             <p className="shortener-settings__hint">
               The domain that short URLs will use. Must be pointed to your server via DNS/Nginx.

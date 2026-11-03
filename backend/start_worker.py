@@ -10,6 +10,6 @@ if __name__ == "__main__":
         "worker",
         "--loglevel=info",
         "--concurrency=4",
-        "--queues=scraping,generation,campaigns,monitoring",
+        "--queues=celery,scraping,validation,discovery,generation,campaigns,monitoring",
         "--max-tasks-per-child=100",
     ])

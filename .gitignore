@@ -50,3 +50,6 @@ Thumbs.db
 # Celery
 celerybeat-schedule
 celerybeat.pid
+
+# Locally generated sites (SITES_BASE_PATH=./sites)
+backend/sites/

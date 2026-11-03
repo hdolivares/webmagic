@@ -104,7 +104,7 @@ class LeadService:
             >>> business, created = await lead_service.get_or_create_business({
             ...     "name": "LA Plumbing Pros",
             ...     "category": "Plumber",
-            ...     "phone": "(310) 861-9785",
+            ...     "phone": "(310) 555-0123",
             ...     "city": "Los Angeles",
             ...     "state": "CA"
             ... })

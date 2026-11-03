@@ -46,7 +46,7 @@ class SiteService:
         
         Examples:
             >>> service.generate_site_url('la-plumbing-pros')
-            'https://sites.lavish.solutions/la-plumbing-pros'
+            'https://sites.example.com/la-plumbing-pros'
             
             >>> service.generate_site_url('la-plumbing-pros', 'laplumbingpros.com')
             'https://laplumbingpros.com'

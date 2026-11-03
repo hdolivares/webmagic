@@ -5,6 +5,9 @@ Handles incoming callbacks from LabsMobile for:
 - SMS delivery status updates  → GET  /webhooks/labsmobile/status
 - Incoming SMS replies          → POST /webhooks/labsmobile/reply
 
+Every callback must include ``?token=<LABSMOBILE_WEBHOOK_TOKEN>``; LabsMobile
+does not sign requests, so this shared secret is what authenticates them.
+
 LabsMobile callback formats (verified Feb 2026):
 
   Status (GET, query params):
@@ -39,12 +42,17 @@ from services.pitcher.sms_campaign_helper import SMSCampaignHelper
 from services.pitcher.email_sender import EmailSender
 from services.crm import BusinessLifecycleService
 from core.config import get_settings
+from core.webhook_security import verify_labsmobile_token
 
 _settings = get_settings()
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/webhooks/labsmobile", tags=["LabsMobile Webhooks"])
+router = APIRouter(
+    prefix="/webhooks/labsmobile",
+    tags=["LabsMobile Webhooks"],
+    dependencies=[Depends(verify_labsmobile_token)],
+)
 
 # LabsMobile desc → internal campaign status
 # acklevel values: "operator" (intermediate), "handset" (final), "error"
@@ -354,7 +362,7 @@ async def _notify_admin_reply(
         <td style="padding:10px 14px; color:#111827; font-style:italic;">"{message_body}"</td></tr>
   </table>
   <p style="margin:16px 0 0; font-size:13px; color:#6b7280;">
-    View all messages at <a href="https://web.lavish.solutions/messages" style="color:#7c3aed;">web.lavish.solutions/messages</a>
+    View all messages at <a href="{_settings.FRONTEND_URL}/messages" style="color:#7c3aed;">{_settings.FRONTEND_URL}/messages</a>
   </p>
 </div>
 """
@@ -364,7 +372,7 @@ async def _notify_admin_reply(
             + (f"Business: {business_name}\n" if business_name else "")
             + f"Action: {action_label}\n"
             f"Message: {message_body}\n\n"
-            f"View: https://web.lavish.solutions/messages"
+            f"View: {_settings.FRONTEND_URL}/messages"
         )
 
         sender = EmailSender()

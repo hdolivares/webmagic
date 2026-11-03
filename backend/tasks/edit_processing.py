@@ -13,6 +13,7 @@ from typing import Optional
 from datetime import datetime
 
 from celery_app import celery_app
+from core.config import get_settings
 from core.database import AsyncSession, get_async_db
 from services.edit_service import get_edit_service, EditRequestStatus
 from services.creative.agents.editor import get_editor_agent
@@ -223,7 +224,7 @@ async def process_edit_request_async(edit_request_id: UUID):
             # Step 6: Generate preview URL
             # For now, we'll use a special preview route
             # TODO: Implement actual preview system
-            preview_url = f"https://sites.lavish.solutions/{site.slug}/preview/{preview_version.id}"
+            preview_url = f"{get_settings().SITES_BASE_URL}/{site.slug}/preview/{preview_version.id}"
             
             # Step 7: Update edit request with results
             await edit_service.update_status(

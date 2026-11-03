@@ -18,7 +18,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
+from core.config import get_settings
 from core.database import get_db
+from core.rate_limit import rate_limit
 from core.customer_security import (
     create_customer_access_token,
     get_current_customer,
@@ -61,6 +63,7 @@ router = APIRouter(prefix="/customer", tags=["Customer Authentication"])
 
 @router.post(
     "/register",
+    dependencies=[Depends(rate_limit(5, 300))],
     response_model=CustomerLoginResponse,
     status_code=status.HTTP_201_CREATED,
     responses={
@@ -106,7 +109,7 @@ async def register(
         await email_service.send_welcome_email(
             to_email=user.email,
             customer_name=user.full_name or user.email.split('@')[0],
-            verification_token=user.verification_token
+            verification_token=user.email_verification_token
         )
         logger.info(f"Customer registered and welcome email sent: {user.email}")
         
@@ -133,6 +136,7 @@ async def register(
 
 @router.post(
     "/login",
+    dependencies=[Depends(rate_limit(10, 60))],
     response_model=CustomerLoginResponse,
     responses={
         401: {"model": ErrorResponse, "description": "Invalid credentials"}
@@ -291,6 +295,7 @@ async def verify_email(
 
 @router.post(
     "/resend-verification",
+    dependencies=[Depends(rate_limit(5, 300))],
     response_model=MessageResponse,
     responses={
         404: {"model": ErrorResponse, "description": "User not found"},
@@ -319,7 +324,7 @@ async def resend_verification(
         await email_service.send_verification_email(
             to_email=user.email,
             customer_name=user.full_name or user.email.split('@')[0],
-            verification_token=user.verification_token
+            verification_token=user.email_verification_token
         )
         logger.info(f"Verification email resent: {user.email}")
         
@@ -343,6 +348,7 @@ async def resend_verification(
 
 @router.post(
     "/forgot-password",
+    dependencies=[Depends(rate_limit(5, 300))],
     response_model=MessageResponse,
     summary="Request password reset",
     description="Send password reset link to customer's email."
@@ -358,7 +364,7 @@ async def forgot_password(
     Returns success even if email doesn't exist (security best practice).
     """
     try:
-        user = await CustomerAuthService.request_password_reset(
+        user, reset_token = await CustomerAuthService.request_password_reset(
             db=db,
             email=request.email
         )
@@ -368,7 +374,7 @@ async def forgot_password(
         await email_service.send_password_reset_email(
             to_email=user.email,
             customer_name=user.full_name or user.email.split('@')[0],
-            reset_token=user.reset_token
+            reset_token=reset_token
         )
         logger.info(f"Password reset requested and email sent: {user.email}")
     
@@ -387,6 +393,7 @@ async def forgot_password(
 
 @router.post(
     "/reset-password",
+    dependencies=[Depends(rate_limit(5, 300))],
     response_model=MessageResponse,
     responses={
         400: {"model": ErrorResponse, "description": "Invalid or expired token"}
@@ -707,7 +714,7 @@ async def customer_disconnect_domain(
         return DomainDisconnectResponse(
             success=True,
             message=f"Domain {domain} has been disconnected successfully.",
-            default_url=f"https://web.lavish.solutions/{site_id}",
+            default_url=f"{get_settings().FRONTEND_URL}/{site_id}",
         )
     except HTTPException:
         raise
